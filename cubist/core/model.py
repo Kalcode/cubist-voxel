@@ -75,6 +75,17 @@ class BuiltAsset:
                 totals[index] = totals.get(index, 0) + n
         return {self.palette.name_of(i): n for i, n in sorted(totals.items())}
 
+    def merged_grid(self) -> VoxelGrid:
+        """Every part in one world-space grid (later parts win overlaps)."""
+        return VoxelGrid.merge([p.grid for p in self.parts])
+
+    def palette_names(self) -> dict[int, str]:
+        """Names of the color indices this asset uses."""
+        used = set()
+        for part in self.parts:
+            used.update(part.grid.colors_used())
+        return {i: self.palette.name_of(i) for i in sorted(used)}
+
     def to_vox_scene(self):
         from cubist.io.vox import VoxPart, VoxScene
 
@@ -99,6 +110,7 @@ class BuiltAsset:
             "parts": [part_info(p) for p in self.parts],
             "sockets": {k: list(v) for k, v in self.sockets.items()},
             "colors": self.color_counts(),
+            "palette_names": {str(i): n for i, n in self.palette_names().items()},
         }
 
 

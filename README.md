@@ -1,10 +1,11 @@
 # Cubist
 
 Agent-native voxel asset authoring: an agent writes a Python script, Cubist samples it into
-voxels and writes MagicaVoxel `.vox` files. Renders, lint, and glTF export come next.
+voxels, writes MagicaVoxel `.vox` files, and renders a contact sheet to critique. Lint and glTF
+export come next.
 
-Status: milestone 1 of the [design](docs/design.md) (core grid, palette, primitives, CSG,
-mirror, `.vox` read/write).
+Status: milestones 1–2 of the [design](docs/design.md): core grid, palette, primitives, CSG,
+mirror, `.vox` read/write, contact sheets, and ASCII slices.
 
 ## Setup
 
@@ -17,13 +18,19 @@ uv run pytest
 
 ```sh
 uv run cubist build projects/demo/assets/goblin.py   # -> projects/demo/out/goblin_scout/
+uv run cubist render projects/demo/out/goblin_scout --slices y=18..19
+uv run cubist render projects/demo/out/goblin_scout --views front,iso,silhouette
 uv run cubist inspect projects/demo/out/goblin_scout/goblin_scout.vox
 ```
+
+A build writes `<name>.vox`, `contact.png` (front, right, back, top, and iso views with
+voxel-coordinate rulers and a color legend), and `build.json`.
 
 An asset script:
 
 ```python
 from cubist import *
+
 
 @asset(name="potion", size=(8, 12, 8), tags=["prop"])
 def potion(p):
@@ -55,7 +62,8 @@ cubist/
   dsl/     SDF primitives, CSG and transforms
   build/   subprocess runner with timeout
   io/      .vox reader/writer
+  render/  rasterizer, contact sheet, ASCII slices, bitmap font
   cli.py
 projects/demo/   style.toml and five demo asset scripts
-tests/
+tests/           golden/ holds reviewed contact sheets
 ```

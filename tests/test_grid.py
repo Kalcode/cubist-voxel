@@ -66,3 +66,18 @@ def test_data_must_be_3d_uint8():
         VoxelGrid(np.zeros((2, 2), dtype=np.uint8))
     with pytest.raises(ValueError):
         VoxelGrid(np.zeros((2, 2, 2), dtype=np.int32))
+
+
+def test_merge_places_grids_in_world_space_later_ones_win():
+    a = make({(0, 0, 0): 1, (1, 0, 0): 1}, shape=(2, 1, 1))
+    b = make({(0, 0, 0): 2}, origin=(1, 0, 0), shape=(1, 1, 1))
+    c = make({(0, 0, 0): 3}, origin=(5, 2, -1), shape=(1, 1, 1))
+    merged = VoxelGrid.merge([a, b, c])
+    assert merged.get(0, 0, 0) == 1
+    assert merged.get(1, 0, 0) == 2
+    assert merged.get(5, 2, -1) == 3
+    assert merged.count() == 3
+
+
+def test_merge_of_nothing_is_empty():
+    assert VoxelGrid.merge([]).count() == 0

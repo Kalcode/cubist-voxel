@@ -75,6 +75,10 @@ def test_build_writes_vox_and_summary_under_project_out(project):
         "parent": None,
     }
     assert summary["colors"] == {"wood.dark": 64}
+    assert summary["palette_names"] == {"1": "wood.dark"}
+    assert result.contact_path == out / "contact.png"
+    assert summary["outputs"]["contact_sheet"] == str(out / "contact.png")
+    assert result.contact_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
 
 def test_unknown_color_is_a_build_error_with_a_suggestion(project):

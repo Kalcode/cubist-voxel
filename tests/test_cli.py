@@ -56,3 +56,33 @@ def test_inspect_reports_parts_and_colors(tmp_path, capsys):
 def test_inspect_missing_file_exits_nonzero(tmp_path, capsys):
     assert main(["inspect", str(tmp_path / "nope.vox")]) == 1
     assert "nope.vox" in capsys.readouterr().err
+
+
+def test_render_writes_contact_sheet_next_to_the_asset(tmp_path, capsys):
+    script = setup(tmp_path)
+    main(["build", str(script)])
+    asset_dir = tmp_path / "out" / "post"
+    (asset_dir / "contact.png").unlink()
+    capsys.readouterr()
+    assert main(["render", str(asset_dir / "post.vox"), "--views", "front,iso"]) == 0
+    info = json.loads(capsys.readouterr().out)
+    assert info["contact_sheet"] == str(asset_dir / "contact.png")
+    assert (asset_dir / "contact.png").is_file()
+
+
+def test_render_slices_use_palette_names_from_the_build(tmp_path, capsys):
+    script = setup(tmp_path)
+    main(["build", str(script)])
+    capsys.readouterr()
+    assert main(["render", str(tmp_path / "out" / "post"), "--slices", "y=0..1"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("legend: . = empty, a = wood.dark, b = wood.light")
+    assert "y=1  (rows: z, back to front; columns: x)" in out
+
+
+def test_render_bad_view_exits_nonzero(tmp_path, capsys):
+    script = setup(tmp_path)
+    main(["build", str(script)])
+    capsys.readouterr()
+    assert main(["render", str(tmp_path / "out" / "post"), "--views", "sideways"]) == 1
+    assert "sideways" in capsys.readouterr().err

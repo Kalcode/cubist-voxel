@@ -23,6 +23,7 @@ from pathlib import Path
 from cubist.core.model import AssetDef
 from cubist.core.palette import Palette, PaletteError
 from cubist.io.vox import write_vox
+from cubist.render.contact_sheet import contact_sheet
 
 DEFAULT_TIMEOUT_S = 30.0
 
@@ -35,6 +36,7 @@ class BuildError(RuntimeError):
 class BuildResult:
     name: str
     vox_path: Path
+    contact_path: Path
     summary_path: Path
     summary: dict
 
@@ -92,7 +94,9 @@ def build_script(
     if "error" in result:
         raise BuildError(result["error"])
     return [
-        BuildResult(r["name"], Path(r["vox"]), Path(r["summary"]), r["summary_data"])
+        BuildResult(
+            r["name"], Path(r["vox"]), Path(r["contact"]), Path(r["summary"]), r["summary_data"]
+        )
         for r in result["assets"]
     ]
 
@@ -127,13 +131,18 @@ def _build_in_process(script: Path, style: Path, out: Path) -> list[dict]:
         asset_dir.mkdir(parents=True, exist_ok=True)
         vox_path = asset_dir / f"{a.name}.vox"
         write_vox(vox_path, built.to_vox_scene())
-        summary = {**built.summary(), "script": str(script), "outputs": {"vox": str(vox_path)}}
+        contact_path = asset_dir / "contact.png"
+        sheet = contact_sheet(built.merged_grid(), palette, name=a.name, size=a.size)
+        sheet.save(contact_path)
+        outputs = {"vox": str(vox_path), "contact_sheet": str(contact_path)}
+        summary = {**built.summary(), "script": str(script), "outputs": outputs}
         summary_path = asset_dir / "build.json"
         summary_path.write_text(json.dumps(summary, indent=2) + "\n")
         results.append(
             {
                 "name": a.name,
                 "vox": str(vox_path),
+                "contact": str(contact_path),
                 "summary": str(summary_path),
                 "summary_data": summary,
             }

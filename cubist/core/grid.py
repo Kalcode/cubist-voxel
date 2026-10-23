@@ -30,6 +30,24 @@ class VoxelGrid:
         data[local[:, 0], local[:, 1], local[:, 2]] = colors
         return cls(data, tuple(lo))
 
+    @classmethod
+    def merge(cls, grids: list[VoxelGrid]) -> VoxelGrid:
+        """All grids in one, in world space; later grids win where they overlap."""
+        grids = [g.cropped() for g in grids if g.count()]
+        if not grids:
+            return cls(np.zeros((0, 0, 0), dtype=np.uint8))
+        lo = np.min([g.origin for g in grids], axis=0)
+        hi = np.max([np.add(g.origin, g.shape) for g in grids], axis=0)
+        data = np.zeros(tuple(hi - lo), dtype=np.uint8)
+        for g in grids:
+            o = np.subtract(g.origin, lo)
+            target = data[
+                o[0] : o[0] + g.shape[0], o[1] : o[1] + g.shape[1], o[2] : o[2] + g.shape[2]
+            ]
+            filled = g.data != 0
+            target[filled] = g.data[filled]
+        return cls(data, tuple(lo))
+
     @property
     def shape(self) -> Vec3i:
         return self.data.shape  # type: ignore[return-value]

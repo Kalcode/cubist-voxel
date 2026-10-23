@@ -145,6 +145,7 @@ single color (`p.cork`). An unknown name is a build error that suggests close ma
 ```python
 from cubist import *
 
+
 @asset(name="barrel", size=(12, 16, 12), tags=["prop", "wood"])
 def barrel(p):
     # lathe, hollow, band, dither, darken_crevices are planned for M3.
@@ -193,15 +194,38 @@ plausible code into a good asset. One image per build also keeps token cost down
 - Flat per-face shading (top light, sides mid, bottom dark) plus simple ambient occlusion, so
   form reads clearly.
 - Optional extras: a silhouette view (solid black) for shape critique, and a before/after diff
-  sheet for revisions.
+  sheet for revisions. Status: silhouette is available (`--views ...,silhouette`); the diff
+  sheet is deferred to `cubist diff` (M5).
 - Target: under 1 s for a 64³ model on a laptop CPU, no GPU required, so it runs in CI and
-  sandboxes.
+  sandboxes. Measured (M2): about 0.1 s for a 64³ sphere on an M-series laptop.
+
+Renderer decisions (M2):
+
+- Pixel scale: even pixels per voxel so the largest orthographic view is about 256 px, clamped
+  to 2..12. Rulers label world coordinates at voxel boundaries; a faint grid sits behind the
+  model; the declared size is outlined in blue only when the model breaks out of it.
+- Orthographic views use the first voxel hit per pixel, per-corner ambient occlusion
+  interpolated across each face, a depth cue (farthest faces 30% darker), and dark outlines just
+  outside any surface that stands at least 2 voxels in front of what is behind it.
+- The iso view is a 2:1 pixel-art projection (30° camera) from the front-right, showing top,
+  front (+Z), and right (+X) faces. Each face is a pre-rasterized sprite; a z-buffer resolves
+  overlaps. With integer sprite dimensions no pixel center lies on a face edge, so faces tile
+  with no gaps or overlaps (tested exactly).
+- Text uses a built-in 5×7 bitmap font, so sheets are pixel-identical across machines.
+- A color legend under the views maps each color to its palette name and voxel count.
+- Golden images for the demo assets live in `tests/golden/`; regenerate deliberately with
+  `CUBIST_UPDATE_GOLDEN=1 uv run pytest tests/test_golden.py` and review them before committing.
 
 ### ASCII slices
 
 `cubist render --slices y=10..14` prints layers as character grids, one character per palette
 name. Images are good for overall form; ASCII is better when the agent needs to reason
 precisely about a small region such as a face or a hinge.
+
+Orientation matches the contact sheet: y slices read like the TOP view (rows back to front),
+z slices like the FRONT view, x slices like the LEFT view. Letters are assigned from every color
+in the asset, so the same color keeps its letter across calls; the legend lists only the colors
+in the printed layers.
 
 ### Agent workflow
 
@@ -389,8 +413,9 @@ CLAUDE.md
 1. **Core and `.vox` writer** — done. Grid, palette, five primitives, CSG, mirror, `.vox`
    read/write. Done when 5 test scripts produce files that open in MagicaVoxel and Goxel, and
    round-trips are exact. (Round-trips are tested; opening in the editors is a manual check.)
-2. **Renderer.** Contact sheet and ASCII slices. Done when a 64³ model renders in under 1 s and
-   golden-image tests pass.
+2. **Renderer** — done. Contact sheet and ASCII slices. Done when a 64³ model renders in under
+   1 s and golden-image tests pass. `cubist build` writes `contact.png`; `cubist render`
+   re-renders or prints slices.
 3. **Full DSL, lint, style bible.** Remaining primitives and ops, paint ops, all lint checks,
    `style.toml` loading, named palette ramps.
 4. **Parts and glTF.** Parts, pivots, sockets, multi-part `.vox`, GLB export. Done when a
