@@ -1,0 +1,18 @@
+[project]
+name = "demo"
+voxel_size_m = 0.0625        # 1/16 m per voxel
+
+[palette]
+# Named ramps, dark to light. Scripts use p.<ramp>.dark / .mid / .light or p.<ramp>[i].
+wood   = ["#3b2414", "#5e3a1f", "#8a5a32", "#b07d4a"]
+metal  = ["#2a2d34", "#4b505a", "#7d8491", "#c2c8d0"]
+glass  = ["#5f97ab", "#9fd0dc"]
+potion = ["#7a1f3d", "#c23b5a", "#ff7a8a"]
+cap    = ["#8e1f1f", "#c43a2a", "#e8644a"]
+stem   = ["#bfae8a", "#efe6cc"]
+cork   = "#a0784c"
+white  = "#f4f1e8"
+# Tables give shades their own names: p.skin.goblin, p.eye.yellow.
+skin   = { goblin = "#6b8e23", goblin_dark = "#4f6b1a" }
+cloth  = { green = "#3f6b2a", brown = "#6b4a2a" }
+eye    = { yellow = "#ffd23f" }
