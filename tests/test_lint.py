@@ -235,3 +235,43 @@ def test_thin_info_lists_clusters():
         f for f in lint(build(fn, allow_floating=True), style()).findings if f.check == "thin"
     )
     assert [c["voxels"] for c in finding.details["clusters"]] == [36, 4]
+
+
+# --- scale against the style bible's [scale] --------------------------------------------
+
+
+def scaled(**scale):
+    return StyleBible(path=None, name="t", voxel_size_m=0.0625, palette=P, scale=scale)
+
+
+def tall(height, tags):
+    def fn(p):
+        return box((4, height, 2), color=p.wood.mid)
+
+    return build(fn, size=(4, height, 2), tags=tags)
+
+
+def scale_findings(a, style):
+    return [f for f in lint(a, style).findings if f.check == "scale"]
+
+
+def test_tagged_asset_far_from_its_scale_height_warns():
+    # The convention: a [scale] key <tag>_height applies to assets tagged <tag>.
+    style = scaled(door_height=34, table_height=14)
+    [f] = scale_findings(tall(20, ["prop", "wood", "door"]), style)
+    assert f.severity == "warning"
+    assert "door" in f.message and "20 voxels (1.2 m)" in f.message and "34" in f.message
+    assert scale_findings(tall(36, ["prop", "door"]), style) == []  # a frame a bit over is fine
+    assert len(scale_findings(tall(30, ["table"]), style)) == 1  # twice table height
+
+
+def test_building_shorter_than_a_door_warns_as_a_doll_house():
+    style = scaled(door_height=34)
+    [f] = scale_findings(tall(20, ["building", "wood"]), style)
+    assert "door" in f.message and "doll" in f.message
+    assert scale_findings(tall(48, ["building"]), style) == []
+
+
+def test_no_scale_section_or_untagged_assets_are_not_checked():
+    assert scale_findings(tall(20, ["building", "door"]), scaled()) == []
+    assert scale_findings(tall(20, ["prop"]), scaled(door_height=34)) == []

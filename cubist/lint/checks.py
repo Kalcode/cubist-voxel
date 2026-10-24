@@ -248,6 +248,50 @@ def check_grounding(asset: BuiltAsset, merged: VoxelGrid) -> list[Finding]:
     ]
 
 
+SCALE_TOLERANCE = (0.8, 1.25)
+
+
+def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
+    """Heights against the style bible's ``[scale]``: a ``<tag>_height`` key applies to assets
+    tagged ``<tag>`` (within SCALE_TOLERANCE), and a building must be tall enough for a door."""
+    b = asset.visible_grid().bounds()
+    if b is None or not style.scale:
+        return []
+    height = b[1][1] - b[0][1]
+    m = style.voxel_size_m
+    tall = f"{height} voxels ({height * m:.1f} m) tall"
+    out = []
+    lo, hi = SCALE_TOLERANCE
+    for tag in asset.tags:
+        want = style.scale.get(f"{tag}_height")
+        if want and not lo * want <= height <= hi * want:
+            out.append(
+                Finding(
+                    "scale",
+                    "warning",
+                    f"{asset.name} is tagged {tag!r} and is {tall}, but [scale] "
+                    f"{tag}_height is {want:g} ({want * m:.1f} m); aim for "
+                    f"{math.ceil(lo * want)}-{math.floor(hi * want)}, or drop the tag if the "
+                    "comparison doesn't apply (a trapdoor lying flat, a miniature)",
+                    {"tag": tag, "height": height, "want": want},
+                )
+            )
+    door = style.scale.get("door_height")
+    if "building" in asset.tags and door and height < door:
+        out.append(
+            Finding(
+                "scale",
+                "warning",
+                f"{asset.name} is a building {tall}, shorter than a door ([scale] door_height "
+                f"{door:g}, {door * m:.1f} m): it will read as a doll house next to the "
+                "characters. Scale it up, or drop the building tag if people don't walk into "
+                "it (a bridge, a fountain, a model)",
+                {"tag": "building", "height": height, "want": door},
+            )
+        )
+    return out
+
+
 def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     """A grounded asset's light should light the floor around it: its range should reach the
     floor as far out as the light is high (range >= sqrt(2) * height)."""

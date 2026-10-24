@@ -253,6 +253,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Budgets | Voxel, color, part, or post-meshing triangle count over the style bible's limits | Warning |
 | Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
+| Scale | An asset tagged `<tag>` more than 20% under or 25% over `[scale]` `<tag>_height` (`door`, `table`, `humanoid`), or a `building` shorter than `door_height` | Warning |
 | Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
@@ -278,7 +279,7 @@ source = "palette.png"       # optional; also .gif, .gpl, .hex
 wood  = ["#3b2414", "#5e3a1f", "#8a5a32", "#b07d4a"]
 metal = ["#2a2d34", "#4b505a", "#7d8491", "#c2c8d0"]
 
-[scale]
+[scale]                      # lint: assets tagged <tag> against <tag>_height; buildings vs door
 humanoid_height = 24
 door_height = 32
 

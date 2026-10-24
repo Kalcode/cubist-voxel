@@ -14,7 +14,9 @@ build output in `out/` and `export/`. Copy `projects/demo/style.toml` as a start
    an existing palette file: `cubist palette import palette.hex` (also .png, .gif, .gpl), then
    define ramps by source position: `wood = [3, 4, 5, 6]`.
 2. **Scale.** Set `[project] voxel_size_m` (1/16 m is common) and `[scale]` reference heights
-   (`humanoid_height`, `door_height`) so proportions stay consistent across assets.
+   (`humanoid_height`, `door_height`) so proportions stay consistent across assets. Lint holds
+   assets tagged `<tag>` to `<tag>_height` (so tag doors `door`, people `humanoid`) and warns
+   on a `building` shorter than `door_height`.
 3. **Budgets and rules.** `[budgets]` max_colors, max_voxels, max_triangles, max_parts;
    `[rules]` no_pure_black, dither = "allowed" | "forbidden", symmetry_tolerance, and `notes`
    describing the art direction in a sentence or two. Unknown keys are errors, which catches
