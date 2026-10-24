@@ -19,6 +19,14 @@ def test_asset_decorator_records_metadata_and_builds():
     assert built.parts[0].pivot == (2, 0, 2)
 
 
+def test_unset_pivot_defaults_to_the_bottom_center_of_the_part():
+    @asset(name="post", size=(3, 6, 3))
+    def post(p):
+        return Model(parts=[Part("pole", box((1, 5, 2), color=p.wood.dark).at(1, 1, 0))])
+
+    assert post.build(P).parts[0].pivot == (1.5, 1, 1)
+
+
 def test_returning_a_bare_shape_makes_a_single_part_model():
     @asset(name="cube", size=(2, 2, 2))
     def cube(p):
@@ -79,3 +87,10 @@ def test_built_asset_converts_to_vox_scene():
     scene = two.build(P).to_vox_scene()
     assert [part.name for part in scene.parts] == ["a", "b"]
     assert tuple(scene.palette[2]) == (0x8A, 0x5A, 0x32, 255)
+
+
+def test_star_import_exposes_the_whole_dsl():
+    import cubist
+    import cubist.dsl
+
+    assert set(cubist.dsl.__all__) - {"building"} <= set(cubist.__all__)

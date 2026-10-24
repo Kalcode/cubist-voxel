@@ -1,4 +1,5 @@
-"""Named parts: a shape plus a pivot and an optional parent part."""
+"""Named parts: a shape plus a pivot, an optional parent part, and an optional symmetry
+axis that lint checks against the asset's center plane."""
 
 from __future__ import annotations
 
@@ -13,8 +14,9 @@ Vec3 = tuple[float, float, float]
 class Part:
     name: str
     shape: Shape
-    pivot: Vec3 = (0, 0, 0)
+    pivot: Vec3 | None = None  # None: the bottom center of the part's voxels
     parent: str | None = None
+    symmetric: str | None = None
 
     def mirrored(
         self,
@@ -30,7 +32,10 @@ class Part:
             raise ShapeError("mirrored() takes exactly one of about_x, about_y, about_z")
         axis, about = given[0]
         i = "xyz".index(axis)
-        pivot = list(self.pivot)
-        pivot[i] = 2 * about - pivot[i]
-        twin = replace(self, name=name, shape=self.shape.reflect(axis, about), pivot=tuple(pivot))
+        pivot = None
+        if self.pivot is not None:
+            pivot = list(self.pivot)
+            pivot[i] = 2 * about - pivot[i]
+            pivot = tuple(pivot)
+        twin = replace(self, name=name, shape=self.shape.reflect(axis, about), pivot=pivot)
         return self, twin

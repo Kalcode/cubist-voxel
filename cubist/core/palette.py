@@ -7,6 +7,9 @@ A palette entry is one of:
 * a table of named hex colors: ``{"green": "#3f6b2a"}`` -> ``p.cloth.green``;
 * a single hex color: ``p.eye``.
 
+With a palette source file, any of these may give a source color's position instead of a
+hex value, and the file's colors are also reachable as ``p.source[i]``.
+
 Color indices are assigned from 1 in definition order (0 means empty), matching the
 ``.vox`` color index space.
 """
@@ -95,31 +98,99 @@ def _list_shades(n: int) -> dict[str, int]:
 
 
 class Palette:
-    def __init__(self, entries: Mapping[str, Sequence[str] | Mapping[str, str] | str]):
-        self._entries: dict[str, Ramp | Color] = {}
-        self._by_index: list[Color] = []
+    """Named colors. With ``source`` (hex colors from a palette file), entries may also refer
+    to source colors by position, and every source color is reachable as ``p.source[i]``."""
 
-        def add(name: str, hex_value: str) -> Color:
-            if len(self._by_index) >= MAX_COLORS:
-                raise PaletteError(f"palette has more than {MAX_COLORS} colors")
-            color = Color(name, len(self._by_index) + 1, parse_hex(hex_value))
-            self._by_index.append(color)
-            return color
+    def __init__(
+        self,
+        entries: Mapping[str, Sequence[str | int] | Mapping[str, str | int] | str | int],
+        source: Sequence[str] | None = None,
+    ):
+        slots: list[list] = []  # [hex, canonical name]; slot i becomes color index i + 1
+        by_hex: dict[str, int] = {}
+        source_slots: list[int] = []
+        for hx in source or []:
+            parse_hex(hx)
+            key = hx.lower()
+            if key not in by_hex:
+                by_hex[key] = len(slots)
+                slots.append([hx, None])
+            source_slots.append(by_hex[key])
 
+        def slot_for(value: str | int, name: str) -> int:
+            if isinstance(value, bool) or not isinstance(value, (str, int)):
+                raise PaletteError(f"{name}: expected a hex color or a source index, got {value!r}")
+            if isinstance(value, int):
+                if not source:
+                    raise PaletteError(
+                        f"{name} refers to source color {value}, but the palette has no source"
+                    )
+                if not 0 <= value < len(source_slots):
+                    raise PaletteError(
+                        f"{name} refers to source color {value}; the source has "
+                        f"{len(source_slots)} colors (0..{len(source_slots) - 1})"
+                    )
+                slot = source_slots[value]
+            else:
+                parse_hex(value)
+                slot = by_hex.get(value.lower(), len(slots))
+                if slot == len(slots):
+                    slots.append([value, None])
+            if slots[slot][1] is None:
+                slots[slot][1] = name
+            return slot
+
+        layout: dict[str, tuple] = {}
         for ramp_name, value in entries.items():
-            if isinstance(value, str):
-                self._entries[ramp_name] = add(ramp_name, value)
+            if ramp_name == "source":
+                raise PaletteError("'source' is reserved for the palette file's colors")
+            if isinstance(value, (str, int)):
+                layout[ramp_name] = ("single", slot_for(value, ramp_name))
             elif isinstance(value, Mapping):
                 shades = {shade: i for i, shade in enumerate(value)}
-                colors = [add(f"{ramp_name}.{shade}", hx) for shade, hx in value.items()]
-                self._entries[ramp_name] = Ramp(ramp_name, colors, shades)
+                ids = [slot_for(v, f"{ramp_name}.{shade}") for shade, v in value.items()]
+                layout[ramp_name] = ("table", ids, shades)
             else:
                 if not value:
                     raise PaletteError(f"ramp {ramp_name!r} is empty")
                 shades = _list_shades(len(value))
                 names = {i: shade for shade, i in shades.items()}
-                colors = [add(f"{ramp_name}.{names.get(i, i)}", hx) for i, hx in enumerate(value)]
-                self._entries[ramp_name] = Ramp(ramp_name, colors, shades)
+                ids = [slot_for(v, f"{ramp_name}.{names.get(i, i)}") for i, v in enumerate(value)]
+                layout[ramp_name] = ("list", ids, shades)
+        for i, slot in enumerate(source_slots):
+            if slots[slot][1] is None:
+                slots[slot][1] = f"source.{i}"
+        if len(slots) > MAX_COLORS:
+            raise PaletteError(f"palette has {len(slots)} colors; at most {MAX_COLORS} fit")
+
+        self._by_index = [Color(name, i + 1, parse_hex(hx)) for i, (hx, name) in enumerate(slots)]
+        self._entries: dict[str, Ramp | Color] = {}
+        self._ramp_of: dict[int, tuple[list[int], int]] = {}
+        for ramp_name, spec in layout.items():
+            if spec[0] == "single":
+                self._entries[ramp_name] = self._by_index[spec[1]]
+                continue
+            kind, ids, shades = spec
+            colors = [self._by_index[s] for s in ids]
+            self._entries[ramp_name] = Ramp(ramp_name, colors, shades)
+            if kind == "list":
+                order = [c.index for c in colors]
+                for pos, c in enumerate(colors):
+                    self._ramp_of.setdefault(c.index, (order, pos))
+        if source_slots:
+            colors = [self._by_index[s] for s in source_slots]
+            self._entries["source"] = Ramp("source", colors, _list_shades(len(colors)))
+
+    def shift(self, index: int, steps: int) -> int:
+        """The color ``steps`` shades lighter (negative: darker) in the color's list ramp,
+        clamped to the ramp's ends. Colors outside list ramps are returned unchanged."""
+        if index not in self._ramp_of:
+            return index
+        order, pos = self._ramp_of[index]
+        return order[max(0, min(len(order) - 1, pos + steps))]
+
+    def ramp_names(self) -> list[str]:
+        return list(self._entries)
 
     def __getattr__(self, name: str) -> Ramp | Color:
         if name.startswith("_"):

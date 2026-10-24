@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from cubist.core.grid import VoxelGrid
 from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
-from cubist.dsl.shape import Shape
+from cubist.dsl.context import building
+from cubist.dsl.shape import Shape, ShapeError
 
 
 class ModelError(ValueError):
@@ -48,12 +49,26 @@ class Model:
                 name = parents[name]
 
 
+def default_pivot(grid: VoxelGrid) -> Vec3:
+    """The bottom center of a part's voxels: where a part usually hinges or stands."""
+    b = grid.bounds()
+    if b is None:
+        return (0, 0, 0)
+    (x0, y0, z0), (x1, _, z1) = b
+
+    def num(v: float):
+        return int(v) if float(v).is_integer() else v
+
+    return (num((x0 + x1) / 2), y0, num((z0 + z1) / 2))
+
+
 @dataclass
 class BuiltPart:
     name: str
     grid: VoxelGrid
     pivot: Vec3
     parent: str | None
+    symmetric: str | None = None
 
 
 @dataclass
@@ -64,6 +79,11 @@ class BuiltAsset:
     parts: list[BuiltPart]
     palette: Palette
     sockets: dict[str, Vec3] = field(default_factory=dict)
+    grounded: bool = False
+    symmetric: str | None = None
+    allow_floating: bool = False
+    seed: int = 0
+    ops_used: set[str] = field(default_factory=set)
 
     def voxel_count(self) -> int:
         return sum(p.grid.count() for p in self.parts)
@@ -100,47 +120,136 @@ class BuiltAsset:
                 "bounds": [list(b[0]), list(b[1])] if b else None,
                 "pivot": list(p.pivot),
                 "parent": p.parent,
+                "symmetric": p.symmetric,
             }
 
         return {
             "name": self.name,
             "size": list(self.size) if self.size else None,
             "tags": list(self.tags),
+            "seed": self.seed,
+            "grounded": self.grounded,
+            "symmetric": self.symmetric,
+            "allow_floating": self.allow_floating,
             "voxels": self.voxel_count(),
             "parts": [part_info(p) for p in self.parts],
             "sockets": {k: list(v) for k, v in self.sockets.items()},
             "colors": self.color_counts(),
             "palette_names": {str(i): n for i, n in self.palette_names().items()},
+            "ops_used": sorted(self.ops_used),
         }
+
+    @classmethod
+    def from_vox(cls, scene, summary: dict, palette: Palette) -> BuiltAsset:
+        """Rebuild an asset from its .vox file and build.json (empty dict if none) for lint.
+
+        Color indices stay as they are in the file, which may differ from ``palette``."""
+        info = {p["name"]: p for p in summary.get("parts", [])}
+        parts = []
+        for part in scene.parts:
+            meta = info.get(part.name, {})
+            parts.append(
+                BuiltPart(
+                    part.name,
+                    part.grid,
+                    tuple(meta.get("pivot", (0, 0, 0))),
+                    meta.get("parent"),
+                    meta.get("symmetric"),
+                )
+            )
+        size = summary.get("size")
+        return cls(
+            name=summary.get("name", parts[0].name if parts else "asset"),
+            size=tuple(size) if size else None,
+            tags=tuple(summary.get("tags", ())),
+            parts=parts,
+            palette=palette,
+            sockets={k: tuple(v) for k, v in summary.get("sockets", {}).items()},
+            grounded=bool(summary.get("grounded", False)),
+            symmetric=summary.get("symmetric"),
+            allow_floating=bool(summary.get("allow_floating", False)),
+            seed=int(summary.get("seed", 0)),
+            ops_used=set(summary.get("ops_used", ())),
+        )
 
 
 class AssetDef:
     """An asset script function plus its metadata, produced by ``@asset``."""
 
-    def __init__(self, fn: Callable, name: str, size: Vec3 | None, tags: Sequence[str]):
+    def __init__(
+        self,
+        fn: Callable,
+        name: str,
+        size: Vec3 | None,
+        tags: Sequence[str],
+        grounded: bool = False,
+        symmetric: str | None = None,
+        allow_floating: bool = False,
+    ):
+        if symmetric not in (None, "x", "y", "z"):
+            raise ModelError(f"symmetric must be 'x', 'y', 'z' or None, got {symmetric!r}")
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
+        self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
 
-    def build(self, palette: Palette) -> BuiltAsset:
-        result = self.fn(palette)
-        if isinstance(result, Shape):
-            result = Model(parts=[Part(self.name, result)])
-        if not isinstance(result, Model):
-            raise ModelError(
-                f"asset {self.name!r} must return a Model or a Shape, got {type(result).__name__}"
-            )
-        parts = [
-            BuiltPart(p.name, p.shape.voxelize(), tuple(p.pivot), p.parent) for p in result.parts
-        ]
-        return BuiltAsset(self.name, self.size, self.tags, parts, palette, result.sockets)
+    def build(self, palette: Palette, seed: int = 0) -> BuiltAsset:
+        with building(palette, seed) as ctx:
+            result = self.fn(palette)
+            if isinstance(result, Shape):
+                result = Model(parts=[Part(self.name, result, symmetric=self.symmetric)])
+            if not isinstance(result, Model):
+                raise ModelError(
+                    f"asset {self.name!r} must return a Model or a Shape, "
+                    f"got {type(result).__name__}"
+                )
+            parts = []
+            for p in result.parts:
+                if p.symmetric not in (None, "x", "y", "z"):
+                    raise ShapeError(f"part {p.name!r}: symmetric must be 'x', 'y', 'z' or None")
+                grid = p.shape.voxelize()
+                pivot = tuple(p.pivot) if p.pivot is not None else default_pivot(grid)
+                parts.append(BuiltPart(p.name, grid, pivot, p.parent, p.symmetric))
+        return BuiltAsset(
+            self.name,
+            self.size,
+            self.tags,
+            parts,
+            palette,
+            result.sockets,
+            grounded=self.grounded,
+            symmetric=self.symmetric,
+            allow_floating=self.allow_floating,
+            seed=int(seed),
+            ops_used=set(ctx.ops_used),
+        )
 
     def __repr__(self) -> str:
         return f"AssetDef({self.name!r}, size={self.size})"
 
 
-def asset(name: str | None = None, size: Vec3 | None = None, tags: Sequence[str] = ()):
-    """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset."""
+def asset(
+    name: str | None = None,
+    size: Vec3 | None = None,
+    tags: Sequence[str] = (),
+    grounded: bool = False,
+    symmetric: str | None = None,
+    allow_floating: bool = False,
+):
+    """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset.
+
+    ``grounded``: the asset should touch y = 0. ``symmetric``: the whole asset mirrors across
+    the center plane of that axis. ``allow_floating``: pieces may float free of the main body.
+    Lint warns when these don't hold.
+    """
 
     def wrap(fn: Callable) -> AssetDef:
-        return AssetDef(fn, name or fn.__name__, tuple(size) if size else None, tags)
+        return AssetDef(
+            fn,
+            name or fn.__name__,
+            tuple(size) if size else None,
+            tags,
+            grounded=grounded,
+            symmetric=symmetric,
+            allow_floating=allow_floating,
+        )
 
     return wrap

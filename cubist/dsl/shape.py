@@ -1,8 +1,15 @@
-"""The Shape base class: a signed distance field with colors, sampled into a grid on demand.
+"""The Shape base class and every chainable method asset scripts call.
 
-A voxel is filled when its center lies inside the shape or exactly on its surface.
-Closed sampling keeps exact ties symmetric, so a shape mirrored about a plane samples
-to a mirrored set of voxels.
+Shapes come in two stages:
+
+* **SDF shapes** (``is_sdf``): primitives and the CSG, transforms, taper, and displace built
+  on them. They are signed distance fields sampled at voxel centers on demand. A voxel is
+  filled when its center lies inside the shape or exactly on its surface; closed sampling
+  keeps exact ties symmetric, so a shape mirrored about a plane samples to mirrored voxels.
+* **Grid shapes**: anything painted or reshaped on voxels (paint ops, hollow, erode, dilate,
+  generic round and chamfer, heightmaps). CSG, transforms, and mirror still work on them,
+  with the same color rules; ops that need a distance field (smooth_union, taper, displace)
+  must come before painting.
 """
 
 from __future__ import annotations
@@ -27,8 +34,18 @@ class ShapeError(ValueError):
     """A shape cannot be built as written."""
 
 
+def require_sdf(shape: Shape, op: str) -> None:
+    if not shape.is_sdf:
+        raise ShapeError(
+            f"{op} needs an unpainted shape; apply {op} before painting, hollowing, or "
+            "other voxel-level ops"
+        )
+
+
 class Shape:
-    """Base for all shapes. Subclasses implement ``_eval`` and ``bounds``."""
+    """Base for all shapes. SDF subclasses implement ``_eval`` and ``bounds``."""
+
+    is_sdf = True
 
     def _eval(self, p: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Distances (N,) and color indices (N,) for points (N, 3). Color 0 = none."""
@@ -39,6 +56,7 @@ class Shape:
         raise NotImplementedError
 
     def sdf(self, points: np.ndarray) -> np.ndarray:
+        require_sdf(self, "sdf")
         return self._eval(np.asarray(points, dtype=np.float64).reshape(-1, 3))[0]
 
     # --- CSG ---------------------------------------------------------------
@@ -109,6 +127,19 @@ class Shape:
 
         return Mirror(self, axis, self._plane(axis, about))
 
+    def array(self, n: int, step: Vec3) -> Shape:
+        """``n`` copies, each moved ``step`` further than the last."""
+        if n < 1:
+            raise ShapeError(f"array needs n >= 1, got {n}")
+        s = np.asarray(step, dtype=np.float64)
+        return self.union(*(self.at(*(s * k)) for k in range(1, n)))
+
+    def radial(self, n: int, axis: str = "y", about: Vec3 = (0, 0, 0)) -> Shape:
+        """``n`` copies spaced evenly around ``axis`` through ``about``."""
+        if n < 1:
+            raise ShapeError(f"radial needs n >= 1, got {n}")
+        return self.union(*(self.rotate(360.0 * k / n, axis, about) for k in range(1, n)))
+
     def _pivot(self, about: Vec3 | None) -> np.ndarray:
         if about is not None:
             return np.asarray(about, dtype=np.float64)
@@ -120,6 +151,103 @@ class Shape:
 
         i = axis_index(axis)
         return float(self._pivot(None)[i]) if about is None else float(about)
+
+    # --- shape modifiers -----------------------------------------------------
+
+    def taper(self, top: float = 1.0, axis: str = "y") -> Shape:
+        """Scale the cross-section linearly along ``axis``: 1 at the bottom, ``top`` at the top."""
+        from cubist.dsl.ops import Taper
+
+        return Taper(self, top, axis)
+
+    def displace(
+        self,
+        amp: float,
+        scale: float = 4.0,
+        seed: int = 0,
+        noise: str = "perlin",
+        octaves: int = 1,
+    ) -> Shape:
+        """Push the surface in and out by noise of amplitude ``amp`` voxels and feature size
+        ``scale`` voxels. Seeded: same seed, same result."""
+        from cubist.dsl.ops import Displace
+
+        return Displace(self, amp, scale, seed, noise, octaves)
+
+    def round(self, r: float = 1) -> Shape:
+        """Round convex edges and corners with radius ``r`` voxels, never growing the shape.
+
+        ``round(1)`` takes one voxel off every edge; larger radii curve further."""
+        from cubist.dsl.gridops import Opening
+
+        return Opening(self, r)
+
+    def chamfer(self, c: int = 1) -> Shape:
+        """Cut ``c`` voxel layers off every convex edge, at 45 degrees."""
+        from cubist.dsl.gridops import Chamfer
+
+        return Chamfer(self, c)
+
+    def hollow(self, t: float = 1) -> Shape:
+        """Keep only a shell ``t`` voxels thick."""
+        from cubist.dsl.gridops import Hollow
+
+        return Hollow(self, t)
+
+    def erode(self, r: float = 1) -> Shape:
+        """Shrink by ``r`` voxels."""
+        from cubist.dsl.gridops import Erode
+
+        return Erode(self, r)
+
+    def dilate(self, r: float = 1, color=None) -> Shape:
+        """Grow by ``r`` voxels; new voxels take the nearest voxel's color or ``color``."""
+        from cubist.dsl.gridops import Dilate
+
+        return Dilate(self, r, color)
+
+    # --- paint ---------------------------------------------------------------
+
+    def paint(self, color, where=None) -> Shape:
+        """Recolor the selected voxels (all by default). ``where`` is a selection or a shape."""
+        from cubist.dsl.paint import paint
+
+        return paint(self, color, where)
+
+    def paint_faces(self, direction: str, color, depth: int = 1, where=None) -> Shape:
+        """Recolor voxels whose face toward ``direction`` (top, bottom, left, right, front,
+        back) is exposed, ``depth`` voxels deep."""
+        from cubist.dsl.paint import paint_faces
+
+        return paint_faces(self, direction, color, depth, where)
+
+    def gradient(self, axis: str, ramp, where=None, reverse: bool = False) -> Shape:
+        """Color the selection in equal bands along ``axis``, dark to light through ``ramp``."""
+        from cubist.dsl.paint import gradient
+
+        return gradient(self, axis, ramp, where, reverse)
+
+    def dither(self, ramp, seed: int = 0, amount: float = 0.5, where=None) -> Shape:
+        """Nudge a share (``amount``) of voxels one shade up or down ``ramp``. Seeded."""
+        from cubist.dsl.paint import dither
+
+        return dither(self, ramp, seed, amount, where)
+
+    def darken_crevices(self, steps: int = 1, where=None) -> Shape:
+        """Darken surface voxels in concave corners by ``steps`` shades of their list ramp.
+
+        Colors from named tables or single colors have no order and stay unchanged."""
+        from cubist.dsl.paint import darken_crevices
+
+        return darken_crevices(self, steps, where)
+
+    def highlight_edges(self, steps: int = 1, where=None) -> Shape:
+        """Lighten voxels on convex edges by ``steps`` shades of their list ramp.
+
+        Colors from named tables or single colors have no order and stay unchanged."""
+        from cubist.dsl.paint import highlight_edges
+
+        return highlight_edges(self, steps, where)
 
     # --- sampling ------------------------------------------------------------
 

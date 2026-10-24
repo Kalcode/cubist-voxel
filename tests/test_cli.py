@@ -86,3 +86,41 @@ def test_render_bad_view_exits_nonzero(tmp_path, capsys):
     capsys.readouterr()
     assert main(["render", str(tmp_path / "out" / "post"), "--views", "sideways"]) == 1
     assert "sideways" in capsys.readouterr().err
+
+
+def test_build_seed_flag(tmp_path, capsys):
+    script = setup(tmp_path)
+    assert main(["build", str(script), "--seed", "3"]) == 0
+    [summary] = json.loads(capsys.readouterr().out)
+    assert summary["seed"] == 3
+    assert "lint" in summary
+
+
+def test_lint_command_reports_clean_asset(tmp_path, capsys):
+    script = setup(tmp_path)
+    main(["build", str(script)])
+    capsys.readouterr()
+    assert main(["lint", str(tmp_path / "out" / "post")]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["ok"] is True
+
+
+def test_lint_command_exits_2_on_errors(tmp_path, capsys):
+    (tmp_path / "style.toml").write_text(STYLE)
+    bad = tmp_path / "wide.py"
+    bad.write_text(
+        "from cubist import *\n\n@asset(name='wide', size=(1, 1, 1))\n"
+        "def wide(p):\n    return box((2, 1, 1), color=p.wood.dark)\n"
+    )
+    main(["build", str(bad)])
+    capsys.readouterr()
+    assert main(["lint", str(tmp_path / "out" / "wide" / "wide.vox")]) == 2
+    report = json.loads(capsys.readouterr().out)
+    assert report["errors"] == 1
+
+
+def test_style_command_prints_the_parsed_bible(tmp_path, capsys):
+    (tmp_path / "style.toml").write_text(STYLE)
+    assert main(["style", "--style", str(tmp_path / "style.toml")]) == 0
+    d = json.loads(capsys.readouterr().out)
+    assert [c["name"] for c in d["palette"]] == ["wood.dark", "wood.light"]

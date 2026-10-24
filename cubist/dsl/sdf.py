@@ -66,3 +66,39 @@ def smooth_min(a: np.ndarray, b: np.ndarray, k: float) -> np.ndarray:
     """Polynomial smooth minimum; k is the blend radius in voxels."""
     h = np.clip(0.5 + 0.5 * (b - a) / k, 0.0, 1.0)
     return b + (a - b) * h - k * h * (1.0 - h)
+
+
+def torus(radial: np.ndarray, axial: np.ndarray, major: float, minor: float) -> np.ndarray:
+    return np.hypot(radial - major, axial) - minor
+
+
+def segment_chebyshev(p: np.ndarray, a: np.ndarray, b: np.ndarray, r: float) -> np.ndarray:
+    """Distance (max-norm) from the nearest point on segment ab, minus r.
+
+    With r = 0.5 this samples to a 26-connected one-voxel line."""
+    pa, ba = p - a, b - a
+    denom = float(np.dot(ba, ba))
+    t = np.clip(pa @ ba / denom, 0.0, 1.0) if denom > 0 else np.zeros(len(p))
+    return np.max(np.abs(pa - t[:, None] * ba), axis=-1) - r
+
+
+def polygon(q: np.ndarray, verts: np.ndarray) -> np.ndarray:
+    """Signed distance from 2D points (N, 2) to a closed polygon (M, 2), any winding."""
+    d = np.sum((q - verts[0]) ** 2, axis=-1)
+    s = np.ones(len(q))
+    n = len(verts)
+    for i in range(n):
+        vi, vj = verts[i], verts[i - 1]
+        e = vj - vi
+        w = q - vi
+        ee = float(np.dot(e, e))
+        if ee > 0:
+            t = np.clip((w @ e) / ee, 0.0, 1.0)
+            b = w - t[:, None] * e
+            d = np.minimum(d, np.sum(b * b, axis=-1))
+        c1 = q[:, 1] >= vi[1]
+        c2 = q[:, 1] < vj[1]
+        c3 = e[0] * w[:, 1] > e[1] * w[:, 0]
+        flip = (c1 & c2 & c3) | (~c1 & ~c2 & ~c3)
+        s = np.where(flip, -s, s)
+    return s * np.sqrt(d)

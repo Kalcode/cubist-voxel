@@ -71,8 +71,9 @@ def test_build_writes_vox_and_summary_under_project_out(project):
         "name": "crate",
         "voxels": 64,
         "bounds": [[0, 0, 0], [4, 4, 4]],
-        "pivot": [0, 0, 0],
+        "pivot": [2, 0, 2],
         "parent": None,
+        "symmetric": None,
     }
     assert summary["colors"] == {"wood.dark": 64}
     assert summary["palette_names"] == {"1": "wood.dark"}
@@ -152,3 +153,81 @@ def test_builds_are_byte_identical(project):
     first = a.vox_path.read_bytes()
     [b] = build_script(script)
     assert b.vox_path.read_bytes() == first
+
+
+def test_build_writes_lint_report(project):
+    script = write_script(
+        project,
+        "big",
+        """
+        from cubist import *
+
+        @asset(name="big", size=(2, 2, 2))
+        def big(p):
+            return box((3, 2, 2), color=p.wood.dark)
+    """,
+    )
+    [result] = build_script(script)
+    assert result.lint_path.is_file()
+    assert result.summary["lint"]["ok"] is False
+    assert result.summary["lint"]["errors"] == 1
+    assert "ERROR bounds" in result.summary["lint"]["summary"]
+
+
+def test_seed_changes_seeded_ops_only(project):
+    script = write_script(
+        project,
+        "noisy",
+        """
+        from cubist import *
+
+        @asset(name="noisy", size=(8, 8, 8))
+        def noisy(p):
+            return box((8, 8, 8), color=p.wood.mid).dither(p.wood, seed=1)
+    """,
+    )
+    [a] = build_script(script, seed=0)
+    first = a.vox_path.read_bytes()
+    [b] = build_script(script, seed=0)
+    assert b.vox_path.read_bytes() == first
+    [c] = build_script(script, seed=1)
+    assert c.vox_path.read_bytes() != first
+    assert c.summary["seed"] == 1
+
+
+def test_determinism_check_passes_for_seeded_scripts(project):
+    script = write_script(
+        project,
+        "calm",
+        """
+        from cubist import *
+
+        @asset(name="calm", size=(8, 8, 8))
+        def calm(p):
+            return box((8, 8, 8), color=p.wood.mid).dither(p.wood, seed=1)
+    """,
+    )
+    [r] = build_script(script, check_determinism=True)
+    assert "determinism" not in r.summary["lint"]["summary"]
+
+
+def test_determinism_check_catches_unseeded_randomness(project):
+    script = write_script(
+        project,
+        "wild",
+        """
+        import random
+        from cubist import *
+
+        @asset(name="wild", size=(40, 1, 1))
+        def wild(p):
+            return box((1, 1, 1), color=p.wood.mid).at(random.randrange(40), 0, 0)
+    """,
+    )
+    for _ in range(3):  # 1-in-40 chance per try that two random builds agree
+        [r] = build_script(script, check_determinism=True)
+        if "determinism" in r.summary["lint"]["summary"]:
+            break
+    assert r.summary["lint"]["ok"] is False
+    lint_json = json.loads(r.lint_path.read_text())
+    assert lint_json["findings"][0]["check"] == "determinism"

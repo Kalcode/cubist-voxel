@@ -12,7 +12,9 @@ cap    = ["#8e1f1f", "#c43a2a", "#e8644a"]
 stem   = ["#bfae8a", "#efe6cc"]
 cork   = "#a0784c"
 white  = "#f4f1e8"
-# Tables give shades their own names: p.skin.goblin, p.eye.yellow.
-skin   = { goblin = "#6b8e23", goblin_dark = "#4f6b1a" }
-cloth  = { green = "#3f6b2a", brown = "#6b4a2a" }
+skin   = ["#3d5214", "#4f6b1a", "#6b8e23", "#8fb339"]
+tunic  = ["#24401a", "#3f6b2a", "#5a8f3c"]
+# Tables give shades their own names (p.eye.yellow). Ramp ops like darken_crevices only
+# step along list ramps, so table colors stay as they are.
+cloth  = { brown = "#6b4a2a" }
 eye    = { yellow = "#ffd23f" }

@@ -6,16 +6,17 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cubist.build.runner import build_script, load_palette
+from cubist.build.runner import build_script, load_palette, load_project_style
 from cubist.core.model import AssetDef
 from cubist.io.vox import read_vox
+from cubist.lint import lint
 
 DEMO = Path(__file__).parent.parent / "projects" / "demo"
 SCRIPTS = sorted((DEMO / "assets").glob("*.py"))
 
 
-def test_there_are_five_demo_scripts():
-    assert len(SCRIPTS) == 5
+def test_there_are_six_demo_scripts():
+    assert len(SCRIPTS) == 6
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
@@ -40,3 +41,12 @@ def test_demo_fits_its_declared_size(script):
         lo, hi = part.grid.bounds()
         assert min(lo) >= 0, part.name
         assert all(h <= s for h, s in zip(hi, asset.size, strict=True)), (part.name, hi)
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
+def test_demo_lints_without_errors_or_warnings(script):
+    style = load_project_style(DEMO / "style.toml")
+    [asset] = [v for v in runpy.run_path(str(script)).values() if isinstance(v, AssetDef)]
+    report = lint(asset.build(style.palette), style)
+    problems = [f for f in report.findings if f.severity in ("error", "warning")]
+    assert problems == [], report.summary()

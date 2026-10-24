@@ -1,7 +1,7 @@
 from cubist import *
 
 
-@asset(name="potion", size=(8, 12, 8), tags=["prop", "glass"])
+@asset(name="potion", size=(8, 12, 8), tags=["prop", "glass"], grounded=True)
 def potion(p):
     bottle = sphere(3.6, color=p.glass.light).at(4, 3.5, 4)
     # Intersect keeps the left shape's color, so this is the bottle's lower half in red.

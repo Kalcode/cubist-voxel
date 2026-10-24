@@ -84,6 +84,16 @@ class VoxelGrid:
             return 0
         return int(self.data[local])
 
+    def lookup(self, coords: np.ndarray) -> np.ndarray:
+        """Color indices at world coords (N, 3); 0 outside the grid."""
+        local = np.asarray(coords, dtype=np.int64).reshape(-1, 3) - np.array(self.origin)
+        inside = np.all((local >= 0) & (local < np.array(self.data.shape)), axis=1)
+        out = np.zeros(len(local), dtype=np.uint8)
+        if inside.any():
+            li = local[inside]
+            out[inside] = self.data[li[:, 0], li[:, 1], li[:, 2]]
+        return out
+
     def voxels(self) -> tuple[np.ndarray, np.ndarray]:
         """World coords (N, 3) and color indices (N,), sorted by x, then y, then z."""
         filled = np.argwhere(self.data)

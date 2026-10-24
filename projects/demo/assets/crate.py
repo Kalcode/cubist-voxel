@@ -1,7 +1,7 @@
 from cubist import *
 
 
-@asset(name="crate", size=(12, 12, 12), tags=["prop", "wood"])
+@asset(name="crate", size=(12, 12, 12), tags=["prop", "wood"], grounded=True)
 def crate(p):
     panels = box((12, 12, 12), color=p.wood.mid)
     # One-voxel-deep plank seams around the sides.

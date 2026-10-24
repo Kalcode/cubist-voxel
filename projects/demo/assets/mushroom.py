@@ -3,7 +3,7 @@ import math
 from cubist import *
 
 
-@asset(name="mushroom", size=(14, 12, 14), tags=["prop", "nature"])
+@asset(name="mushroom", size=(14, 12, 14), tags=["prop", "nature"], grounded=True)
 def mushroom(p):
     stem = cone(r=3, h=8, r_top=2, color=p.stem.light).at(7, 0, 7)
     dome = ellipsoid((6.5, 4.5, 6.5), color=p.cap.mid).at(7, 7, 7)

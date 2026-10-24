@@ -102,43 +102,77 @@ language agents write most reliably.
 
 ### Primitives
 
-Implemented (M1): `box`, `ellipsoid`/`sphere`, `cylinder`, `cone` (with optional `r_top` for a
-frustum), `capsule`. Each starts at its local origin and is placed with `.at(x, y, z)`: `box` at
-its min corner, `sphere`/`ellipsoid` at the center, `cylinder`/`cone` at the center of the base,
-extending `h` along `axis`; `capsule` takes absolute endpoints.
+Each starts at its local origin and is placed with `.at(x, y, z)`.
 
-Planned (M3): `torus`, `wedge` (ramps, roofs), `line(p0, p1, r)`, `lathe(profile)` (barrels,
-bottles, columns), `extrude(polygon_2d, depth)`, `heightmap(array)`.
+| Primitive | Local origin and parameters |
+| --- | --- |
+| `box(size)` | min corner at the origin |
+| `sphere(r)`, `ellipsoid(radii)` | centered |
+| `cylinder(r, h, axis)`, `cone(r, h, axis, r_top=0)` | base centered on the origin, extending `h` along `axis` |
+| `capsule(p0, p1, r)` | absolute endpoints, round ends |
+| `line(p0, p1, r=0.5)` | absolute endpoints; max-norm distance, so the default samples to a connected one-voxel line (ropes, wires) |
+| `torus(R, r, axis)` | centered, ring around `axis` |
+| `wedge(size, rise="+x")` | like `box`, height 0 at the low end of `rise` (`±x`, `±z`) rising to full height |
+| `lathe(profile, axis)` | `(height, radius)` points, heights increasing, revolved around `axis` (barrels, bottles, columns) |
+| `extrude(polygon, depth, axis="z")` | 2D polygon in the other two axes (`z`: x,y; `y`: x,z; `x`: z,y) pushed `depth` from the origin |
+| `heightmap(heights)` | columns from y = 0 up to `heights[x][z]` |
+
+### Two stages: distance fields, then voxels
+
+Shapes start as signed distance fields. Anything that works on voxels (painting, hollowing,
+morphology, heightmaps) turns a shape into a grid-stage shape. CSG, transforms, and `mirror`
+work in both stages with the same color rules; `smooth_union`, `taper`, and `displace` need a
+distance field and refuse grid-stage input with a message to apply them before painting.
 
 ### Operations
 
 - CSG: `union` (`|`), `subtract` (`-`), `intersect` (`&`), `smooth_union(k)`. Union gives
   overlaps the later shape's color; subtract and intersect keep the left shape's colors.
-- Transforms: `at`/`translate`, `rotate` (any angle, resampled; default pivot is the bounds
-  center), `scale`, `reflect(axis, about)` (reflection only), `mirror(axis, about)` (keeps the
-  shape and adds its reflection, exactly symmetric in form and color). Planned: `array(n, step)`,
-  `radial(n)`.
-- Shape (M3): `hollow(t)`, `taper`, `round(r)`, `chamfer`, `displace(noise, amp, seed)`,
-  `erode`/`dilate`.
-- Paint, on the grid (M3): `paint(color)`, `paint_faces("top")` (grass on top, for example),
-  `gradient(axis, ramp)`, `dither(ramp, seed)`, `darken_crevices()`, `highlight_edges()`.
-- Selections (M3): by region, by color, by exposed face direction, by part. Paint ops accept a
-  selection.
+- Transforms: `at`/`translate`, `rotate` (any angle; default pivot is the bounds center),
+  `scale`, `reflect(axis, about)` (reflection only), `mirror(axis, about)` (keeps the shape and
+  adds its reflection, exactly symmetric in form and color), `array(n, step)`,
+  `radial(n, axis, about)`. Grid-stage shapes are resampled exactly for whole-voxel moves and
+  90° turns, by nearest voxel otherwise; mirroring them needs a plane on the voxel grid.
+- Field modifiers: `taper(top, axis)`, `displace(amp, scale, seed, noise="perlin"|"value",
+  octaves)`.
+- Voxel morphology (exact Euclidean distances between voxel centers): `round(r)` (morphological
+  opening: never grows the shape; `round(1)` takes one voxel off every edge), `chamfer(c)`
+  (removes `c` layers of convex-edge voxels), `hollow(t)` (a shell `t` thick measured in all 26
+  directions, so curved shells stay watertight), `erode(r)`, `dilate(r, color=None)` (new voxels
+  take the nearest voxel's color).
+- Paint: `paint(color, where)`, `paint_faces(direction, color, depth=1)`,
+  `gradient(axis, ramp, reverse=False)`, `dither(ramp, seed, amount=0.5)`,
+  `darken_crevices(steps=1)`, `highlight_edges(steps=1)`. Ramp-stepping ops move along list
+  ramps; table and single colors have no order and stay unchanged. A crevice is a surface voxel
+  with solid material beside its open face one and two layers out (a floor meeting a wall), so
+  bevel steps don't darken; an edge is a voxel exposed on two different axes.
+- Selections for `where=`: `band(axis, at, height)`, `region(lo, hi)`, `colored(*colors)`,
+  `faces(direction)`, `surface()`, `inside(shape)`, or any shape directly; combine with `&`,
+  `|`, `-`, `~`. Selecting by part is done by painting that part's shape.
+
+### Seeds
+
+Seeded ops (`displace`, `dither`) mix their own seed with the build seed (`cubist build
+--seed N`, default 0) through a pinned integer hash, so one flag reshuffles every seeded op and
+the same script and seed always give the same voxels on any platform.
 
 ### Parts, pivots, sockets
 
-A `Model` holds named `Part`s. Each part has a shape, a pivot, an optional parent, and is
-exported as its own `.vox` model and glTF node. Sockets are named attachment points (`hand_r`,
-`muzzle`, `door_hinge`). `Part.mirrored("arm_r", about_x=…)` returns the part and a reflected
-twin; `Model` flattens such pairs. An `@asset` function may return a bare `Shape`, which becomes
-a single part named after the asset.
+A `Model` holds named `Part`s. Each part has a shape, a pivot (default: the bottom center of its
+voxels), an optional parent, an optional `symmetric` axis, and is exported as its own `.vox`
+model and glTF node. Sockets are named attachment points (`hand_r`, `muzzle`, `door_hinge`).
+`Part.mirrored("arm_r", about_x=…)` returns the part and a reflected twin; `Model` flattens such
+pairs. An `@asset` function may return a bare `Shape`, which becomes a single part named after
+the asset. `@asset` also takes `grounded`, `symmetric`, and `allow_floating` for lint.
 
 ### Palette
 
 Scripts reference colors by name, never by index. A palette entry in `style.toml` is a list
 (a ramp, dark to light: shades `dark` = first, `mid` = middle, `light` = last, any position as
-`p.wood[i]`), a table of named shades (`skin = { goblin = "#6b8e23" }` → `p.skin.goblin`), or a
-single color (`p.cork`). An unknown name is a build error that suggests close matches.
+`p.wood[i]`), a table of named shades (`cloth = { brown = "#6b4a2a" }` → `p.cloth.brown`), or a
+single color (`p.cork`). With `source = "palette.png"` (also `.gif`, `.gpl`, `.hex`), entries
+may give source positions instead of hex (`warm = [1, 2, 3]`) and every source color is
+`p.source[i]`. An unknown name is a build error that suggests close matches.
 
 ### Examples
 
@@ -146,10 +180,9 @@ single color (`p.cork`). An unknown name is a build error that suggests close ma
 from cubist import *
 
 
-@asset(name="barrel", size=(12, 16, 12), tags=["prop", "wood"])
+@asset(name="barrel", size=(12, 16, 12), tags=["prop", "wood"], grounded=True)
 def barrel(p):
-    # lathe, hollow, band, dither, darken_crevices are planned for M3.
-    body = lathe(profile=[(0, 5), (3, 6), (13, 6), (16, 5)], axis="y", color=p.wood.mid)
+    body = lathe(profile=[(0, 5), (3, 6), (13, 6), (16, 5)], color=p.wood.mid).at(6, 0, 6)
     body = body.hollow(1).union(cylinder(r=5, h=1, color=p.wood.dark).at(6, 15, 6))
     for y in (2, 13):
         body = body.paint(p.metal.dark, where=band(axis="y", at=y, height=1))
@@ -158,28 +191,28 @@ def barrel(p):
 ```
 
 ```python
-@asset(name="goblin_scout", size=(16, 24, 12), tags=["character"])
+@asset(name="goblin_scout", size=(16, 24, 12), tags=["character"], grounded=True)
 def goblin(p):
-    torso = box((6, 7, 4), color=p.cloth.green).at(5, 9, 4)
-    head = box((8, 6, 6), color=p.skin.goblin).at(4, 16, 3)
+    torso = box((6, 7, 4), color=p.tunic.mid).at(5, 9, 4).taper(top=0.7).highlight_edges()
+    head = box((8, 6, 6), color=p.skin.mid).at(4, 16, 3).round(1)
     eye = box((2, 1, 1), color=p.eye.yellow).at(5, 18, 8)
-    head = head.union(eye).mirror("x", about=8)
-    arm = capsule((0, 0, 0), (0, -6, 0), r=1, color=p.skin.goblin).at(4, 15, 6)
+    head = head.union(eye).mirror("x", about=8).darken_crevices()
+    arm = capsule((0, 0, 0), (0, -6, 0), r=1, color=p.skin.mid).at(4, 15, 6)
     return Model(
         parts=[
-            Part("torso", torso, pivot=(8, 9, 6)),
-            Part("head", head, parent="torso", pivot=(8, 16, 6)),
+            Part("torso", torso, pivot=(8, 9, 6), symmetric="x"),
+            Part("head", head, parent="torso", pivot=(8, 16, 6), symmetric="x"),
             Part("arm_l", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_r", about_x=8),
         ],
         sockets={"hand_r": (12, 8, 6)},
     )
 ```
 
-The full working version is `projects/demo/assets/goblin.py`.
+Both run as written; the full versions are in `projects/demo/assets/`.
 
 **Rules for scripts:** no file or network access, no randomness except through the provided
-`seed`, and a build timeout (default 30 s). Status: the timeout is enforced; the file/network
-restriction is not yet.
+`seed`, and a build timeout (default 30 s). Status: the timeout is enforced and
+`--check-determinism` catches unseeded randomness; the file/network restriction is not yet.
 
 ## Renderer and feedback loop
 
@@ -247,6 +280,14 @@ a less biased verdict.
 The linter catches the mistakes renders hide, and errors block export. It writes `lint.json`
 plus a short human-readable summary that the CLI and MCP tools return with every build.
 
+Implementation notes (M3): connectivity is 6-neighbor; symmetry compares form and color across
+the asset's center plane (`size / 2`, or the bounds center without a size), for the whole asset
+(`@asset(symmetric=...)`) or single parts (`Part(symmetric=...)`), against
+`[rules] symmetry_tolerance`; triangles are counted from the greedy mesh; hidden voxels are those
+with no face open to air connected to the outside, so enclosed cavities count as hidden; the
+palette check also enforces `[rules] no_pure_black` and `dither = "forbidden"`. Determinism runs
+only with `cubist build --check-determinism`. `cubist lint` exits 2 when there are errors.
+
 | Check | What it catches | Severity |
 | --- | --- | --- |
 | Palette | Colors not in the project palette | Error |
@@ -273,7 +314,7 @@ name = "goblin-dungeon"
 voxel_size_m = 0.0625        # 1/16 m per voxel
 
 [palette]
-source = "palette.png"       # planned (M3); also .gpl, .hex
+source = "palette.png"       # optional; also .gif, .gpl, .hex
 # Named ramps, dark to light. Scripts use p.<ramp>.<shade>.
 wood  = ["#3b2414", "#5e3a1f", "#8a5a32", "#b07d4a"]
 metal = ["#2a2d34", "#4b505a", "#7d8491", "#c2c8d0"]
@@ -289,9 +330,14 @@ max_triangles = 6000
 
 [rules]
 no_pure_black = true
-dither = "allowed"
+dither = "allowed"           # or "forbidden"
+symmetry_tolerance = 0       # voxels allowed to differ from the mirror
 notes = "Chunky silhouettes, oversized heads and hands, light comes from top-left."
 ```
+
+Every section is optional; unknown sections and keys are errors with a suggestion, so a typo
+never silently disables a budget. `[budgets]` also takes `max_parts`. `cubist style` prints the
+parsed bible with every palette name.
 
 ### Example library
 
@@ -318,9 +364,10 @@ image content so the agent sees them without opening files.
 | Command | Does |
 | --- | --- |
 | `cubist new <name> --category prop` | Scaffold a brief and script stub |
-| `cubist build <script>` | Build → `.vox`, contact sheet, `lint.json` in `out/<name>/` |
+| `cubist build <script> [--seed N] [--check-determinism]` | Build → `.vox`, contact sheet, `lint.json` in `out/<name>/` |
 | `cubist render <asset> --views front,side,iso --slices y=10..14` | Re-render or print ASCII slices |
-| `cubist lint <asset>` | Lint only |
+| `cubist lint <asset>` | Lint only (exit 2 on errors) |
+| `cubist style` | Parsed `style.toml` with palette names |
 | `cubist export <asset> --vox --glb` | Export (blocked by lint errors unless `--force`) |
 | `cubist inspect <asset>` | Bounds, parts, pivots, voxel counts, color histogram as JSON |
 | `cubist diff <a> <b>` | Before/after contact sheet |
@@ -383,7 +430,8 @@ to an approved, exported asset without human help.
 
 ### Stack
 
-Python 3.11+, `numpy`, `Pillow`, `pygltflib` (or `trimesh`) for glTF, the official MCP Python
+Python 3.11+, `numpy`, `scipy` (`ndimage`: exact distance transforms and connected components
+for morphology and lint), `Pillow`, `pygltflib` (or `trimesh`) for glTF, the official MCP Python
 SDK, `pytest`, `ruff`, `uv`. Optional: `vengi-voxconvert` on PATH. Before adding any
 third-party `.vox` library, check its license; a native writer is small enough to own.
 
@@ -391,12 +439,13 @@ third-party `.vox` library, check its license; a native writer is small enough t
 
 ```text
 cubist/
-  core/      grid.py  palette.py  part.py  model.py
-  dsl/       sdf.py  shape.py  ops.py  primitives.py  (paint.py  select.py)
+  core/      grid.py  palette.py  part.py  model.py  style.py
+  dsl/       sdf.py  shape.py  ops.py  primitives.py  gridops.py  paint.py  select.py
+             noise.py  context.py
   build/     runner.py
-  render/    raster.py  contact_sheet.py  ascii.py
-  lint/      checks.py  report.py
-  io/        vox.py  gltf.py  vengi.py
+  render/    raster.py  contact_sheet.py  ascii.py  font.py
+  lint/      __init__.py (report)  checks.py
+  io/        vox.py  mesh.py  gltf.py  vengi.py
   cli.py
   mcp_server.py
 projects/
@@ -416,8 +465,9 @@ CLAUDE.md
 2. **Renderer** — done. Contact sheet and ASCII slices. Done when a 64³ model renders in under
    1 s and golden-image tests pass. `cubist build` writes `contact.png`; `cubist render`
    re-renders or prints slices.
-3. **Full DSL, lint, style bible.** Remaining primitives and ops, paint ops, all lint checks,
-   `style.toml` loading, named palette ramps.
+3. **Full DSL, lint, style bible** — done. Remaining primitives and ops, paint ops, all lint
+   checks, `style.toml` loading, named palette ramps. The design doc's barrel example builds as
+   written; every demo asset lints with no errors or warnings.
 4. **Parts and glTF.** Parts, pivots, sockets, multi-part `.vox`, GLB export. Done when a
    multi-part GLB imports into Godot 4 with the right hierarchy and scale.
 5. **Agent integration.** CLI polish, MCP server, `CLAUDE.md` workflow, example library with 10

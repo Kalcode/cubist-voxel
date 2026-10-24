@@ -3,7 +3,12 @@
 * ``box``: min corner at the origin.
 * ``sphere`` / ``ellipsoid``: centered on the origin.
 * ``cylinder`` / ``cone``: base centered on the origin, extending ``h`` along ``axis``.
-* ``capsule``: between two absolute points.
+* ``capsule`` / ``line``: between two absolute points.
+* ``torus``: centered on the origin, ring around ``axis``.
+* ``wedge``: like ``box``, sloping up along ``rise``.
+* ``lathe``: a profile of (height, radius) points revolved around ``axis`` at the origin.
+* ``extrude``: a 2D polygon pushed ``depth`` voxels along ``axis`` from the origin.
+* ``heightmap``: columns rising from y = 0, one per array cell.
 """
 
 from __future__ import annotations
@@ -16,7 +21,7 @@ from cubist.dsl.ops import axis_index
 from cubist.dsl.shape import Shape, ShapeError, Vec3
 
 
-def _index(color: Color | None) -> int:
+def color_index(color: Color | None) -> int:
     if color is None:
         return 0
     if not isinstance(color, Color):
@@ -32,7 +37,7 @@ def _positive(name: str, *values: float) -> None:
 class Primitive(Shape):
     def __init__(self, color: Color | None):
         self.color = color
-        self._c = _index(color)
+        self._c = color_index(color)
 
     def _eval(self, p):
         d = self._distance(p)
@@ -156,3 +161,144 @@ def cone(
 
 def capsule(p0: Vec3, p1: Vec3, r: float, color: Color | None = None) -> Shape:
     return Capsule(p0, p1, r, color)
+
+
+class Torus(Primitive):
+    def __init__(self, major: float, minor: float, axis: str, color: Color | None):
+        super().__init__(color)
+        _positive("torus R and r", major, minor)
+        self.major, self.minor, self.axis = float(major), float(minor), axis_index(axis)
+
+    def _distance(self, p):
+        others = [i for i in range(3) if i != self.axis]
+        radial = np.hypot(p[:, others[0]], p[:, others[1]])
+        return sdf.torus(radial, p[:, self.axis], self.major, self.minor)
+
+    def bounds(self):
+        reach = self.major + self.minor
+        lo, hi = np.full(3, -reach), np.full(3, reach)
+        lo[self.axis], hi[self.axis] = -self.minor, self.minor
+        return lo, hi
+
+
+_RISES = {"+x": (0, 1), "-x": (0, -1), "+z": (2, 1), "-z": (2, -1)}
+
+
+class Wedge(Box):
+    """A box cut diagonally: height 0 at the low end of ``rise``, full height at the high end."""
+
+    def __init__(self, size: Vec3, rise: str, color: Color | None):
+        super().__init__(size, color)
+        if rise not in _RISES:
+            raise ShapeError(f"wedge rise must be one of {', '.join(_RISES)}, got {rise!r}")
+        self.rise = rise
+
+    def _distance(self, p):
+        axis, sign = _RISES[self.rise]
+        run, height = self.size[axis], self.size[1]
+        along = p[:, axis] if sign > 0 else run - p[:, axis]
+        # Inside the slope when y * run <= along * height.
+        plane = (p[:, 1] * run - along * height) / np.hypot(run, height)
+        return np.maximum(super()._distance(p), plane)
+
+
+class Line(Primitive):
+    def __init__(self, p0: Vec3, p1: Vec3, r: float, color: Color | None):
+        super().__init__(color)
+        _positive("line r", r)
+        self.p0 = np.asarray(p0, dtype=np.float64)
+        self.p1 = np.asarray(p1, dtype=np.float64)
+        self.r = float(r)
+
+    def _distance(self, p):
+        return sdf.segment_chebyshev(p, self.p0, self.p1, self.r)
+
+    def bounds(self):
+        return np.minimum(self.p0, self.p1) - self.r, np.maximum(self.p0, self.p1) + self.r
+
+
+class Lathe(Primitive):
+    def __init__(self, profile, axis: str, color: Color | None):
+        super().__init__(color)
+        pts = np.asarray(profile, dtype=np.float64)
+        if pts.ndim != 2 or pts.shape[1] != 2 or len(pts) < 2:
+            raise ShapeError("lathe profile needs at least two (height, radius) points")
+        if np.any(np.diff(pts[:, 0]) < 0) or pts[-1, 0] <= pts[0, 0]:
+            raise ShapeError("lathe profile heights must increase from first to last point")
+        if np.any(pts[:, 1] < 0):
+            raise ShapeError("lathe profile radii must be >= 0")
+        self.axis = axis_index(axis)
+        h0, h1 = pts[0, 0], pts[-1, 0]
+        # Closed outline in the (radius, height) half-plane, along the axis and back.
+        outline = [(0.0, h0)] + [(r, h) for h, r in pts] + [(0.0, h1)]
+        self.outline = np.array(outline)
+        self.h0, self.h1, self.rmax = h0, h1, float(pts[:, 1].max())
+
+    def _distance(self, p):
+        others = [i for i in range(3) if i != self.axis]
+        radial = np.hypot(p[:, others[0]], p[:, others[1]])
+        return sdf.polygon(np.stack([radial, p[:, self.axis]], -1), self.outline)
+
+    def bounds(self):
+        lo, hi = np.full(3, -self.rmax), np.full(3, self.rmax)
+        lo[self.axis], hi[self.axis] = self.h0, self.h1
+        return lo, hi
+
+
+# extrusion axis -> (polygon u axis, polygon v axis)
+_EXTRUDE_PLANES = {"z": (0, 1), "y": (0, 2), "x": (2, 1)}
+
+
+class Extrude(Primitive):
+    def __init__(self, polygon, depth: float, axis: str, color: Color | None):
+        super().__init__(color)
+        verts = np.asarray(polygon, dtype=np.float64)
+        if verts.ndim != 2 or verts.shape[1] != 2 or len(verts) < 3:
+            raise ShapeError("extrude needs a polygon of at least three (u, v) points")
+        _positive("extrude depth", depth)
+        if axis not in _EXTRUDE_PLANES:
+            raise ShapeError(f"extrude axis must be x, y or z, got {axis!r}")
+        self.verts, self.depth = verts, float(depth)
+        self.axis = axis_index(axis)
+        self.u, self.v = _EXTRUDE_PLANES[axis]
+
+    def _distance(self, p):
+        d2 = sdf.polygon(np.stack([p[:, self.u], p[:, self.v]], -1), self.verts)
+        dz = np.abs(p[:, self.axis] - self.depth / 2.0) - self.depth / 2.0
+        outside = np.hypot(np.maximum(d2, 0.0), np.maximum(dz, 0.0))
+        return outside + np.minimum(np.maximum(d2, dz), 0.0)
+
+    def bounds(self):
+        lo, hi = np.zeros(3), np.zeros(3)
+        lo[self.u], hi[self.u] = self.verts[:, 0].min(), self.verts[:, 0].max()
+        lo[self.v], hi[self.v] = self.verts[:, 1].min(), self.verts[:, 1].max()
+        lo[self.axis], hi[self.axis] = 0.0, self.depth
+        return lo, hi
+
+
+def torus(R: float, r: float, axis: str = "y", color: Color | None = None) -> Shape:  # noqa: N803
+    return Torus(R, r, axis, color)
+
+
+def wedge(size: Vec3, rise: str = "+x", color: Color | None = None) -> Shape:
+    return Wedge(size, rise, color)
+
+
+def line(p0: Vec3, p1: Vec3, r: float = 0.5, color: Color | None = None) -> Shape:
+    """A path between two points; the default r = 0.5 samples to a connected 1-voxel line."""
+    return Line(p0, p1, r, color)
+
+
+def lathe(profile, axis: str = "y", color: Color | None = None) -> Shape:
+    return Lathe(profile, axis, color)
+
+
+def extrude(polygon, depth: float, axis: str = "z", color: Color | None = None) -> Shape:
+    return Extrude(polygon, depth, axis, color)
+
+
+def heightmap(heights, color: Color | None = None) -> Shape:
+    """Columns from y = 0 up to ``heights[x][z]`` voxels (rounded)."""
+    from cubist.dsl.gridops import Heightmap
+
+    return Heightmap(heights, color)

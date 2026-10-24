@@ -5,7 +5,28 @@ Asset scripts start with ``from cubist import *``.
 
 from cubist.core.model import Model, ModelError, asset
 from cubist.core.part import Part
-from cubist.dsl import Shape, ShapeError, box, capsule, cone, cylinder, ellipsoid, sphere
+from cubist.dsl import (
+    Shape,
+    ShapeError,
+    band,
+    box,
+    capsule,
+    colored,
+    cone,
+    cylinder,
+    ellipsoid,
+    extrude,
+    faces,
+    heightmap,
+    inside,
+    lathe,
+    line,
+    region,
+    sphere,
+    surface,
+    torus,
+    wedge,
+)
 
 __all__ = [
     "Model",
@@ -14,10 +35,22 @@ __all__ = [
     "Shape",
     "ShapeError",
     "asset",
+    "band",
     "box",
     "capsule",
+    "colored",
     "cone",
     "cylinder",
     "ellipsoid",
+    "extrude",
+    "faces",
+    "heightmap",
+    "inside",
+    "lathe",
+    "line",
+    "region",
     "sphere",
+    "surface",
+    "torus",
+    "wedge",
 ]
