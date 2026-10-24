@@ -3,7 +3,7 @@
 The parent process never imports the script. A worker (``python -m cubist.build.runner``)
 runs it, voxelizes each ``@asset``, and writes into ``out/<name>/``:
 
-* ``<name>.vox`` — the model,
+* ``<name>.vox`` — the model (the previous build moves to ``<name>.prev.vox``),
 * ``contact.png`` — the contact sheet,
 * ``lint.json`` — the lint report,
 * ``build.json`` — a summary including the lint result.
@@ -165,6 +165,8 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
     asset_dir.mkdir(parents=True, exist_ok=True)
     vox_bytes = encode_vox(built.to_vox_scene())
     vox_path = asset_dir / f"{built.name}.vox"
+    if vox_path.exists():  # keep the last build for `cubist diff`
+        vox_path.replace(asset_dir / f"{built.name}.prev.vox")
     vox_path.write_bytes(vox_bytes)
     contact_path = asset_dir / "contact.png"
     contact_sheet(built.merged_grid(), built.palette, name=built.name, size=built.size).save(

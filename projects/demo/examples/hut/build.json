@@ -1,0 +1,83 @@
+{
+  "name": "hut",
+  "size": [
+    24,
+    20,
+    20
+  ],
+  "tags": [
+    "building",
+    "wood",
+    "stone"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 4271,
+  "parts": [
+    {
+      "name": "hut",
+      "voxels": 4271,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          24,
+          19,
+          20
+        ]
+      ],
+      "pivot": [
+        12,
+        0,
+        10
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 167,
+    "wood.1": 252,
+    "wood.mid": 914,
+    "metal.light": 1,
+    "glass.dark": 18,
+    "stone.1": 255,
+    "stone.mid": 553,
+    "stone.light": 215,
+    "roof.1": 305,
+    "roof.mid": 987,
+    "roof.light": 604
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "2": "wood.1",
+    "3": "wood.mid",
+    "8": "metal.light",
+    "9": "glass.dark",
+    "28": "stone.1",
+    "29": "stone.mid",
+    "30": "stone.light",
+    "32": "roof.1",
+    "33": "roof.mid",
+    "34": "roof.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "highlight_edges"
+  ],
+  "script": "hut.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 4 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (1,11,0)-(23,12,20)\nINFO hidden: 2406 solid voxels can't be seen from outside; export hollows them"
+  }
+}

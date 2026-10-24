@@ -37,7 +37,7 @@ def test_text_width_and_drawing():
 def test_unknown_characters_draw_as_question_marks():
     a = np.zeros((10, 10, 3), dtype=np.uint8)
     b = np.zeros((10, 10, 3), dtype=np.uint8)
-    draw_text(a, 0, 0, "~", (255, 255, 255))
+    draw_text(a, 0, 0, "^", (255, 255, 255))
     draw_text(b, 0, 0, "?", (255, 255, 255))
     assert np.array_equal(a, b)
 

@@ -1,0 +1,193 @@
+{
+  "name": "goblin_scout",
+  "size": [
+    16,
+    24,
+    12
+  ],
+  "tags": [
+    "character"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 516,
+  "parts": [
+    {
+      "name": "torso",
+      "voxels": 136,
+      "bounds": [
+        [
+          5,
+          9,
+          4
+        ],
+        [
+          11,
+          16,
+          8
+        ]
+      ],
+      "pivot": [
+        8,
+        9,
+        6
+      ],
+      "parent": null,
+      "symmetric": "x"
+    },
+    {
+      "name": "head",
+      "voxels": 244,
+      "bounds": [
+        [
+          2,
+          16,
+          3
+        ],
+        [
+          14,
+          22,
+          10
+        ]
+      ],
+      "pivot": [
+        8,
+        16,
+        6
+      ],
+      "parent": "torso",
+      "symmetric": "x"
+    },
+    {
+      "name": "leg_l",
+      "voxels": 36,
+      "bounds": [
+        [
+          5,
+          0,
+          5
+        ],
+        [
+          7,
+          9,
+          7
+        ]
+      ],
+      "pivot": [
+        6,
+        9,
+        6
+      ],
+      "parent": "torso",
+      "symmetric": null
+    },
+    {
+      "name": "leg_r",
+      "voxels": 36,
+      "bounds": [
+        [
+          9,
+          0,
+          5
+        ],
+        [
+          11,
+          9,
+          7
+        ]
+      ],
+      "pivot": [
+        10,
+        9,
+        6
+      ],
+      "parent": "torso",
+      "symmetric": null
+    },
+    {
+      "name": "arm_l",
+      "voxels": 32,
+      "bounds": [
+        [
+          3,
+          8,
+          5
+        ],
+        [
+          5,
+          16,
+          7
+        ]
+      ],
+      "pivot": [
+        4,
+        15,
+        6
+      ],
+      "parent": "torso",
+      "symmetric": null
+    },
+    {
+      "name": "arm_r",
+      "voxels": 32,
+      "bounds": [
+        [
+          11,
+          8,
+          5
+        ],
+        [
+          13,
+          16,
+          7
+        ]
+      ],
+      "pivot": [
+        12,
+        15,
+        6
+      ],
+      "parent": "torso",
+      "symmetric": null
+    }
+  ],
+  "sockets": {
+    "hand_r": [
+      12,
+      8,
+      6
+    ]
+  },
+  "colors": {
+    "skin.dark": 4,
+    "skin.1": 92,
+    "skin.mid": 280,
+    "tunic.mid": 76,
+    "tunic.light": 36,
+    "cloth.brown": 24,
+    "eye.yellow": 4
+  },
+  "palette_names": {
+    "37": "skin.dark",
+    "38": "skin.1",
+    "39": "skin.mid",
+    "42": "tunic.mid",
+    "43": "tunic.light",
+    "44": "cloth.brown",
+    "45": "eye.yellow"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "highlight_edges"
+  ],
+  "script": "goblin_scout.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 2 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (7,16,9)-(9,17,10)\nINFO hidden: 160 solid voxels can't be seen from outside; export hollows them"
+  }
+}

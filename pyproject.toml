@@ -5,6 +5,7 @@ description = "Agent-native voxel asset authoring: code in, .vox/.glb, renders, 
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "mcp>=1.2",
     "numpy>=1.26",
     "pillow>=10",
     "scipy>=1.13",

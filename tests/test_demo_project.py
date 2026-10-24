@@ -1,4 +1,4 @@
-"""Milestone 1 acceptance: the demo scripts build to .vox files that round-trip exactly."""
+"""The demo scripts build, round-trip through .vox exactly, fit their size, and lint clean."""
 
 import runpy
 from pathlib import Path
@@ -15,8 +15,8 @@ DEMO = Path(__file__).parent.parent / "projects" / "demo"
 SCRIPTS = sorted((DEMO / "assets").glob("*.py"))
 
 
-def test_there_are_six_demo_scripts():
-    assert len(SCRIPTS) == 6
+def test_there_are_ten_demo_scripts():
+    assert len(SCRIPTS) == 10
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)

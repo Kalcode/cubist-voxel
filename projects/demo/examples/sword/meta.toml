@@ -1,0 +1,6 @@
+name = "sword"
+category = "prop"
+tags = ["prop", "weapon", "metal"]
+note = "Thin weapon with a readable silhouette at 7x27: a one-voxel blade with a fuller stripe by union order, a tip from a cone clipped to the blade's slab, crossguard, grip, and pommel."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

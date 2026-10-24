@@ -1,0 +1,6 @@
+name = "barrel"
+category = "prop"
+tags = ["prop", "wood"]
+note = "Turned-prop template. A lathe profile gives the bulge in one line, hollow(1) keeps a watertight shell, band selections paint the metal hoops, and a dithered wood ramp plus darken_crevices adds grain without noise. Reuse for buckets, pots, and columns."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

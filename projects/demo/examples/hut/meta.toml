@@ -1,0 +1,6 @@
+name = "hut"
+category = "building"
+tags = ["building", "wood", "stone"]
+note = "Building template. Stone foundation, hollow walls with corner posts, door and windows unioned flush over the wall, a gabled roof from one extruded triangle with an overhang, and a chimney pushing through; stone and thatch are dithered."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

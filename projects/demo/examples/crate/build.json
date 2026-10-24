@@ -1,0 +1,60 @@
+{
+  "name": "crate",
+  "size": [
+    12,
+    12,
+    12
+  ],
+  "tags": [
+    "prop",
+    "wood"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 1664,
+  "parts": [
+    {
+      "name": "crate",
+      "voxels": 1664,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          12,
+          12,
+          12
+        ]
+      ],
+      "pivot": [
+        6,
+        0,
+        6
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 448,
+    "wood.mid": 1216
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "3": "wood.mid"
+  },
+  "ops_used": [],
+  "script": "crate.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO hidden: 936 solid voxels can't be seen from outside; export hollows them"
+  }
+}

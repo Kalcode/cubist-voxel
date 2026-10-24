@@ -1,0 +1,70 @@
+{
+  "name": "barrel",
+  "size": [
+    12,
+    16,
+    12
+  ],
+  "tags": [
+    "prop",
+    "wood"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 808,
+  "parts": [
+    {
+      "name": "body",
+      "voxels": 808,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          12,
+          16,
+          12
+        ]
+      ],
+      "pivot": [
+        6,
+        0,
+        6
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 139,
+    "wood.1": 239,
+    "wood.mid": 234,
+    "wood.light": 76,
+    "metal.dark": 120
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "2": "wood.1",
+    "3": "wood.mid",
+    "4": "wood.light",
+    "5": "metal.dark"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "paint"
+  ],
+  "script": "barrel.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO hidden: 192 solid voxels can't be seen from outside; export hollows them"
+  }
+}

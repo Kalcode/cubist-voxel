@@ -1,0 +1,6 @@
+name = "potion"
+category = "prop"
+tags = ["prop", "glass"]
+note = "Small-prop template. The liquid is the bottle's lower half via intersect (which keeps the left shape's color); neck, rim, and cork stack on top. Radii are nudged (3.6, not 3.5) so even-width shapes fill their footprint."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

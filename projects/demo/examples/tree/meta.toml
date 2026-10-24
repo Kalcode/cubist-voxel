@@ -1,0 +1,6 @@
+name = "tree"
+category = "prop"
+tags = ["prop", "nature"]
+note = "Organic canopy from a smooth_union of spheres plus displace for lumpiness; the leaf ramp runs dark below to light on top, with dither and darken_crevices for depth. Tapered trunk with a root flare."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

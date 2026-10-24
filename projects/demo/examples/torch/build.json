@@ -1,0 +1,73 @@
+{
+  "name": "torch",
+  "size": [
+    7,
+    18,
+    7
+  ],
+  "tags": [
+    "prop",
+    "light",
+    "wood"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 129,
+  "parts": [
+    {
+      "name": "torch",
+      "voxels": 129,
+      "bounds": [
+        [
+          1,
+          0,
+          1
+        ],
+        [
+          6,
+          18,
+          6
+        ]
+      ],
+      "pivot": [
+        3.5,
+        0,
+        3.5
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.1": 35,
+    "metal.dark": 22,
+    "fire.dark": 2,
+    "fire.1": 7,
+    "fire.mid": 10,
+    "fire.light": 35,
+    "cloth.brown": 18
+  },
+  "palette_names": {
+    "2": "wood.1",
+    "5": "metal.dark",
+    "19": "fire.dark",
+    "20": "fire.1",
+    "21": "fire.mid",
+    "22": "fire.light",
+    "44": "cloth.brown"
+  },
+  "ops_used": [
+    "gradient"
+  ],
+  "script": "torch.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 44 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (1,0,1)-(6,18,6)\nINFO hidden: 30 solid voxels can't be seen from outside; export hollows them"
+  }
+}

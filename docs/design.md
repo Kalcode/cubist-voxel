@@ -347,11 +347,19 @@ parsed bible with every palette name.
   uses them as few-shot references.
 - `cubist examples promote <asset>` adds a finished asset once the user approves it, so quality
   compounds as the game grows.
+- Search scores 2 points for a category match and 1 per shared tag. Promoting refuses assets
+  with lint errors and writes a portable summary (no paths from the author's machine).
+- The demo project ships ten seed examples (barrel, chest, crate, goblin, hut, mushroom,
+  potion, sword, torch, tree), each authored with the build/critique loop and marked
+  `approved_by = "claude (seed, pending review)"` until a person reviews them.
 
 ### Asset brief
 
 Every asset starts from a short brief: name, category, size budget, description, must-haves,
-tags, and optional reference images. `cubist new` scaffolds a brief and a script stub.
+tags, and optional reference images. `cubist new` scaffolds a brief and a script stub. Briefs
+are `briefs/<name>.toml` (`name`, `category`, `size`, `tags`, `description`, `must_haves`,
+`references`); default sizes come from the category (prop 16³, character 16×24×12, creature
+24³, building 32³, vehicle 24×16×40, terrain 32×8×32).
 
 ## CLI and MCP tool surface
 
@@ -363,16 +371,17 @@ image content so the agent sees them without opening files.
 
 | Command | Does |
 | --- | --- |
-| `cubist new <name> --category prop` | Scaffold a brief and script stub |
+| `cubist new <name> --category prop [--size x,y,z] [--tags ...] [--must-have ...]` | Scaffold a brief and script stub |
 | `cubist build <script> [--seed N] [--check-determinism]` | Build → `.vox`, contact sheet, `lint.json` in `out/<name>/` |
 | `cubist render <asset> --views front,side,iso --slices y=10..14` | Re-render or print ASCII slices |
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist style` | Parsed `style.toml` with palette names |
 | `cubist export <asset> [--glb] [--vox] [--via-vengi FMT] [--ao] [--vertex-colors]` | Export (blocked by lint errors unless `--force`; exit 2) |
 | `cubist inspect <asset>` | Bounds, parts, pivots, voxel counts, color histogram as JSON |
-| `cubist diff <a> <b>` | Before/after contact sheet |
+| `cubist diff <asset> [<other>]` | Before/after/changes sheet; with one argument, against the previous build (`<name>.prev.vox`) |
 | `cubist palette import <file>` | Import a palette into `style.toml` |
-| `cubist examples search --tags prop,wood` / `promote <asset>` | Example library |
+| `cubist examples list` / `search --tags prop,wood --category prop` / `promote <asset> --note ...` | Example library |
+| `cubist mcp --project <dir>` | Run the MCP server on stdio |
 
 ### MCP tools
 
@@ -386,8 +395,16 @@ image content so the agent sees them without opening files.
 | `get_style_bible()` | Parsed `style.toml` with palette names |
 | `search_examples(tags, category)` | Example scripts and their contact sheets |
 
+| `diff(asset)` | Before/after/changes sheet against the previous build |
+| `new_asset(name, category, ...)` | Scaffolds a brief and script stub |
+
 There is no tool for placing or deleting individual voxels. If finer control is ever needed,
 add it as a DSL feature.
+
+Implementation notes (M5): built on the official MCP Python SDK 2.x (`MCPServer`). The server
+sends the authoring workflow as its instructions; tool failures come back as tool errors with
+the underlying message (an unknown palette name includes its suggestion). `render` accepts
+`slices` for ASCII output. Assets are named (`crate` → `out/crate/`) or given as paths.
 
 ## Export pipeline
 
@@ -462,10 +479,10 @@ cubist/
   dsl/       sdf.py  shape.py  ops.py  primitives.py  gridops.py  paint.py  select.py
              noise.py  context.py
   build/     runner.py
-  render/    raster.py  contact_sheet.py  ascii.py  font.py
+  render/    raster.py  contact_sheet.py  ascii.py  font.py  diff.py
   lint/      __init__.py (report)  checks.py
   io/        vox.py  mesh.py  gltf.py  vengi.py
-  export.py
+  export.py  project.py  examples.py  palette_import.py
   cli.py
   mcp_server.py
 projects/
@@ -491,8 +508,9 @@ CLAUDE.md
 4. **Parts and glTF** — done. Parts, pivots, sockets, multi-part `.vox`, GLB export. Done when a
    multi-part GLB imports into Godot 4 with the right hierarchy and scale (verified headless
    against Godot 4.6).
-5. **Agent integration.** CLI polish, MCP server, `CLAUDE.md` workflow, example library with 10
-   seed examples (hand-checked).
+5. **Agent integration** — done. CLI polish, MCP server, `CLAUDE.md` workflow, example library
+   with 10 seed examples (checked by Claude against the critique checklist; awaiting a person's
+   review).
 6. **Evaluation.** 20 briefs across props, buildings, and characters. Track lint pass rate,
    iterations to acceptance, and a 1–5 human quality score per asset.
 

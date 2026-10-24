@@ -1,0 +1,64 @@
+{
+  "name": "mushroom",
+  "size": [
+    14,
+    12,
+    14
+  ],
+  "tags": [
+    "prop",
+    "nature"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 536,
+  "parts": [
+    {
+      "name": "mushroom",
+      "voxels": 536,
+      "bounds": [
+        [
+          1,
+          0,
+          1
+        ],
+        [
+          13,
+          11,
+          13
+        ]
+      ],
+      "pivot": [
+        7,
+        0,
+        7
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "cap.mid": 264,
+    "stem.dark": 88,
+    "stem.light": 152,
+    "white": 32
+  },
+  "palette_names": {
+    "15": "cap.mid",
+    "17": "stem.dark",
+    "18": "stem.light",
+    "36": "white"
+  },
+  "ops_used": [],
+  "script": "mushroom.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 12 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (2,0,2)-(12,8,12)\nINFO hidden: 204 solid voxels can't be seen from outside; export hollows them"
+  }
+}

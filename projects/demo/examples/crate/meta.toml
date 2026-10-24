@@ -1,0 +1,6 @@
+name = "crate"
+category = "prop"
+tags = ["prop", "wood"]
+note = "Frame-and-panel construction from twelve edge beams. One-voxel seams cut with a ring subtraction read clearly under AO, and two shades of one ramp keep it readable at small sizes."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

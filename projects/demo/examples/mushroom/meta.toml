@@ -1,0 +1,6 @@
+name = "mushroom"
+category = "prop"
+tags = ["prop", "nature"]
+note = "Organic prop. The cap is an ellipsoid cut in half; spots are placed on its surface parametrically and clipped to the cap so they read as paint, not bumps. A frustum stem and a gill disc finish it."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

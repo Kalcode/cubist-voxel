@@ -1,0 +1,64 @@
+{
+  "name": "potion",
+  "size": [
+    8,
+    12,
+    8
+  ],
+  "tags": [
+    "prop",
+    "glass"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 252,
+  "parts": [
+    {
+      "name": "potion",
+      "voxels": 252,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          8,
+          12,
+          8
+        ]
+      ],
+      "pivot": [
+        4,
+        0,
+        4
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "glass.dark": 60,
+    "glass.light": 64,
+    "potion.mid": 120,
+    "cork": 8
+  },
+  "palette_names": {
+    "9": "glass.dark",
+    "10": "glass.light",
+    "12": "potion.mid",
+    "35": "cork"
+  },
+  "ops_used": [],
+  "script": "potion.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 24 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (0,3,0)-(8,10,8)\nINFO hidden: 96 solid voxels can't be seen from outside; export hollows them"
+  }
+}

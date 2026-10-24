@@ -1,0 +1,6 @@
+name = "torch"
+category = "prop"
+tags = ["prop", "light", "wood"]
+note = "Odd width centered on a voxel center so the flame's cone keeps its tip. The teardrop flame is a smooth_union plus displace, colored by a reversed fire gradient: hot base, cool tips."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

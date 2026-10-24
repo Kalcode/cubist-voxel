@@ -1,0 +1,6 @@
+name = "chest"
+category = "prop"
+tags = ["prop", "wood", "container"]
+note = "Hinged two-part prop. The lid's pivot sits on the back edge so rotating about x opens it, the open-topped body shows an interior when it does, one band selection repeats the hoops across both parts, and a lock socket marks the interaction point."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-23"

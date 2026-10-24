@@ -1,0 +1,65 @@
+{
+  "name": "sword",
+  "size": [
+    7,
+    27,
+    3
+  ],
+  "tags": [
+    "prop",
+    "weapon",
+    "metal"
+  ],
+  "seed": 0,
+  "grounded": false,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 105,
+  "parts": [
+    {
+      "name": "sword",
+      "voxels": 105,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          7,
+          27,
+          3
+        ]
+      ],
+      "pivot": [
+        3.5,
+        0,
+        1.5
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 25,
+    "metal.dark": 21,
+    "metal.mid": 20,
+    "metal.light": 39
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "5": "metal.dark",
+    "7": "metal.mid",
+    "8": "metal.light"
+  },
+  "ops_used": [],
+  "script": "sword.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 94 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (0,0,0)-(7,27,3)\nINFO hidden: 9 solid voxels can't be seen from outside; export hollows them"
+  }
+}

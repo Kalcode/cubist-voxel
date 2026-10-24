@@ -5,9 +5,23 @@ voxels, writes MagicaVoxel `.vox` files, renders a contact sheet to critique, an
 result against the project's style bible, and exports `.glb` with parts as nodes for game
 engines.
 
-Status: milestones 1–4 of the [design](docs/design.md): the full shape DSL (primitives, CSG,
-transforms, morphology, paint ops, selections), `.vox` read/write with part hierarchy, contact
-sheets, ASCII slices, lint, `style.toml`, and GLB export verified in Godot 4.
+Status: milestones 1–5 of the [design](docs/design.md): the full shape DSL, `.vox` read/write
+with part hierarchy, contact sheets, ASCII slices, diffs, lint, `style.toml`, GLB export
+verified in Godot 4, an MCP server, and an example library of ten seed assets.
+
+## Use it from Claude Code
+
+`CLAUDE.md` holds the authoring workflow (brief → examples → script → build → critique →
+revise, at most 5 iterations), so Claude Code follows it when you ask for an asset:
+
+> Make a lantern prop for the demo project: iron frame, glowing glass, a ring on top.
+
+To give any MCP client the same tools (build, render, lint, inspect, export, style bible,
+examples, diff), register the server:
+
+```sh
+claude mcp add cubist -- uv run --directory /path/to/voxel-auther-system cubist mcp --project projects/demo
+```
 
 ## Setup
 
@@ -26,6 +40,10 @@ uv run cubist lint projects/demo/out/goblin_scout          # exit 2 on errors
 uv run cubist export projects/demo/out/goblin_scout --ao  # -> projects/demo/export/
 uv run cubist inspect projects/demo/out/goblin_scout/goblin_scout.vox
 uv run cubist style --style projects/demo/style.toml
+uv run cubist new lantern --category prop --project projects/demo   # brief + script stub
+uv run cubist diff projects/demo/out/goblin_scout                   # vs. the previous build
+uv run cubist examples search --tags wood --category prop --project projects/demo
+uv run cubist palette import some-lospec-palette.hex --style projects/demo/style.toml
 ```
 
 A build writes `<name>.vox`, `contact.png` (front, right, back, top, and iso views with
@@ -81,6 +99,7 @@ cubist/
   lint/    lint checks and report
   render/  rasterizer, contact sheet, ASCII slices, bitmap font
   cli.py
-projects/demo/   style.toml and six demo asset scripts
+  mcp_server.py, examples.py, project.py, palette_import.py
+projects/demo/   style.toml, ten asset scripts, examples/ (the seed library)
 tests/           golden/ holds reviewed contact sheets
 ```

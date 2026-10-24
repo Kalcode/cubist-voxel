@@ -1,0 +1,106 @@
+{
+  "name": "chest",
+  "size": [
+    14,
+    12,
+    10
+  ],
+  "tags": [
+    "prop",
+    "wood",
+    "container"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 964,
+  "parts": [
+    {
+      "name": "body",
+      "voxels": 404,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          14,
+          7,
+          10
+        ]
+      ],
+      "pivot": [
+        7,
+        0,
+        5
+      ],
+      "parent": null,
+      "symmetric": null
+    },
+    {
+      "name": "lid",
+      "voxels": 560,
+      "bounds": [
+        [
+          0,
+          7,
+          0
+        ],
+        [
+          14,
+          12,
+          10
+        ]
+      ],
+      "pivot": [
+        7,
+        7,
+        0
+      ],
+      "parent": "body",
+      "symmetric": null
+    }
+  ],
+  "sockets": {
+    "lock": [
+      7,
+      5,
+      10,
+      "body"
+    ]
+  },
+  "colors": {
+    "wood.dark": 22,
+    "wood.1": 98,
+    "wood.mid": 561,
+    "wood.light": 155,
+    "metal.1": 8,
+    "metal.mid": 100,
+    "metal.light": 20
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "2": "wood.1",
+    "3": "wood.mid",
+    "4": "wood.light",
+    "6": "metal.1",
+    "7": "metal.mid",
+    "8": "metal.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "highlight_edges",
+    "paint"
+  ],
+  "script": "chest.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO hidden: 312 solid voxels can't be seen from outside; export hollows them"
+  }
+}

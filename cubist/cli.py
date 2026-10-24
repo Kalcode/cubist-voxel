@@ -15,11 +15,15 @@ from cubist.build.runner import (
     find_style,
     load_project_style,
 )
+from cubist.examples import ExampleError, list_examples, promote, search_examples
 from cubist.export import NATIVE, ExportBlocked, export_asset, lint_loaded, load_asset
 from cubist.io.vengi import VengiError
 from cubist.io.vox import read_vox
+from cubist.palette_import import import_palette
+from cubist.project import ProjectError, find_project, new_asset
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
+from cubist.render.diff import diff_sheet
 
 
 def _hex(rgba) -> str:
@@ -114,6 +118,92 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _project(args: argparse.Namespace) -> Path:
+    return find_project(args.project or Path.cwd())
+
+
+def _csv(value: str | None) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()] if value else []
+
+
+def cmd_new(args: argparse.Namespace) -> int:
+    size = tuple(int(v) for v in _csv(args.size)) if args.size else None
+    if size is not None and len(size) != 3:
+        raise ProjectError("--size takes three numbers, like 12,16,12")
+    brief, script = new_asset(
+        _project(args),
+        args.name,
+        category=args.category,
+        size=size,
+        tags=_csv(args.tags),
+        description=args.description or "",
+        must_haves=args.must_have or [],
+    )
+    _print({"brief": str(brief), "script": str(script)})
+    return 0
+
+
+def cmd_diff(args: argparse.Namespace) -> int:
+    after = load_asset(args.asset)
+    if args.other:
+        before, after = after, load_asset(args.other)
+    else:
+        prev = after.vox.with_name(f"{after.vox.stem}.prev.vox")
+        if not prev.exists():
+            raise ProjectError(f"no previous build of {after.name} to compare ({prev.name})")
+        from cubist.export import LoadedAsset
+
+        before = LoadedAsset(prev, read_vox(prev), after.summary)
+    sheet = diff_sheet(
+        before.grid,
+        after.grid,
+        after.scene.palette,
+        name=after.name,
+        size=after.summary.get("size"),
+        names=after.names,
+        before_palette=before.scene.palette,
+    )
+    out = args.out or after.vox.parent / "diff.png"
+    sheet.save(out)
+    from cubist.render.diff import change_grid
+
+    _, counts = change_grid(before.grid, after.grid)
+    _print({"diff_sheet": str(out), **counts})
+    return 0
+
+
+def cmd_palette_import(args: argparse.Namespace) -> int:
+    style = args.style or find_style(Path.cwd() / "_")
+    colors = import_palette(style, args.file)
+    _print({"style": str(style), "source": Path(args.file).name, "colors": colors})
+    return 0
+
+
+def cmd_examples(args: argparse.Namespace) -> int:
+    project = _project(args)
+    if args.action == "list":
+        _print(list_examples(project))
+    elif args.action == "search":
+        _print(
+            search_examples(project, tags=_csv(args.tags), category=args.category, limit=args.limit)
+        )
+    else:
+        if not args.name or not args.note:
+            raise ExampleError("promote needs an asset name and --note on why it is good")
+        dest = promote(
+            project, args.name, note=args.note, approved_by=args.approved_by, force=args.force
+        )
+        _print({"example": str(dest)})
+    return 0
+
+
+def cmd_mcp(args: argparse.Namespace) -> int:
+    from cubist.mcp_server import create_server
+
+    create_server(_project(args)).run("stdio")
+    return 0
+
+
 def cmd_style(args: argparse.Namespace) -> int:
     style_path = args.style or find_style(Path.cwd() / "_")
     _print(load_project_style(style_path).to_dict())
@@ -179,6 +269,45 @@ def parser() -> argparse.ArgumentParser:
     i.add_argument("asset", type=Path)
     i.set_defaults(fn=cmd_inspect)
 
+    n = sub.add_parser("new", help="scaffold a brief and a script stub for a new asset")
+    n.add_argument("name")
+    n.add_argument("--category", default="prop", help="prop, character, creature, building, ...")
+    n.add_argument("--size", help="x,y,z in voxels (default by category)")
+    n.add_argument("--tags", help="comma-separated")
+    n.add_argument("--description")
+    n.add_argument("--must-have", action="append", help="repeat for each must-have")
+    n.add_argument("--project", type=Path, help="project directory (default: from cwd)")
+    n.set_defaults(fn=cmd_new)
+
+    d = sub.add_parser("diff", help="before/after/changes sheet (default: vs. the last build)")
+    d.add_argument("asset", type=Path, help="the newer asset (or the older one with OTHER)")
+    d.add_argument("other", type=Path, nargs="?", help="compare ASSET (before) to OTHER (after)")
+    d.add_argument("--out", type=Path, help="sheet path (default: diff.png beside the asset)")
+    d.set_defaults(fn=cmd_diff)
+
+    pal = sub.add_parser("palette", help="palette tools")
+    pal_sub = pal.add_subparsers(dest="action", required=True)
+    pi = pal_sub.add_parser("import", help="set a palette file as the style's palette source")
+    pi.add_argument("file", type=Path, help=".png, .gif, .gpl, or .hex")
+    pi.add_argument("--style", type=Path, help="style.toml (default: nearest above the cwd)")
+    pi.set_defaults(fn=cmd_palette_import)
+
+    ex = sub.add_parser("examples", help="the example library")
+    ex.add_argument("action", choices=("list", "search", "promote"))
+    ex.add_argument("name", nargs="?", help="asset to promote")
+    ex.add_argument("--tags", help="comma-separated, for search")
+    ex.add_argument("--category", help="for search")
+    ex.add_argument("--limit", type=int, default=3)
+    ex.add_argument("--note", help="for promote: one paragraph on why it is good")
+    ex.add_argument("--approved-by", default="user")
+    ex.add_argument("--force", action="store_true", help="promote despite lint errors")
+    ex.add_argument("--project", type=Path, help="project directory (default: from cwd)")
+    ex.set_defaults(fn=cmd_examples)
+
+    m = sub.add_parser("mcp", help="run the MCP server on stdio")
+    m.add_argument("--project", type=Path, help="project directory (default: from cwd)")
+    m.set_defaults(fn=cmd_mcp)
+
     s = sub.add_parser("style", help="print the parsed style bible with palette names")
     s.add_argument("--style", type=Path, help="style.toml (default: nearest above the cwd)")
     s.set_defaults(fn=cmd_style)
@@ -189,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         return args.fn(args)
-    except (BuildError, VengiError, ValueError, OSError) as e:
+    except (BuildError, VengiError, ValueError, OSError) as e:  # incl. Project/ExampleError
         print(f"error: {e}", file=sys.stderr)
         return 1
 

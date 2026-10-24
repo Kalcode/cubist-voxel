@@ -1,0 +1,70 @@
+{
+  "name": "tree",
+  "size": [
+    16,
+    20,
+    16
+  ],
+  "tags": [
+    "prop",
+    "nature"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 994,
+  "parts": [
+    {
+      "name": "tree",
+      "voxels": 994,
+      "bounds": [
+        [
+          1,
+          0,
+          3
+        ],
+        [
+          15,
+          19,
+          14
+        ]
+      ],
+      "pivot": [
+        8,
+        0,
+        8.5
+      ],
+      "parent": null,
+      "symmetric": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.1": 109,
+    "leaf.dark": 260,
+    "leaf.1": 285,
+    "leaf.mid": 232,
+    "leaf.light": 108
+  },
+  "palette_names": {
+    "2": "wood.1",
+    "23": "leaf.dark",
+    "24": "leaf.1",
+    "25": "leaf.mid",
+    "26": "leaf.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "gradient"
+  ],
+  "script": "tree.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 25 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (1,0,3)-(15,19,14)\nINFO hidden: 577 solid voxels can't be seen from outside; export hollows them"
+  }
+}
