@@ -116,12 +116,77 @@ clips = [
 ]
 ```
 
+### Free tracks and generators
+
+Any part can move without a joint. Free tracks key one channel each, about the part's pivot
+along the parent's axes; tracks on the same channel add up (a swing plus a shake):
+
+```python
+turn(part, axis, keys, ease=None)  # degrees about axis ("x", "-y", ...)
+move(part, axis, keys, ease=None)  # voxels along axis
+visible(part, keys)  # 1 shown, 0 hidden; always steps
+```
+
+A part's local motion is the joint's slide plus the moves, turned by `R_joint @ R_z @ R_y @
+R_x`: free rotations x first, then y, then z, then the joint. Generators write the keys for
+common motion:
+
+| Call | Makes |
+| --- | --- |
+| `swing(part, axis, amount, phase=0, cycles=1, center=0)` | `center + amount·sin(2π(cycles·u + phase))` degrees; `phase=0.5` is the opposite limb |
+| `bob(part, height, cycles=2, phase=0, axis="y")` | from rest to `height` voxels and back, `cycles` times (two steps per walk cycle); negative dips |
+| `shake(part, amount, channel="rotate_z", rate=12, seed=0)` | seeded jitter, starting and ending at rest (recoil, impacts); follows `--seed` |
+| `spin_track(part, turns, axis=None)` | constant-speed turns on a spin joint, or about `axis` on any part |
+
+Curves are sampled 8 times per cycle; whole cycles close loops exactly. `keys` can also be a
+function of `u` in [0, 1]: `TrackSpec(part, "rotate_z", lambda u: 30 * u, samples=9)`.
+
+```python
+walk = clip(
+    "walk",
+    0.8,
+    [
+        swing("leg_r", "x", 25),
+        swing("leg_l", "x", 25, phase=0.5),
+        swing("arm_r", "x", 20, phase=0.5),
+        swing("arm_l", "x", 20),
+        bob("torso", -0.4),
+    ],  # dip as the legs spread so the feet stay planted
+    loop=True,
+    events=[(0.2, "footstep"), (0.6, "footstep")],
+    travel=(0, 0, 19),  # in place; the engine moves it 19 voxels a second
+)
+flash = Part("flash", star_shape, parent="frame", hidden=True)
+fire = clip(
+    "fire",
+    0.35,
+    [visible("flash", [(0, 1), (0.06, 0)]), turn("frame", "x", [(0, 0), (0.05, -10), (0.35, 0)])],
+)
+```
+
+- **Hidden parts** (`Part(..., hidden=True)`) start hidden, and so do their children. Contact
+  sheets leave them out and name them (`HIDDEN: FLASH`); filmstrips show them while visible.
+- **`travel`** is `(x, y, z)` voxels per second, for clips that walk in place.
+- A clip needs at least one track and one joint track per part.
+
+### Oriented sockets
+
+```python
+socket(position, part=None, forward=None, up="+y")
+```
+
+A socket with a `forward` direction (muzzles, wand tips, grips) becomes a GLB node whose local
++Z points forward and +Y up; `up` is made perpendicular to `forward`. `(x, y, z)` and
+`(x, y, z, part)` tuples still work for sockets without a direction.
+
 A build of an asset with clips also writes `motion.png` (a filmstrip of every clip: iso frames
 above an orthographic view chosen to show the motion, each labeled with its time) and a GIF per
 clip. `cubist render out/<name> --clip open --at 0.3` draws a full contact sheet of one moment;
-`--frames 12 --view right` gives a denser filmstrip. Motion lint flags keys past a joint's
-limits (error), loops that don't close, parts moving through each other (warnings), and how far
-each clip reaches beyond the rest box (info).
+`--frames 12 --view right` gives a denser filmstrip, and `cubist diff` also writes
+`motion-diff.png` (last build's filmstrip above this one's). Motion lint flags keys past a
+joint's limits (error), loops that don't close, parts moving through each other, grounded
+assets pushed through the floor (warnings), and how far each clip reaches beyond the rest box
+(info).
 
 ## Primitives
 

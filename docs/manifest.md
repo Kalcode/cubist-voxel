@@ -57,6 +57,7 @@ can read it before exporting.
 | `pivot` | Where the part turns, in asset space. In the `.glb` this is the part node's origin. |
 | `parent` | The part it hangs from, or `null` |
 | `joint` | How it moves (below), or `null` for a part that doesn't move on its own |
+| `hidden` | Starts hidden (a clip's `visible` track shows it); children of hidden parts are hidden too. In the `.glb` its node has scale 0, and `visible` tracks become `STEP` scale channels |
 | `voxels` | Voxel count |
 | `vox_model` | The model's name in the `.vox` scene graph |
 
@@ -85,10 +86,12 @@ An engine can drive joints directly, such as a door the player pushes, using the
 ## Sockets
 
 ```json
-"sockets": {"hand_r": {"position": [4, 8, 6], "part": "arm_r"}}
+"sockets": {"muzzle": {"position": [1.5, 6.5, 17], "part": "frame",
+                       "forward": [0, 0, 1], "up": [0, 1, 0]}}
 ```
 
-`position` is in asset space at rest. `part` is the part the socket moves with. When the script
+`forward` and `up` (or `null`) give an oriented socket's direction: in the `.glb` the socket
+node's local +Z points `forward` and +Y `up`. `position` is in asset space at rest. `part` is the part the socket moves with. When the script
 didn't name one, it is the part with the nearest voxel. In the `.glb` each socket is an empty
 node under that part.
 
@@ -101,11 +104,20 @@ node under that part.
  "events": [[0.0, "creak"]]}
 ```
 
-- A **track** keys one channel of one part. Version 1 has one channel, `joint`, whose values are
-  the part's joint value.
+- A **track** keys one channel of one part:
+  - `joint`: the part's joint value, at most one per part;
+  - `rotate_x|y|z`: degrees about the pivot along the parent's axes;
+  - `move_x|y|z`: voxels along the parent's axes;
+  - `visible`: 1 shown, 0 hidden, always stepped.
+
+  Free tracks on the same channel add up. A part's local transform is
+  `T(pivot - parent.pivot) · T(slide + moves) · R_joint · R_z · R_y · R_x`.
 - A track's `ease` of `null` means the clip's `ease`.
 - **Events** are `[time, name]` markers for the engine (sounds, effects, gameplay). Cubist gives
   them no meaning.
+- `travel` (or `null`) is `[x, y, z]` voxels per second: how fast an in-place clip such as a
+  walk moves the asset through the world. The `.glb` animation carries it in metres per second
+  as `extras.travel`.
 - `loop` means the clip repeats. Its last pose should equal its first; Cubist lints for this.
 - Parts without tracks stay at rest. A part also moves when one of its ancestors moves.
 

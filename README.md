@@ -97,6 +97,7 @@ show you the result.
 | --- | --- | --- |
 | Create | "Make a wooden signpost with two arrows and moss at the base, about goblin height." | `voxel-create` |
 | Edit or refine | "The goblin's ears look like nubs; make them longer and pointier." | `voxel-refine` |
+| Animate | "Make the chest lid open with a little bounce." / "Give the goblin a walk cycle." | `voxel-animate` |
 | Get ideas | "Suggest ten props for a blacksmith's yard and write briefs for the best five." | `voxel-ideas` |
 | Start a game | "Set up a snowy mountain project from this Lospec palette." | `voxel-project` |
 
@@ -145,16 +146,16 @@ come.
 cubist/            the package: core, dsl, build, render, lint, io, export, mcp_server, cli
 projects/demo/     a sample game: style.toml, briefs, asset scripts, examples/ (the library)
 projects/eval/     20 briefs used to evaluate agents end to end
-.claude/skills/    Claude Code skills: voxel-create, voxel-refine, voxel-ideas, voxel-project
+.claude/skills/    Claude Code skills: voxel-create, voxel-refine, voxel-animate, voxel-ideas, voxel-project
 docs/              guides, the design doc, and images (scripts/make_images.py regenerates them)
 tests/             the test suite; golden/ holds reviewed contact sheets
 ```
 
 ## Status
 
-Milestones 1–7 of the [design](docs/design.md) are done (7 is hinges, slides and spins), with
-human scores for the first evaluation still to come. Next up: characters, flipbooks and glow,
-voxel effects, then a motion evaluation
+Milestones 1–8 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
+characters), with human scores for the first evaluation still to come. Next up: flipbooks and
+glow, voxel effects, then a motion evaluation
 ([the plan](docs/superpowers/specs/2026-10-24-motion-and-effects-design.md)).
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and

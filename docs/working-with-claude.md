@@ -47,6 +47,21 @@ Claude edits the script (never the voxels), rebuilds, and shows a diff sheet: ad
 green, removed red, recolored orange. Small requests give small diffs, which are easy to review.
 This is the `voxel-refine` skill.
 
+## Make it move
+
+Describe the motion the way you'd direct it. Claude adds joints and clips to the script, builds,
+reads the filmstrip (iso frames over a side view, each with its time), checks the motion lint,
+and sends you the GIF.
+
+> Make the chest lid open with a little bounce, and close with a thud.
+
+> The goblin needs a walk cycle and an idle where it looks around.
+
+> When the blaster fires: kick the muzzle up, snap the slide back, and flash for two frames.
+
+Feedback on timing works like feedback on shape: "the door swings too slowly", "the arms
+should swing less". This is the `voxel-animate` skill.
+
 ## Get ideas
 
 Ask for sets, variations, or gaps. Claude reads the style bible and what already exists, then

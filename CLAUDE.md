@@ -14,7 +14,8 @@ at a time. Run commands from the project directory (e.g. `projects/demo`), via `
 2. Write `assets/<name>.py` and build: `cubist build assets/<name>.py`.
 3. Inspect `out/<name>/contact.png` and the lint summary in the build output. If the asset
    moves, also read `out/<name>/motion.png` (the filmstrip): do the parts move the way the brief
-   asks, with nothing passing through anything?
+   asks, with nothing passing through anything, loops that don't hitch, and timing that reads?
+   The `voxel-animate` skill has the full motion workflow.
 4. Critique against this checklist:
    - Is the silhouette readable at game distance?
    - Do proportions match the style bible?

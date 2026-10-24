@@ -505,8 +505,16 @@ moves and what it looks like; the engine decides when it happens and how it is s
    (`cubist render --clip NAME [--at T]`); motion lint; glTF animations checked in Blender; the
    manifest. Demo: chest, door, window, desk, biplane. Plan:
    `docs/superpowers/plans/2026-10-24-m7-hinges-slides-spins.md`.
-8. **Characters** — free tracks on any part, motion generators (`swing`, `bob`, `shake`),
-   visibility, events, travel speed, oriented sockets, the floor check, a `voxel-animate` skill.
+8. **Characters** — done. Free `turn`/`move` tracks on any part (composed `R_joint · R_z · R_y ·
+   R_x`, same-channel tracks add up); generators (`swing`, `bob`, `shake`, `spin_track`)
+   resolved against the clip length into plain keys; hidden parts and `visible` tracks (left out
+   of contact sheets, zero-scale GLB nodes with STEP scale channels); `travel`; oriented sockets;
+   the `motion_floor` check; filmstrip diffs; examples keep their filmstrips; the
+   `voxel-animate` skill. Demo: the goblin walks and idles, the blaster fires, the wand casts.
+   An independent review of M7 found 11 edge-case bugs (step-only clips cut short in glTF,
+   crashes on renamed parts, fast spins under-sampled, false collisions for rigidly attached
+   parts, GIF timing, ...), all fixed with regression tests in `tests/test_motion_edges.py`.
+   Plan: `docs/superpowers/plans/2026-10-24-m8-characters.md`.
 9. **Flipbooks, color cycles, glow, lights.**
 10. **Effects** — fracture, baked bursts, particle models and emitters.
 11. **Evaluation** — twelve motion briefs built by fresh agents, scored from their GIFs.
