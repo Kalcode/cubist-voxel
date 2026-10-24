@@ -77,6 +77,7 @@ def test_build_writes_vox_and_summary_under_project_out(project):
         "parent": None,
         "symmetric": None,
         "joint": None,
+        "hidden": False,
     }
     assert summary["clips"] == []
     assert summary["colors"] == {"wood.dark": 64}

@@ -37,7 +37,7 @@ from cubist.core.style import StyleBible, StyleError, load_style
 from cubist.io.vox import encode_vox
 from cubist.lint import Finding, lint
 from cubist.manifest import build_manifest
-from cubist.render.contact_sheet import contact_sheet
+from cubist.render.contact_sheet import contact_sheet, hidden_note
 from cubist.render.filmstrip import clip_frames, filmstrip, save_gif
 
 DEFAULT_TIMEOUT_S = 30.0
@@ -176,9 +176,13 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
         vox_path.replace(asset_dir / f"{built.name}.prev.vox")
     vox_path.write_bytes(vox_bytes)
     contact_path = asset_dir / "contact.png"
-    contact_sheet(built.merged_grid(), built.palette, name=built.name, size=built.size).save(
-        contact_path
-    )
+    contact_sheet(
+        built.visible_grid(),
+        built.palette,
+        name=built.name,
+        size=built.size,
+        note=hidden_note(built.hidden_parts()),
+    ).save(contact_path)
     report = lint(built, style)
     lint_path = asset_dir / "lint.json"
     lint_path.write_text(json.dumps(report.to_dict(), indent=2) + "\n")

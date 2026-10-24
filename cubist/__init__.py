@@ -47,6 +47,7 @@ from cubist.motion import (
     spin_track,
     swing,
     turn,
+    visible,
 )
 
 __all__ = [
@@ -92,5 +93,6 @@ __all__ = [
     "swing",
     "torus",
     "turn",
+    "visible",
     "wedge",
 ]

@@ -46,6 +46,26 @@ class LoadedAsset:
         return VoxelGrid.merge([p.grid for p in self.scene.parts])
 
     @property
+    def hidden(self) -> list[str]:
+        """Parts the build marked hidden at rest, and parts hanging from them."""
+        meta = {p["name"]: p for p in self.summary.get("parts", [])}
+        parents = {p.name: p.parent for p in self.scene.parts}
+
+        def hidden(name: str | None) -> bool:
+            while name is not None:
+                if meta.get(name, {}).get("hidden"):
+                    return True
+                name = parents.get(name)
+            return False
+
+        return [p.name for p in self.scene.parts if hidden(p.name)]
+
+    @property
+    def visible_grid(self) -> VoxelGrid:
+        hidden = set(self.hidden)
+        return VoxelGrid.merge([p.grid for p in self.scene.parts if p.name not in hidden])
+
+    @property
     def names(self) -> dict[int, str]:
         return {int(k): v for k, v in self.summary.get("palette_names", {}).items()}
 

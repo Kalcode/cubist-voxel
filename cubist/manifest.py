@@ -41,6 +41,7 @@ def build_manifest(
                 "parent": p.parent,
                 "pivot": list(p.pivot),
                 "joint": p.joint.to_dict() if p.joint else None,
+                "hidden": p.hidden,
                 "voxels": p.grid.count(),
                 "vox_model": p.name,
             }

@@ -11,7 +11,13 @@ from cubist.core.model import BuiltAsset, voxel_sha256
 from cubist.lint.checks import Finding
 from cubist.motion.clips import Clip
 from cubist.motion.joints import Joint
-from cubist.motion.pose import moving_parts, posed_bounds, sample_times, world_matrices
+from cubist.motion.pose import (
+    hidden_at,
+    moving_parts,
+    posed_bounds,
+    sample_times,
+    world_matrices,
+)
 
 LIMIT_TOLERANCE = 1e-6
 LOOP_TOLERANCE = 0.05  # voxels a part's corners may drift between a loop's ends
@@ -179,15 +185,16 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
         names = [p.name for p in asset.parts if len(voxels[p.name])]
         for t in sample_times(c, rate=COLLISION_SAMPLES_PER_S):
             m = world_matrices(asset, c, float(t))
+            hide = hidden_at(asset, c, float(t))
             posed = {}
             for n in names:
                 pts = voxels[n]
                 posed[n] = _keys(np.floor(np.round(pts @ m[n][:3, :3].T + m[n][:3, 3], 6)))
             for a in moving:
-                if not len(voxels[a]):
+                if not len(voxels[a]) or a in hide:
                     continue
                 for b in names:
-                    if b == a or (b in moving and names.index(b) < names.index(a)):
+                    if b == a or b in hide or (b in moving and names.index(b) < names.index(a)):
                         continue
                     hits = np.isin(posed[a], posed[b])
                     hits &= ~np.isin(rest_keys[a], rest_keys[b])  # shared at rest: overlap lint

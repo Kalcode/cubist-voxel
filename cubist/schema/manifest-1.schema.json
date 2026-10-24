@@ -36,6 +36,7 @@
         "parent": {"type": ["string", "null"]},
         "pivot": {"$ref": "#/$defs/vec3"},
         "joint": {"oneOf": [{"$ref": "#/$defs/joint"}, {"type": "null"}]},
+        "hidden": {"type": "boolean"},
         "voxels": {"type": "integer", "minimum": 0},
         "vox_model": {"type": "string"}
       }

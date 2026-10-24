@@ -123,6 +123,7 @@ class BuiltPart:
     parent: str | None
     symmetric: str | None = None
     joint: Joint | None = None
+    hidden: bool = False
 
 
 def voxel_sha256(grid: VoxelGrid) -> str:
@@ -170,6 +171,25 @@ class BuiltAsset:
         """Every part in one world-space grid (later parts win overlaps)."""
         return VoxelGrid.merge([p.grid for p in self.parts])
 
+    def hidden_parts(self) -> list[str]:
+        """Parts hidden at rest: hidden themselves or hanging from a hidden part."""
+        parents = {p.name: p.parent for p in self.parts}
+        flagged = {p.name for p in self.parts if p.hidden}
+
+        def hidden(name: str | None) -> bool:
+            while name is not None:
+                if name in flagged:
+                    return True
+                name = parents.get(name)
+            return False
+
+        return [p.name for p in self.parts if hidden(p.name)]
+
+    def visible_grid(self) -> VoxelGrid:
+        """The parts visible at rest in one grid: what the contact sheet shows."""
+        hidden = set(self.hidden_parts())
+        return VoxelGrid.merge([p.grid for p in self.parts if p.name not in hidden])
+
     def palette_names(self) -> dict[int, str]:
         """Names of the color indices this asset uses."""
         used = set()
@@ -195,6 +215,7 @@ class BuiltAsset:
                 "parent": p.parent,
                 "symmetric": p.symmetric,
                 "joint": p.joint.to_dict() if p.joint else None,
+                "hidden": p.hidden,
                 "voxel_sha256": voxel_sha256(p.grid),
             }
 
@@ -235,6 +256,7 @@ class BuiltAsset:
                     meta.get("parent"),
                     meta.get("symmetric"),
                     Joint.from_dict(joint) if joint else None,
+                    bool(meta.get("hidden", False)),
                 )
             )
         size = summary.get("size")
@@ -289,7 +311,9 @@ class AssetDef:
                 except ShapeError as e:
                     raise ShapeError(f"part {p.name!r}: {e}") from None
                 pivot = tuple(p.pivot) if p.pivot is not None else default_pivot(grid)
-                parts.append(BuiltPart(p.name, grid, pivot, p.parent, p.symmetric, p.joint))
+                parts.append(
+                    BuiltPart(p.name, grid, pivot, p.parent, p.symmetric, p.joint, bool(p.hidden))
+                )
         return BuiltAsset(
             self.name,
             self.size,

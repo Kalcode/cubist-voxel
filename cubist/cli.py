@@ -23,7 +23,7 @@ from cubist.io.vox import read_vox
 from cubist.palette_import import import_palette
 from cubist.project import ProjectError, find_project, new_asset
 from cubist.render.ascii import parse_slices, slices
-from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
+from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet, hidden_note
 from cubist.render.diff import diff_sheet
 from cubist.render.filmstrip import render_clip
 
@@ -109,7 +109,13 @@ def cmd_render(args: argparse.Namespace) -> int:
         views = args.views.split(",") if args.views else DEFAULT_VIEWS
         out = args.out or asset.vox.parent / "render.png"  # contact.png belongs to the build
         sheet = contact_sheet(
-            grid, asset.scene.palette, name=name, size=size, views=views, names=asset.names
+            asset.visible_grid,
+            asset.scene.palette,
+            name=name,
+            size=size,
+            views=views,
+            names=asset.names,
+            note=hidden_note(asset.hidden),
         )
         sheet.save(out)
         _print({"contact_sheet": str(out)})

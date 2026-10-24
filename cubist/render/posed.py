@@ -79,7 +79,12 @@ class PosedScene:
         return posed_bounds(self.asset, matrices)
 
     def render(
-        self, matrices: dict[str, np.ndarray], view: str, scale: int, region: Region
+        self,
+        matrices: dict[str, np.ndarray],
+        view: str,
+        scale: int,
+        region: Region,
+        hidden: frozenset[str] = frozenset(),
     ) -> ViewRender:
         lo = np.array(region[0], dtype=np.float64)
         hi = np.array(region[1], dtype=np.float64)
@@ -88,7 +93,7 @@ class PosedScene:
         # Gather posed faces from every part.
         corners, normals, colors, ao = [], [], [], []
         for name, mesh in self.meshes.items():
-            if not len(mesh.colors):
+            if not len(mesh.colors) or name in hidden:
                 continue
             m = matrices.get(name, np.eye(4))
             corners.append(mesh.corners @ m[:3, :3].T + m[:3, 3])

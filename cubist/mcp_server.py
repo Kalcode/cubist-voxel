@@ -22,7 +22,7 @@ from cubist.io.vengi import VengiError
 from cubist.io.vox import read_vox
 from cubist.project import new_asset as scaffold
 from cubist.render.ascii import parse_slices, slices
-from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
+from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet, hidden_note
 from cubist.render.diff import change_grid, diff_sheet
 from cubist.render.filmstrip import render_clip
 
@@ -133,12 +133,13 @@ def create_server(project: str | Path) -> MCPServer:
             out.append(_slices(loaded, axis, start, stop))
         if views or not spec:
             sheet = contact_sheet(
-                loaded.grid,
+                loaded.visible_grid,
                 loaded.scene.palette,
                 name=loaded.name,
                 size=loaded.summary.get("size"),
                 views=views or DEFAULT_VIEWS,
                 names=loaded.names,
+                note=hidden_note(loaded.hidden),
             )
             path = loaded.vox.parent / "render.png"
             sheet.save(path)

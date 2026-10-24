@@ -14,9 +14,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.motion.clips import Clip
-from cubist.motion.pose import sample_times, world_matrices
+from cubist.motion.pose import hidden_at, sample_times, world_matrices
 from cubist.render.contact_sheet import (
     DEFAULT_VIEWS,
     GAP,
@@ -135,9 +136,9 @@ def filmstrip(
         v = view or motion_view(asset, c)
         cells = []
         for t in frame_times(c, frames):
-            m = world_matrices(asset, c, t)
-            iso_rgb = iso_framed(scene.render(m, "iso", scale, region).rgb)
-            ortho = scene.render(m, v, scale, region)
+            m, hide = world_matrices(asset, c, t), hidden_at(asset, c, t)
+            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide).rgb)
+            ortho = scene.render(m, v, scale, region, hide)
             rgb = _decorate(ortho, step, size_box.get(v) if size_box else None)
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
@@ -195,12 +196,10 @@ def clip_frames(
     else:
         times = [clip.length * k / n for k in range(n + 1)]
     frame_ms = round(1000 / fps)
-    images = [
-        Image.fromarray(
-            iso_framed(scene.render(world_matrices(asset, clip, t), "iso", scale, region).rgb)
-        )
-        for t in times
-    ]
+    images = []
+    for t in times:
+        m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
+        images.append(Image.fromarray(iso_framed(scene.render(m, "iso", scale, region, hide).rgb)))
     durations = [frame_ms] * len(images)
     if not clip.loop:
         durations[-1] += GIF_HOLD_MS
@@ -236,15 +235,15 @@ def posed_sheet(
 ) -> Image.Image:
     """Today's contact sheet of the asset posed at time ``t`` of ``clip``."""
     scene = PosedScene(asset, table)
-    m = world_matrices(asset, clip, t)
+    m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
     bounds = scene.bounds(m)
     regions = [bounds]
     if asset.size is not None:
         regions.append(((0, 0, 0), tuple(int(s) for s in asset.size)))  # type: ignore[arg-type]
     region = _union(regions)
-    grid = asset.merged_grid()
+    grid = VoxelGrid.merge([p.grid for p in asset.parts if p.name not in hide])
     return sheet(
-        lambda view, s, r: scene.render(m, view, s, r),
+        lambda view, s, r: scene.render(m, view, s, r, hide),
         region,
         np.asarray(table),
         names or {},

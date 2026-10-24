@@ -1,5 +1,6 @@
 """Named parts: a shape plus a pivot, an optional parent part, an optional symmetry axis that
-lint checks against the asset's center plane, and an optional joint saying how it moves."""
+lint checks against the asset's center plane, an optional joint saying how it moves, and
+whether it starts hidden (shown by clips)."""
 
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ class Part:
     parent: str | None = None
     symmetric: str | None = None
     joint: Joint | None = None
+    hidden: bool = False  # hidden at rest; a clip's visible(...) track shows it
 
     def mirrored(
         self,

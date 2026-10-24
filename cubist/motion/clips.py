@@ -65,6 +65,8 @@ class Clip:
     events: tuple[tuple[float, str], ...] = ()
 
     def track_ease(self, track: Track) -> str:
+        if track.channel == "visible":
+            return "step"
         return track.ease or self.ease
 
     def to_dict(self) -> dict:
@@ -134,6 +136,12 @@ def _free(kind: str, part: str, axis: str, keys, ease: str | None) -> TrackSpec:
     return TrackSpec(part, f"{kind}_{name}", keys, ease)
 
 
+def visible(part: str, keys) -> TrackSpec:
+    """Show (1) and hide (0) a part over the clip, stepping between keys. Pair it with
+    ``Part(..., hidden=True)`` for flashes and sparks that appear for a moment."""
+    return TrackSpec(part, "visible", keys, "step")
+
+
 def turn(part: str, axis: str, keys, ease: str | None = None) -> TrackSpec:
     """Rotate any part about its pivot: degrees along the parent's ``axis`` ('x', '-y', ...)."""
     return _free("rotate", part, axis, keys, ease)
@@ -186,6 +194,8 @@ def _check_track(name: str, length: float, track: Track) -> None:
         raise ModelError(f"{what}: key times must be in order, got {list(track.times)}")
     if len(set(track.times)) != len(track.times):
         raise ModelError(f"{what}: two keys share a time; give each key its own time")
+    if track.channel == "visible" and any(v not in (0.0, 1.0) for v in track.values):
+        raise ModelError(f"{what}: visible keys must be 0 or 1 (hidden or shown)")
     if track.times[0] < -_EPS or track.times[-1] > length + _EPS:
         raise ModelError(
             f"{what}: key times must be inside the clip (0 to {length:g} s), "
@@ -242,8 +252,14 @@ def clip(
                     f"(turn(...), move(...), swing(...), ...), got {t!r}"
                 )
             built.append(t)
+    if not built:
+        raise ModelError(f"clip {name!r} has no tracks; give it keys for at least one part")
     for t in built:
         _check_track(name, length, t)
+    shown = [t.part for t in built if t.channel == "visible"]
+    twice = sorted({p for p in shown if shown.count(p) > 1})
+    if twice:
+        raise ModelError(f"clip {name!r} has two visible(...) tracks for {twice[0]!r}; merge them")
     evs = []
     for ev in events:
         try:

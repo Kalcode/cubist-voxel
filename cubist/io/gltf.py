@@ -191,8 +191,9 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
     xyzw, and the glTF ``interpolation``."""
     pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
     out = {}
-    for name in dict.fromkeys(t.part for t in clip.tracks):
-        tracks = [t for t in clip.tracks if t.part == name]
+    motion = [t for t in clip.tracks if t.channel != "visible"]
+    for name in dict.fromkeys(t.part for t in motion):
+        tracks = [t for t in motion if t.part == name]
         part = asset.part(name)
         if all(clip.track_ease(t) == "step" for t in tracks):
             times = sorted({t for tr in tracks for t in tr.times})
@@ -237,7 +238,7 @@ def _animation(
         key = (sample["interpolation"], times.tobytes())
         if key not in inputs:
             inputs[key] = binary.accessor(times, "SCALAR", _FLOAT, None, bounds=True)
-        kind = "VEC3" if path == "translation" else "VEC4"
+        kind = "VEC4" if path == "rotation" else "VEC3"
         output = binary.accessor(values.astype(np.float32), kind, _FLOAT, None)
         samplers.append(
             {"input": inputs[key], "output": output, "interpolation": sample["interpolation"]}
@@ -252,6 +253,11 @@ def _animation(
             add(name, "translation", sample["translation"], sample)
         if np.abs(np.abs(sample["rotation"] @ identity) - 1.0).max() > 1e-12:
             add(name, "rotation", sample["rotation"], sample)
+    for track in clip.tracks:
+        if track.channel == "visible":
+            shown = np.array([[v, v, v] for v in track.values], dtype=np.float64)
+            steps = {"times": np.array(track.times), "interpolation": "STEP"}
+            add(track.part, "scale", shown, steps)
     if not channels and samples:
         # A clip that moves nothing still exists, so engines can find it by name.
         name, sample = next(iter(samples.items()))
@@ -293,6 +299,8 @@ def encode_glb(
         parent = part.parent if part.parent in pivots else None
         offset = pivots[part.name] - (pivots[parent] if parent else 0.0)
         node: dict = {"name": part.name, "translation": [float(v) * s for v in offset]}
+        if part.hidden:
+            node["scale"] = [0.0, 0.0, 0.0]  # shown by a clip's visibility track
         quads = greedy_mesh(part.grid, ao=ao, seal=hollow)
         if quads:
             pos, nrm, color, shade, tris = _quad_geometry(quads, pivots[part.name], s)

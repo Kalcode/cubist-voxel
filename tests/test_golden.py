@@ -14,7 +14,7 @@ from PIL import Image
 
 from cubist.build.runner import load_palette
 from cubist.core.model import AssetDef
-from cubist.render.contact_sheet import contact_sheet
+from cubist.render.contact_sheet import contact_sheet, hidden_note
 from cubist.render.filmstrip import filmstrip
 
 ROOT = Path(__file__).parent.parent
@@ -57,7 +57,13 @@ def test_contact_sheet_matches_golden(script):
     palette = load_palette(DEMO / "style.toml")
     [asset] = [v for v in runpy.run_path(str(script)).values() if isinstance(v, AssetDef)]
     built = asset.build(palette)
-    sheet = contact_sheet(built.merged_grid(), palette, name=asset.name, size=asset.size)
+    sheet = contact_sheet(
+        built.visible_grid(),
+        palette,
+        name=asset.name,
+        size=asset.size,
+        note=hidden_note(built.hidden_parts()),
+    )
     path = GOLDEN / f"{asset.name}.png"
     if UPDATE:
         GOLDEN.mkdir(exist_ok=True)

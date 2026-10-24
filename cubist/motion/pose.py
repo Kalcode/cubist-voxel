@@ -154,6 +154,32 @@ def posed_bounds(asset: BuiltAsset, matrices: dict[str, np.ndarray]) -> tuple:
     return lo, hi
 
 
+def visibility(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, bool]:
+    """Whether each part shows at ``t``: its own ``visible`` track (else its rest state), and
+    every ancestor showing too."""
+    own = {p.name: not p.hidden for p in asset.parts}
+    if clip is not None:
+        for track in clip.tracks:
+            if track.channel == "visible":
+                own[track.part] = track_value(track, t, clip) > 0.5
+    parents = {p.name: p.parent for p in asset.parts}
+    out: dict[str, bool] = {}
+
+    def shows(name: str) -> bool:
+        if name not in out:
+            parent = parents[name]
+            out[name] = own[name] and (parent not in parents or shows(parent))
+        return out[name]
+
+    for name in own:
+        shows(name)
+    return out
+
+
+def hidden_at(asset: BuiltAsset, clip: Clip | None, t: float) -> frozenset[str]:
+    return frozenset(n for n, shown in visibility(asset, clip, t).items() if not shown)
+
+
 def moving_parts(asset: BuiltAsset, clip: Clip) -> list[str]:
     """Parts the clip drives, plus everything hanging from them, in model order."""
     driven = {t.part for t in clip.tracks}

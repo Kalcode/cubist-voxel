@@ -187,6 +187,7 @@ def contact_sheet(
     views: Sequence[str] = DEFAULT_VIEWS,
     names: dict[int, str] | None = None,
     scale: int | None = None,
+    note: str | None = None,
 ) -> Image.Image:
     check_views(views)
     table, names = palette_table(palette, names)
@@ -208,7 +209,13 @@ def contact_sheet(
         size=size,
         views=views,
         scale=scale,
+        note=note,
     )
+
+
+def hidden_note(hidden) -> str | None:
+    """The info-line note naming parts left out of a contact sheet because they start hidden."""
+    return "HIDDEN: " + ", ".join(n.upper() for n in hidden) if hidden else None
 
 
 def check_views(views: Sequence[str]) -> None:
