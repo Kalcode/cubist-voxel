@@ -69,6 +69,13 @@ def build_manifest(
                 "pivot": list(p.pivot),
                 "joint": p.joint.to_dict() if p.joint else None,
                 "hidden": p.hidden,
+                "frames": {
+                    "count": len(p.frames),
+                    "fps": p.fps,
+                    "vox_models": [p.name] + [f"{p.name}@{k}" for k in range(1, len(p.frames))],
+                }
+                if p.frames
+                else None,
                 "voxels": p.grid.count(),
                 "vox_model": p.name,
             }

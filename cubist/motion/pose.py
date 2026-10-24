@@ -134,11 +134,22 @@ def world_matrices(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, 
     return out
 
 
+def part_bounds(part) -> tuple | None:
+    """A part's voxel bounds, across all frames of a flipbook."""
+    boxes = [g.bounds() for g in (part.frames or [part.grid])]
+    boxes = [b for b in boxes if b is not None]
+    if not boxes:
+        return None
+    lo = tuple(min(b[0][i] for b in boxes) for i in range(3))
+    hi = tuple(max(b[1][i] for b in boxes) for i in range(3))
+    return lo, hi
+
+
 def posed_bounds(asset: BuiltAsset, matrices: dict[str, np.ndarray]) -> tuple:
-    """The whole-voxel box around every part's posed voxel bounds."""
+    """The whole-voxel box around every part's posed voxel bounds (all flipbook frames)."""
     pts = []
     for p in asset.parts:
-        b = p.grid.bounds()
+        b = part_bounds(p)
         if b is None:
             continue
         lo, hi = np.array(b[0], float), np.array(b[1], float)
@@ -173,6 +184,45 @@ def visibility(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, bool
 
     for name in own:
         shows(name)
+    return out
+
+
+def frame_index(asset: BuiltAsset, clip: Clip | None, name: str, t: float) -> int:
+    """Which frame of a flipbook part shows at ``t``: the clip's ``frame`` track if it has
+    one, else the flipbook looping on its own at its fps. 0 for other parts."""
+    part = asset.part(name)
+    if not part.frames:
+        return 0
+    n = len(part.frames)
+    if clip is not None:
+        for track in clip.tracks:
+            if track.part == name and track.channel == "frame":
+                return int(round(track_value(track, t, clip))) % n
+    return int(np.floor(t * (part.fps or 8.0) + 1e-9)) % n
+
+
+def frame_indices(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, int]:
+    return {p.name: frame_index(asset, clip, p.name, t) for p in asset.parts if p.frames}
+
+
+def preview_clips(asset: BuiltAsset) -> list[Clip]:
+    """The clips worth previewing and exporting: the authored ones, plus a looping
+    ``<part>_frames`` clip for each flipbook that no clip drives (it plays on its own)."""
+    out = list(asset.clips)
+    driven = {t.part for c in asset.clips for t in c.tracks if t.channel == "frame"}
+    names = {c.name for c in out}
+    for p in asset.parts:
+        if not p.frames or p.name in driven:
+            continue
+        n, fps = len(p.frames), p.fps or 8.0
+        name = f"{p.name}_frames"
+        while name in names:
+            name += "_"
+        track = Track(
+            p.name, "frame", tuple(k / fps for k in range(n)), tuple(map(float, range(n)))
+        )
+        out.append(Clip(name, n / fps, (track,), loop=True, ease="step"))
+        names.add(name)
     return out
 
 

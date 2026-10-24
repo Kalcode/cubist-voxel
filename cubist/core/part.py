@@ -15,12 +15,14 @@ Vec3 = tuple[float, float, float]
 @dataclass(frozen=True)
 class Part:
     name: str
-    shape: Shape
+    shape: Shape | None = None  # or frames=[...] for a flipbook
     pivot: Vec3 | None = None  # None: the bottom center of the part's voxels
     parent: str | None = None
     symmetric: str | None = None
     joint: Joint | None = None
     hidden: bool = False  # hidden at rest; a clip's visible(...) track shows it
+    frames: tuple[Shape, ...] | list[Shape] | None = None  # a flipbook: one shape per frame
+    fps: float = 8.0  # flipbook frames per second when it plays on its own
 
     def mirrored(
         self,
@@ -42,7 +44,7 @@ class Part:
             pivot[i] = 2 * about - pivot[i]
             pivot = tuple(pivot)
         joint = self.joint.reflected(i) if isinstance(self.joint, Joint) else self.joint
-        twin = replace(
-            self, name=name, shape=self.shape.reflect(axis, about), pivot=pivot, joint=joint
-        )
+        shape = self.shape.reflect(axis, about) if self.shape is not None else None
+        frames = [f.reflect(axis, about) for f in self.frames] if self.frames else self.frames
+        twin = replace(self, name=name, shape=shape, pivot=pivot, joint=joint, frames=frames)
         return self, twin

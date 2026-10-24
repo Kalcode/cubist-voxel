@@ -65,6 +65,20 @@ class Model:
         for part in self.parts:
             if part.parent is not None and part.parent not in names:
                 raise ModelError(f"part {part.name!r} has unknown parent {part.parent!r}")
+            if part.frames is not None:
+                if part.shape is not None:
+                    raise ModelError(f"part {part.name!r}: give a shape or frames, not both")
+                if len(part.frames) < 2 or not all(isinstance(f, Shape) for f in part.frames):
+                    raise ModelError(
+                        f"part {part.name!r} frames must be a list of at least two shapes"
+                    )
+                if isinstance(part.fps, bool) or not part.fps > 0:
+                    raise ModelError(f"part {part.name!r} fps must be > 0, got {part.fps!r}")
+            elif not isinstance(part.shape, Shape):
+                raise ModelError(
+                    f"part {part.name!r} needs a shape (or frames=[...] for a flipbook), "
+                    f"got {part.shape!r}"
+                )
             if part.joint is not None and not isinstance(part.joint, Joint):
                 raise ModelError(
                     f"part {part.name!r} joint must be hinge(...), slide(...) or spin(...), "
@@ -90,6 +104,7 @@ class Model:
 
     def _check_clips(self) -> None:
         joints = {p.name: p.joint for p in self.parts}
+        flipbooks = {p.name: bool(p.frames) for p in self.parts}
         seen: set[str] = set()
         for c in self.clips:
             if not isinstance(c, Clip):
@@ -102,6 +117,11 @@ class Model:
                     raise ModelError(
                         f"clip {c.name!r} has a track for unknown part {t.part!r}; parts are "
                         f"{', '.join(sorted(joints))}"
+                    )
+                if t.channel == "frame" and not flipbooks[t.part]:
+                    raise ModelError(
+                        f"clip {c.name!r} picks frames of {t.part!r}, which is not a flipbook; "
+                        "give it frames=[...]"
                     )
                 if t.channel == "joint" and joints[t.part] is None:
                     raise ModelError(
@@ -132,6 +152,8 @@ class BuiltPart:
     symmetric: str | None = None
     joint: Joint | None = None
     hidden: bool = False
+    frames: list[VoxelGrid] | None = None  # a flipbook's frames; grid is frames[0]
+    fps: float | None = None
 
 
 def voxel_sha256(grid: VoxelGrid) -> str:
@@ -160,7 +182,7 @@ class BuiltAsset:
     cycles: list[Cycle] = field(default_factory=list)
 
     def is_animated(self) -> bool:
-        return bool(self.clips) or any(p.joint is not None for p in self.parts)
+        return bool(self.clips) or any(p.joint is not None or p.frames for p in self.parts)
 
     def part(self, name: str) -> BuiltPart:
         for p in self.parts:
@@ -209,11 +231,16 @@ class BuiltAsset:
         return {i: self.palette.name_of(i) for i in sorted(used)}
 
     def to_vox_scene(self):
+        """Parts as .vox models; a flipbook's later frames ride along as hidden models named
+        ``<part>@<k>`` under it."""
         from cubist.io.vox import VoxPart, VoxScene
 
-        return VoxScene(
-            [VoxPart(p.name, p.grid, p.parent) for p in self.parts], self.palette.rgba_table()
-        )
+        parts = []
+        for p in self.parts:
+            parts.append(VoxPart(p.name, p.grid, p.parent, hidden=p.hidden))
+            for k, frame in enumerate((p.frames or [])[1:], start=1):
+                parts.append(VoxPart(f"{p.name}@{k}", frame, p.name, hidden=True))
+        return VoxScene(parts, self.palette.rgba_table())
 
     def summary(self) -> dict:
         def part_info(p: BuiltPart) -> dict:
@@ -227,7 +254,10 @@ class BuiltAsset:
                 "symmetric": p.symmetric,
                 "joint": p.joint.to_dict() if p.joint else None,
                 "hidden": p.hidden,
+                "frames": len(p.frames) if p.frames else None,
+                "fps": p.fps if p.frames else None,
                 "voxel_sha256": voxel_sha256(p.grid),
+                "frame_sha256": [voxel_sha256(f) for f in p.frames] if p.frames else None,
             }
 
         return {
@@ -258,8 +288,11 @@ class BuiltAsset:
 
         Color indices stay as they are in the file, which may differ from ``palette``."""
         info = {p["name"]: p for p in summary.get("parts", [])}
+        by_name = {p.name: p for p in scene.parts}
         parts = []
         for part in scene.parts:
+            if "@" in part.name and part.name.rsplit("@", 1)[0] in by_name:
+                continue  # a flipbook frame, folded into its part below
             meta = info.get(part.name, {})
             joint = meta.get("joint")
             parts.append(
@@ -273,6 +306,10 @@ class BuiltAsset:
                     bool(meta.get("hidden", False)),
                 )
             )
+            if meta.get("frames"):
+                extra = [by_name.get(f"{part.name}@{k}") for k in range(1, meta["frames"])]
+                parts[-1].frames = [part.grid] + [f.grid for f in extra if f is not None]
+                parts[-1].fps = float(meta.get("fps") or 8.0)
         size = summary.get("size")
         return cls(
             name=summary.get("name", parts[0].name if parts else "asset"),
@@ -345,12 +382,26 @@ class AssetDef:
             for p in result.parts:
                 check_symmetric(p.symmetric, f"part {p.name!r} symmetric")
                 try:
-                    grid = p.shape.voxelize()
+                    if p.frames:
+                        frame_grids = [f.voxelize() for f in p.frames]
+                        grid = frame_grids[0]
+                    else:
+                        frame_grids, grid = None, p.shape.voxelize()
                 except ShapeError as e:
                     raise ShapeError(f"part {p.name!r}: {e}") from None
                 pivot = tuple(p.pivot) if p.pivot is not None else default_pivot(grid)
                 parts.append(
-                    BuiltPart(p.name, grid, pivot, p.parent, p.symmetric, p.joint, bool(p.hidden))
+                    BuiltPart(
+                        p.name,
+                        grid,
+                        pivot,
+                        p.parent,
+                        p.symmetric,
+                        p.joint,
+                        bool(p.hidden),
+                        frame_grids,
+                        float(p.fps) if frame_grids else None,
+                    )
                 )
         return BuiltAsset(
             self.name,

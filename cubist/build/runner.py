@@ -37,6 +37,7 @@ from cubist.core.style import StyleBible, StyleError, load_style
 from cubist.io.vox import encode_vox
 from cubist.lint import Finding, lint
 from cubist.manifest import build_manifest
+from cubist.motion.pose import preview_clips
 from cubist.render.contact_sheet import contact_sheet, hidden_note
 from cubist.render.filmstrip import clip_frames, filmstrip, save_gif
 
@@ -223,20 +224,21 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
 def _write_motion(built: BuiltAsset, asset_dir: Path) -> dict:
     """Filmstrip and GIFs for an asset with clips; clears stale ones either way."""
     motion_path = asset_dir / "motion.png"
-    keep = {f"{c.name}.gif" for c in built.clips}
+    clips = preview_clips(built)
+    keep = {f"{c.name}.gif" for c in clips}
     for old in asset_dir.glob("*.gif"):
         if old.name not in keep:
             old.unlink()
-    if not built.clips:
+    if not clips:
         for old in (motion_path, asset_dir / "motion.prev.png"):
             old.unlink(missing_ok=True)
         return {}
     table = built.palette.rgba_table()
     if motion_path.exists():
         motion_path.replace(asset_dir / "motion.prev.png")
-    filmstrip(built, table, built.clips).save(motion_path)
+    filmstrip(built, table, clips).save(motion_path)
     gifs = {}
-    for c in built.clips:
+    for c in clips:
         frames, durations = clip_frames(built, table, c)
         save_gif(frames, durations, asset_dir / f"{c.name}.gif")
         gifs[c.name] = str(asset_dir / f"{c.name}.gif")

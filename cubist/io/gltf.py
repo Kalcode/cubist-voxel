@@ -30,8 +30,8 @@ from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
 from cubist.io.mesh import Quad, greedy_mesh
-from cubist.motion.clips import Clip
-from cubist.motion.pose import dense_times, local_motion, track_value
+from cubist.motion.clips import STEPPED, Clip
+from cubist.motion.pose import dense_times, frame_index, local_motion, preview_clips, track_value
 
 AO_LEVELS = (0.5, 0.7, 0.85, 1.0)
 _FLOAT, _UINT, _USHORT = 5126, 5125, 5123
@@ -177,7 +177,7 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
     xyzw, and the glTF ``interpolation``."""
     pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
     out = {}
-    motion = [t for t in clip.tracks if t.channel != "visible"]
+    motion = [t for t in clip.tracks if t.channel not in STEPPED]
     for name in dict.fromkeys(t.part for t in motion):
         tracks = [t for t in motion if t.part == name]
         part = asset.part(name)
@@ -214,14 +214,21 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
 
 
 def _animation(
-    asset: BuiltAsset, clip: Clip, binary: _Binary, index_of: dict[str, int], s: float
+    asset: BuiltAsset,
+    clip: Clip,
+    binary: _Binary,
+    index_of: dict[str, int],
+    s: float,
+    frame_nodes: dict[tuple[str, int], int] | None = None,
 ) -> dict:
     samples = animation_samples(asset, clip, s)
     channels: list[dict] = []
     samplers: list[dict] = []
     inputs: dict[tuple[str, bytes], int] = {}
 
-    def add(name: str, path: str, values: np.ndarray, sample: dict) -> None:
+    def add(
+        name: str, path: str, values: np.ndarray, sample: dict, node: int | None = None
+    ) -> None:
         times = sample["times"].astype(np.float32).reshape(-1, 1)
         key = (sample["interpolation"], times.tobytes())
         if key not in inputs:
@@ -231,9 +238,8 @@ def _animation(
         samplers.append(
             {"input": inputs[key], "output": output, "interpolation": sample["interpolation"]}
         )
-        channels.append(
-            {"sampler": len(samplers) - 1, "target": {"node": index_of[name], "path": path}}
-        )
+        target = index_of[name] if node is None else node
+        channels.append({"sampler": len(samplers) - 1, "target": {"node": target, "path": path}})
 
     identity = np.array([0.0, 0.0, 0.0, 1.0])
     for name, sample in samples.items():
@@ -248,6 +254,14 @@ def _animation(
             shown = np.array([[v, v, v] for v in values], dtype=np.float64)
             steps = {"times": np.array(times), "interpolation": "STEP"}
             add(track.part, "scale", shown, steps)
+        elif track.channel == "frame" and frame_nodes:
+            times = sorted({0.0, clip.length, *track.times})
+            steps = {"times": np.array(times), "interpolation": "STEP"}
+            n = len(asset.part(track.part).frames or [])
+            for k in range(n):
+                on = [1.0 if frame_index(asset, clip, track.part, t) == k else 0.0 for t in times]
+                values = np.array([[v, v, v] for v in on])
+                add(track.part, "scale", values, steps, frame_nodes[(track.part, k)])
     if not channels and samples:
         # A clip that moves nothing still exists, so engines can find it by name.
         name, sample = next(iter(samples.items()))
@@ -338,51 +352,71 @@ def encode_glb(
     index_of: dict[str, int] = {}
     pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
 
+    def mesh_of(grid: VoxelGrid, pivot: np.ndarray, name: str) -> int | None:
+        quads = greedy_mesh(grid, ao=ao, seal=hollow)
+        if not quads:
+            return None
+        pos, nrm, color, shade, tris = _quad_geometry(quads, pivot, s)
+        attributes = {
+            "POSITION": binary.accessor(
+                pos.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER, bounds=True
+            ),
+            "NORMAL": binary.accessor(nrm.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER),
+        }
+        if use_texture:
+            uv = np.stack([(color + 0.5) / 256.0, np.full(len(color), 0.5)], axis=1)
+            attributes["TEXCOORD_0"] = binary.accessor(
+                uv.astype(np.float32), "VEC2", _FLOAT, _ARRAY_BUFFER
+            )
+        if vertex_colors or ao:
+            # COLOR_0 is linear in glTF; the palette is sRGB.
+            rgb = srgb_to_linear(rgba[color, :3]) if vertex_colors else np.ones((len(color), 3))
+            col = np.concatenate([rgb * shade[:, None], np.ones((len(rgb), 1))], axis=1)
+            attributes["COLOR_0"] = binary.accessor(
+                col.astype(np.float32), "VEC4", _FLOAT, _ARRAY_BUFFER
+            )
+        big = len(pos) > 65535
+        indices = binary.accessor(
+            tris.astype(np.uint32 if big else np.uint16),
+            "SCALAR",
+            _UINT if big else _USHORT,
+            _ELEMENT_ARRAY_BUFFER,
+        )
+        meshes.append(
+            {
+                "name": name,
+                "primitives": [
+                    {"attributes": attributes, "indices": indices, "material": 0, "mode": 4}
+                ],
+            }
+        )
+        return len(meshes) - 1
+
+    frame_nodes: dict[tuple[str, int], int] = {}
     for part in asset.parts:
         parent = part.parent if part.parent in pivots else None
         offset = pivots[part.name] - (pivots[parent] if parent else 0.0)
         node: dict = {"name": part.name, "translation": [float(v) * s for v in offset]}
         if part.hidden:
             node["scale"] = [0.0, 0.0, 0.0]  # shown by a clip's visibility track
-        quads = greedy_mesh(part.grid, ao=ao, seal=hollow)
-        if quads:
-            pos, nrm, color, shade, tris = _quad_geometry(quads, pivots[part.name], s)
-            attributes = {
-                "POSITION": binary.accessor(
-                    pos.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER, bounds=True
-                ),
-                "NORMAL": binary.accessor(nrm.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER),
-            }
-            if use_texture:
-                uv = np.stack([(color + 0.5) / 256.0, np.full(len(color), 0.5)], axis=1)
-                attributes["TEXCOORD_0"] = binary.accessor(
-                    uv.astype(np.float32), "VEC2", _FLOAT, _ARRAY_BUFFER
-                )
-            if vertex_colors or ao:
-                # COLOR_0 is linear in glTF; the palette is sRGB.
-                rgb = srgb_to_linear(rgba[color, :3]) if vertex_colors else np.ones((len(color), 3))
-                col = np.concatenate([rgb * shade[:, None], np.ones((len(rgb), 1))], axis=1)
-                attributes["COLOR_0"] = binary.accessor(
-                    col.astype(np.float32), "VEC4", _FLOAT, _ARRAY_BUFFER
-                )
-            big = len(pos) > 65535
-            indices = binary.accessor(
-                tris.astype(np.uint32 if big else np.uint16),
-                "SCALAR",
-                _UINT if big else _USHORT,
-                _ELEMENT_ARRAY_BUFFER,
-            )
-            meshes.append(
-                {
-                    "name": part.name,
-                    "primitives": [
-                        {"attributes": attributes, "indices": indices, "material": 0, "mode": 4}
-                    ],
-                }
-            )
-            node["mesh"] = len(meshes) - 1
         index_of[part.name] = len(nodes)
         nodes.append(node)
+        if part.frames:
+            # A flipbook: one child node per frame, all but the first scaled to nothing.
+            for k, grid in enumerate(part.frames):
+                fnode: dict = {"name": f"{part.name}@{k}"}
+                mesh = mesh_of(grid, pivots[part.name], f"{part.name}@{k}")
+                if mesh is not None:
+                    fnode["mesh"] = mesh
+                if k:
+                    fnode["scale"] = [0.0, 0.0, 0.0]
+                frame_nodes[(part.name, k)] = len(nodes)
+                node.setdefault("children", []).append(len(nodes))
+                nodes.append(fnode)
+            continue
+        mesh = mesh_of(part.grid, pivots[part.name], part.name)
+        if mesh is not None:
+            node["mesh"] = mesh
 
     for part in asset.parts:
         parent = part.parent if part.parent in index_of else None
@@ -444,8 +478,9 @@ def encode_glb(
             ]
         }
         doc.setdefault("extensionsUsed", []).append("KHR_lights_punctual")
-    if asset.clips:
-        doc["animations"] = [_animation(asset, c, binary, index_of, s) for c in asset.clips]
+    clips = preview_clips(asset)
+    if clips:
+        doc["animations"] = [_animation(asset, c, binary, index_of, s, frame_nodes) for c in clips]
     doc["extras"] = {
         "cubist": {"voxel_size_m": s, "size": list(asset.size) if asset.size else None}
     }

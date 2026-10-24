@@ -39,6 +39,20 @@
         "pivot": {"$ref": "#/$defs/vec3"},
         "joint": {"oneOf": [{"$ref": "#/$defs/joint"}, {"type": "null"}]},
         "hidden": {"type": "boolean"},
+        "frames": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["count", "fps", "vox_models"],
+              "properties": {
+                "count": {"type": "integer", "minimum": 2},
+                "fps": {"type": "number", "exclusiveMinimum": 0},
+                "vox_models": {"type": "array", "items": {"type": "string"}}
+              }
+            },
+            {"type": "null"}
+          ]
+        },
         "voxels": {"type": "integer", "minimum": 0},
         "vox_model": {"type": "string"}
       }
@@ -82,7 +96,7 @@
       "properties": {
         "part": {"type": "string"},
         "channel": {"enum": ["joint", "rotate_x", "rotate_y", "rotate_z", "move_x", "move_y",
-                             "move_z", "visible"]},
+                             "move_z", "visible", "frame"]},
         "times": {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 1},
         "values": {"type": "array", "items": {"type": "number"}, "minItems": 1},
         "ease": {"enum": ["smooth", "linear", "step", null]}

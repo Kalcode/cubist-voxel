@@ -33,6 +33,7 @@ class VoxPart:
     name: str
     grid: VoxelGrid
     parent: str | None = None
+    hidden: bool = False  # written as the scene graph's _hidden attribute
 
 
 @dataclass
@@ -81,8 +82,12 @@ def _to_mv(grid: VoxelGrid) -> tuple[np.ndarray, tuple[int, int, int]]:
     return mv, (int(t[0]), int(t[1]), int(t[2]))
 
 
-def _trn(node_id: int, name: str | None, child: int, layer: int, t=None) -> bytes:
+def _trn(
+    node_id: int, name: str | None, child: int, layer: int, t=None, hidden: bool = False
+) -> bytes:
     attrs = {"_name": name} if name else {}
+    if hidden:
+        attrs["_hidden"] = "1"
     frame = {"_t": f"{t[0]} {t[1]} {t[2]}"} if t is not None else {}
     return _chunk(
         b"nTRN",
@@ -151,11 +156,11 @@ def encode_vox(scene: VoxScene) -> bytes:
         children = [k for k in kids.get(part.name, []) if k not in placed]
         if not children:
             trn_id, shp_id = new_id(), new_id()
-            nodes.append(_trn(trn_id, part.name, shp_id, 0, translations[i]))
+            nodes.append(_trn(trn_id, part.name, shp_id, 0, translations[i], part.hidden))
             nodes.append(_shp(shp_id, i))
             return trn_id
         group_trn, group, own_trn, own_shp = new_id(), new_id(), new_id(), new_id()
-        nodes.append(_trn(group_trn, part.name, group, 0))
+        nodes.append(_trn(group_trn, part.name, group, 0, None, part.hidden))
         nodes.append(_trn(own_trn, part.name, own_shp, 0, translations[i]))
         nodes.append(_shp(own_shp, i))
         child_ids = [own_trn]
@@ -282,7 +287,9 @@ def _decode(data: bytes) -> VoxScene:
 
     parts: list[VoxPart] = []
 
-    def visit(node_id: int, offset: np.ndarray, name: str | None, owners: tuple) -> None:
+    def visit(
+        node_id: int, offset: np.ndarray, name: str | None, owners: tuple, hidden: bool = False
+    ) -> None:
         kind, node = nodes[node_id]
         if kind == b"nTRN":
             frame = node["frames"][0] if node["frames"] else {}
@@ -292,17 +299,18 @@ def _decode(data: bytes) -> VoxScene:
             own = node["attrs"].get("_name") or name
             child_kind = nodes[node["child"]][0]
             inner = owners + (own,) if child_kind == b"nGRP" and own else owners
-            visit(node["child"], offset + t, own, inner)
+            hide = hidden or node["attrs"].get("_hidden") == "1"
+            visit(node["child"], offset + t, own, inner, hide)
         elif kind == b"nGRP":
             for child in node["children"]:
-                visit(child, offset, None, owners)
+                visit(child, offset, None, owners, hidden)
         else:
             model_id = node["models"][0]
             part_name = name or f"model{model_id}"
             # A shape named like the group it sits in is that group's own shape.
             chain = owners[:-1] if owners and owners[-1] == part_name else owners
             parent = chain[-1] if chain else None
-            parts.append(VoxPart(part_name, _from_mv(models[model_id], offset), parent))
+            parts.append(VoxPart(part_name, _from_mv(models[model_id], offset), parent, hidden))
 
     visit(0, np.zeros(3, dtype=np.int64), None, ())
     known = {p.name for p in parts}

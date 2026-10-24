@@ -5,7 +5,8 @@ A track drives one channel of one part, relative to rest:
 * ``joint``: the part's joint value (degrees for a hinge, voxels for a slide, turns for a spin);
 * ``rotate_x|y|z``: degrees about the part's pivot along the parent's axes, on any part;
 * ``move_x|y|z``: voxels along the parent's axes, on any part;
-* ``visible``: 1 shown, 0 hidden (always stepped).
+* ``visible``: 1 shown, 0 hidden (always stepped);
+* ``frame``: which frame of a flipbook part shows (always stepped).
 
 Track specs (``turn``, ``move``, the generators) describe keys before the clip's length is
 known; ``clip()`` resolves them into plain tracks, so a clip only ever holds keys.
@@ -23,7 +24,8 @@ from cubist.core.errors import ModelError
 EASES = ("smooth", "linear", "step")
 ROTATE = ("rotate_x", "rotate_y", "rotate_z")
 MOVE = ("move_x", "move_y", "move_z")
-CHANNELS = ("joint", *ROTATE, *MOVE, "visible")
+CHANNELS = ("joint", *ROTATE, *MOVE, "visible", "frame")
+STEPPED = ("visible", "frame")
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _EPS = 1e-9
 
@@ -67,7 +69,7 @@ class Clip:
     travel: tuple[float, float, float] | None = None  # voxels per second, for in-place walks
 
     def track_ease(self, track: Track) -> str:
-        if track.channel == "visible":
+        if track.channel in STEPPED:
             return "step"
         return track.ease or self.ease
 
@@ -146,6 +148,12 @@ def visible(part: str, keys) -> TrackSpec:
     return TrackSpec(part, "visible", keys, "step")
 
 
+def frames(part: str, keys) -> TrackSpec:
+    """Pick which frame of a flipbook part shows, stepping between keys: ``[(0, 0), (0.05, 1)]``
+    plays a two-frame muzzle flash once. Without a frames track a flipbook loops at its fps."""
+    return TrackSpec(part, "frame", keys, "step")
+
+
 def turn(part: str, axis: str, keys, ease: str | None = None) -> TrackSpec:
     """Rotate any part about its pivot: degrees along the parent's ``axis`` ('x', '-y', ...)."""
     return _free("rotate", part, axis, keys, ease)
@@ -203,6 +211,8 @@ def _check_track(name: str, length: float, track: Track) -> None:
         raise ModelError(f"{what}: two keys share a time; give each key its own time")
     if track.channel == "visible" and any(v not in (0.0, 1.0) for v in track.values):
         raise ModelError(f"{what}: visible keys must be 0 or 1 (hidden or shown)")
+    if track.channel == "frame" and any(v < 0 or v != int(v) for v in track.values):
+        raise ModelError(f"{what}: frame keys must be frame numbers 0, 1, 2, ...")
     if track.times[0] < -_EPS or track.times[-1] > length + _EPS:
         raise ModelError(
             f"{what}: key times must be inside the clip (0 to {length:g} s), "

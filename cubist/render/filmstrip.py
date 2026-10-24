@@ -19,7 +19,7 @@ from cubist.core.model import BuiltAsset
 from cubist.core.style import glow_array
 from cubist.io.gltf import nearest_part
 from cubist.motion.clips import Clip
-from cubist.motion.pose import dense_times, hidden_at, world_matrices
+from cubist.motion.pose import dense_times, frame_indices, hidden_at, world_matrices
 from cubist.render.contact_sheet import (
     DEFAULT_VIEWS,
     GAP,
@@ -154,9 +154,9 @@ def filmstrip(
         cells = []
         for t in frame_times(c, frames):
             m, hide = world_matrices(asset, c, t), hidden_at(asset, c, t)
-            marks = light_markers(asset, m)
-            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks).rgb)
-            ortho = scene.render(m, v, scale, region, hide, marks)
+            marks, fr = light_markers(asset, m), frame_indices(asset, c, t)
+            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks, fr).rgb)
+            ortho = scene.render(m, v, scale, region, hide, marks, fr)
             rgb = _decorate(ortho, step, size_box.get(v) if size_box else None)
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
@@ -213,19 +213,28 @@ def clip_frames(
         scale = min(choose_scale(dims), cap)
         scale = max(2, scale - scale % 2)
     step_cs = max(1, round(100 / fps))
-    times = []
+    grid = []
     k = 0
     while k * step_cs / 100 < clip.length - 1e-9:
-        times.append(k * step_cs / 100)
+        grid.append(k * step_cs / 100)
         k += 1
+    # Every moment a stepped track (flipbook frames, visibility) changes gets its own frame.
+    steps = sorted(
+        {t for tr in clip.tracks if clip.track_ease(tr) == "step" for t in tr.times
+         if 0 <= t < clip.length - 1e-9}
+    )  # fmt: skip
+    times = sorted({*steps, *(g for g in grid if all(abs(g - s) >= 0.01 for s in steps))})
     if not clip.loop:
         times.append(clip.length)
     ends = times[1:] + ([clip.length] if clip.loop else [])
-    durations = [max(10, round((b - a) * 100) * 10) for a, b in zip(times, ends, strict=False)]
+    durations = [
+        max(10, (round(b * 100) - round(a * 100)) * 10) for a, b in zip(times, ends, strict=False)
+    ]
     images = []
     for t in times:
         m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
-        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m))
+        fr = frame_indices(asset, clip, t)
+        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m), fr)
         images.append(Image.fromarray(iso_framed(view.rgb)))
     if not clip.loop:
         durations.append(step_cs * 10 + GIF_HOLD_MS)
@@ -262,6 +271,7 @@ def posed_sheet(
     """Today's contact sheet of the asset posed at time ``t`` of ``clip``."""
     scene = PosedScene(asset, table, glow_array(asset.glow))
     m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
+    fr = frame_indices(asset, clip, t)
     bounds = scene.bounds(m)
     regions = [bounds]
     if asset.size is not None:
@@ -269,7 +279,7 @@ def posed_sheet(
     region = _union(regions)
     grid = VoxelGrid.merge([p.grid for p in asset.parts if p.name not in hide])
     return sheet(
-        lambda view, s, r: scene.render(m, view, s, r, hide, light_markers(asset, m)),
+        lambda view, s, r: scene.render(m, view, s, r, hide, light_markers(asset, m), fr),
         region,
         np.asarray(table),
         names or {},

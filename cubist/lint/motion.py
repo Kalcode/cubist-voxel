@@ -283,9 +283,16 @@ def check_hand_edits(asset: BuiltAsset, summary: dict) -> list[Finding]:
     if not asset.is_animated() or not summary.get("parts"):
         return []
     recorded = {p["name"]: p.get("voxel_sha256") for p in summary["parts"]}
+    frames = {p["name"]: p.get("frame_sha256") for p in summary["parts"]}
     names = [p.name for p in asset.parts]
-    changed = [p.name for p in asset.parts
-               if recorded.get(p.name) and recorded[p.name] != voxel_sha256(p.grid)]  # fmt: skip
+
+    def edited(p) -> bool:
+        if recorded.get(p.name) and recorded[p.name] != voxel_sha256(p.grid):
+            return True
+        want = frames.get(p.name)
+        return bool(want) and want != [voxel_sha256(f) for f in (p.frames or [p.grid])]
+
+    changed = [p.name for p in asset.parts if edited(p)]
     added = [n for n in names if n not in recorded]
     removed = [n for n in recorded if n not in names]
     if not (changed or added or removed):

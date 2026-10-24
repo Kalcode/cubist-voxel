@@ -73,7 +73,7 @@ class PosedScene:
         self.asset = asset
         self.table = np.asarray(table)
         self.glow = glow
-        self.meshes = {p.name: _Mesh(p.grid) for p in asset.parts}
+        self.meshes = {p.name: [_Mesh(g) for g in (p.frames or [p.grid])] for p in asset.parts}
 
     def bounds(self, matrices: dict[str, np.ndarray]) -> Region:
         """The whole-voxel box around every part's posed bounding box."""
@@ -87,6 +87,7 @@ class PosedScene:
         region: Region,
         hidden: frozenset[str] = frozenset(),
         markers: list[tuple[tuple[float, float, float], tuple[int, int, int]]] = (),
+        frames: dict[str, int] | None = None,
     ) -> ViewRender:
         lo = np.array(region[0], dtype=np.float64)
         hi = np.array(region[1], dtype=np.float64)
@@ -94,7 +95,8 @@ class PosedScene:
 
         # Gather posed faces from every part.
         corners, normals, colors, ao = [], [], [], []
-        for name, mesh in self.meshes.items():
+        for name, meshes in self.meshes.items():
+            mesh = meshes[(frames or {}).get(name, 0) % len(meshes)]
             if not len(mesh.colors) or name in hidden:
                 continue
             m = matrices.get(name, np.eye(4))
