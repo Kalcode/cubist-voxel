@@ -8,7 +8,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from cubist.core.model import BuiltAsset
-from cubist.io.gltf import glb_origin, nearest_part, socket_part, socket_position
+from cubist.core.socket import Socket
+from cubist.io.gltf import glb_origin, nearest_part
 
 MANIFEST_VERSION = 1
 SCHEMA_PATH = Path(__file__).parent / "schema" / "manifest-1.schema.json"
@@ -23,10 +24,12 @@ def build_manifest(
 ) -> dict:
     sockets = {}
     for name, value in asset.sockets.items():
-        point = socket_position(value)
+        sock = Socket.from_value(value, name)
         sockets[name] = {
-            "position": list(point),
-            "part": socket_part(value) or nearest_part(asset, point),
+            "position": list(sock.position),
+            "part": sock.part or nearest_part(asset, sock.position),
+            "forward": list(sock.forward) if sock.forward else None,
+            "up": list(sock.up) if sock.up else None,
         }
     return {
         "cubist_manifest": MANIFEST_VERSION,

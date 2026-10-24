@@ -56,7 +56,9 @@
       "required": ["position", "part"],
       "properties": {
         "position": {"$ref": "#/$defs/vec3"},
-        "part": {"type": ["string", "null"]}
+        "part": {"type": ["string", "null"]},
+        "forward": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
+        "up": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]}
       }
     },
     "track": {

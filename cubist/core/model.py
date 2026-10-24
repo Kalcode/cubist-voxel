@@ -10,6 +10,7 @@ from cubist.core.errors import ModelError
 from cubist.core.grid import VoxelGrid
 from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
+from cubist.core.socket import Socket
 from cubist.dsl.context import building
 from cubist.dsl.shape import Shape, ShapeError
 from cubist.motion.clips import Clip
@@ -51,7 +52,7 @@ class Model:
         clips: Sequence[Clip] | None = None,
     ):
         self.parts = _flatten(parts)
-        self.sockets = dict(sockets or {})
+        self.sockets = {k: Socket.from_value(v, k) for k, v in (sockets or {}).items()}
         self.clips = list(clips or [])
         names = [p.name for p in self.parts]
         dupes = sorted({n for n in names if names.count(n) > 1})
@@ -65,11 +66,9 @@ class Model:
                     f"part {part.name!r} joint must be hinge(...), slide(...) or spin(...), "
                     f"got {part.joint!r}"
                 )
-        for socket, value in self.sockets.items():
-            if len(value) not in (3, 4):
-                raise ModelError(f"socket {socket!r} must be (x, y, z) or (x, y, z, part)")
-            if len(value) == 4 and value[3] not in names:
-                raise ModelError(f"socket {socket!r} names unknown part {value[3]!r}")
+        for name, value in self.sockets.items():
+            if value.part is not None and value.part not in names:
+                raise ModelError(f"socket {name!r} names unknown part {value.part!r}")
         self._check_clips()
         parents = {p.name: p.parent for p in self.parts}
         for name in names:
@@ -140,7 +139,7 @@ class BuiltAsset:
     tags: tuple[str, ...]
     parts: list[BuiltPart]
     palette: Palette | None
-    sockets: dict[str, Vec3] = field(default_factory=dict)
+    sockets: dict[str, Socket] = field(default_factory=dict)
     grounded: bool = False
     symmetric: str | None = None
     allow_floating: bool = False
@@ -230,7 +229,7 @@ class BuiltAsset:
             "voxels": self.merged_grid().count(),
             "part_voxels": self.voxel_count(),
             "parts": [part_info(p) for p in self.parts],
-            "sockets": {k: list(v) for k, v in self.sockets.items()},
+            "sockets": {k: Socket.from_value(v, k).to_summary() for k, v in self.sockets.items()},
             "colors": self.color_counts(),
             "palette_names": {str(i): n for i, n in self.palette_names().items()},
             "ops_used": sorted(self.ops_used),
@@ -266,7 +265,7 @@ class BuiltAsset:
             tags=tuple(summary.get("tags", ())),
             parts=parts,
             palette=palette,
-            sockets={k: tuple(v) for k, v in summary.get("sockets", {}).items()},
+            sockets={k: Socket.from_value(v, k) for k, v in summary.get("sockets", {}).items()},
             grounded=bool(summary.get("grounded", False)),
             symmetric=summary.get("symmetric"),
             allow_floating=bool(summary.get("allow_floating", False)),

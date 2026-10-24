@@ -5,6 +5,7 @@ Asset scripts start with ``from cubist import *``.
 
 from cubist.core.model import Model, ModelError, asset
 from cubist.core.part import Part
+from cubist.core.socket import socket
 from cubist.dsl import (
     Shape,
     ShapeError,
@@ -85,6 +86,7 @@ __all__ = [
     "region",
     "shake",
     "slide",
+    "socket",
     "sphere",
     "spin",
     "spin_track",

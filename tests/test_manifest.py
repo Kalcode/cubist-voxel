@@ -48,7 +48,9 @@ def test_manifest_validates_against_schema():
     lid = m["parts"][1]
     assert lid["joint"] == {"type": "hinge", "axis": [-1.0, 0.0, 0.0], "limits": [0.0, 110.0]}
     assert lid["parent"] == "body" and lid["pivot"] == [2, 4, 0] and lid["vox_model"] == "lid"
-    assert m["sockets"] == {"handle": {"position": [2.0, 5.0, 4.0], "part": "lid"}}
+    assert m["sockets"] == {
+        "handle": {"position": [2.0, 5.0, 4.0], "part": "lid", "forward": None, "up": None}
+    }
     assert m["clips"][0]["name"] == "open" and m["clips"][0]["events"] == [[0.0, "creak"]]
 
 

@@ -28,6 +28,7 @@ from PIL import Image
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
+from cubist.core.socket import Socket
 from cubist.io.mesh import Quad, greedy_mesh
 from cubist.motion.clips import Clip
 from cubist.motion.pose import local_motion, sample_times, track_value
@@ -44,11 +45,11 @@ def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
 
 
 def socket_position(value) -> tuple[float, float, float]:
-    return tuple(float(v) for v in value[:3])  # type: ignore[return-value]
+    return Socket.from_value(value).position
 
 
 def socket_part(value) -> str | None:
-    return value[3] if len(value) > 3 else None
+    return Socket.from_value(value).part
 
 
 class _Binary:
@@ -350,7 +351,15 @@ def encode_glb(
         point = socket_position(value)
         owner_name = socket_part(value) or nearest_part(asset, point)
         offset = np.array(point) - (pivots[owner_name] if owner_name in pivots else 0.0)
-        nodes.append({"name": name, "translation": [float(v) * s for v in offset]})
+        snode: dict = {"name": name, "translation": [float(v) * s for v in offset]}
+        sock = Socket.from_value(value, name)
+        if sock.forward is not None:
+            # local +Z forward, +Y up
+            up, fwd = np.array(sock.up), np.array(sock.forward)
+            snode["rotation"] = [
+                float(c) for c in _quat(np.column_stack([np.cross(up, fwd), up, fwd]))
+            ]
+        nodes.append(snode)
         owner = nodes[index_of[owner_name]] if owner_name in index_of else root
         owner.setdefault("children", []).append(len(nodes) - 1)
 

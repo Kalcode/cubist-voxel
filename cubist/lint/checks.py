@@ -9,6 +9,7 @@ from scipy import ndimage
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
+from cubist.core.socket import Socket
 from cubist.core.style import StyleBible
 from cubist.core.topology import SIX, hidden_mask, outside_air
 from cubist.io.mesh import greedy_mesh
@@ -140,7 +141,7 @@ def check_pivots(asset: BuiltAsset) -> list[Finding]:
     if merged is not None:
         lo, hi = np.array(merged[0]), np.array(merged[1])
         for name, value in asset.sockets.items():
-            pos = tuple(value[:3])
+            pos = Socket.from_value(value, name).position
             p = np.array(pos, dtype=float)
             if np.any(p < lo) or np.any(p > hi):
                 out.append(
