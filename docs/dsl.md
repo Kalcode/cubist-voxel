@@ -64,6 +64,65 @@ Part(...).mirrored(name, about_x=None, about_y=None, about_z=None)  # -> (part, 
 - Each voxel should belong to one part; lint warns when parts overlap (they double up in exports
   and poke through when a part moves). Subtract one part's shape from the other.
 
+## Joints and clips
+
+```python
+Part(name, shape, ..., joint=None)
+hinge(axis, limits)  # turn about axis through the pivot; limits = (lo, hi) degrees
+slide(direction, distance)  # move 0..distance voxels along direction
+spin(axis, rps=None)  # turn without limits; rps = a default speed, turns per second
+clip(name, length, tracks, loop=False, ease="smooth", events=())
+Model(parts, sockets=None, clips=None)
+```
+
+A joint says how a part moves about its pivot; a clip is named, timed motion of joints.
+
+- **Axes** are `"x"`, `"-x"`, `"+z"` (and so on) or a vector, in the parent's frame: a part
+  rides along when its parent moves.
+- **Units:** seconds, degrees for hinges, voxels for slides, turns for spins. The pose as
+  modeled is joint value 0, and clip values are relative to it.
+- **Tracks** map part names to keys: plain values spread evenly from 0 to `length` (one value
+  holds still), or `(time, value)` pairs. A list of `Track` objects also works.
+- **`ease`**: `smooth` (default) eases in and out and never overshoots its keys, so to
+  overshoot, add a key past the target: `[0, 115, 105]`. `linear` keeps a constant speed (spins,
+  conveyor belts); `step` jumps from key to key.
+- **`loop=True`** clips should end in the pose they start in; spins end on whole turns. Lint
+  warns otherwise.
+- **`events`** are `(time, name)` markers for the engine (`"creak"`, `"footstep"`); Cubist
+  gives them no meaning.
+- `Part.mirrored(...)` reflects joints too: mirrored legs swing forward together.
+- Clip names become file names (`out/<name>/<clip>.gif`): letters, digits, `_` and `-`.
+
+Which way a hinge turns follows the right-hand rule, like `rotate`:
+
+| Axis | A positive angle turns | So |
+| --- | --- | --- |
+| `hinge("x")` | +Y toward +Z | a lid hinged at its **back** edge opens with `hinge("-x")` |
+| `hinge("y")` | +X toward -Z | a door hinged at its low-x edge swings toward the viewer with negative angles |
+| `hinge("z")` | +X toward +Y | a part hinged at its low-x end lifts with positive angles |
+
+Put a hinge's pivot where the part really hinges: the edge it turns on, at the face it swings
+away from. A pivot inside the neighboring part makes the part sweep through it (lint:
+`motion_collision`).
+
+```python
+lid = Part("lid", lid_shape, parent="body", pivot=(7, 7, 0), joint=hinge("-x", (0, 120)))
+drawer = Part("drawer", drawer_shape, parent="desk", joint=slide("+z", 6))
+prop = Part("prop", blades, parent="plane", pivot=(10.5, 5.5, 20.5), joint=spin("z", rps=2))
+clips = [
+    clip("open", 0.6, {"lid": [0, 115, 105]}),  # overshoot, then settle
+    clip("pull", 0.7, {"drawer": [0, 6]}),
+    clip("spin", 1.0, {"prop": [0, 2]}, loop=True, ease="linear"),
+]
+```
+
+A build of an asset with clips also writes `motion.png` (a filmstrip of every clip: iso frames
+above an orthographic view chosen to show the motion, each labeled with its time) and a GIF per
+clip. `cubist render out/<name> --clip open --at 0.3` draws a full contact sheet of one moment;
+`--frames 12 --view right` gives a denser filmstrip. Motion lint flags keys past a joint's
+limits (error), loops that don't close, parts moving through each other (warnings), and how far
+each clip reaches beyond the rest box (info).
+
 ## Primitives
 
 Each starts at its local origin; move it with `.at(x, y, z)`.

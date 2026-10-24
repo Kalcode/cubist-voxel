@@ -12,7 +12,9 @@ at a time. Run commands from the project directory (e.g. `projects/demo`), via `
    script stub), the style bible (`cubist style`), and the 2–3 closest approved examples
    (`cubist examples search --tags ... --category ...`): study their scripts and contact sheets.
 2. Write `assets/<name>.py` and build: `cubist build assets/<name>.py`.
-3. Inspect `out/<name>/contact.png` and the lint summary in the build output.
+3. Inspect `out/<name>/contact.png` and the lint summary in the build output. If the asset
+   moves, also read `out/<name>/motion.png` (the filmstrip): do the parts move the way the brief
+   asks, with nothing passing through anything?
 4. Critique against this checklist:
    - Is the silhouette readable at game distance?
    - Do proportions match the style bible?
@@ -29,7 +31,9 @@ When the user approves an asset: `cubist examples promote <name> --note "why it 
 DSL gotchas: a voxel is filled when its center is inside a shape; shapes symmetric about a whole
 number need an even width; pointed shapes (cones, tips) need their center on a voxel center
 (x.5) so the tip has a column; ramp ops (`darken_crevices`, `highlight_edges`, `dither`) only
-step along list ramps; characters face +Z, so their right side is at low x. The full DSL
+step along list ramps; characters face +Z, so their right side is at low x; hinges follow the right-hand rule, so a
+lid hinged at its back edge opens with `hinge("-x")`, and a hinge's pivot belongs on the edge
+the part turns on, at the face it swings away from. The full DSL
 reference, with every signature, is `docs/dsl.md`.
 
 ## Developing Cubist

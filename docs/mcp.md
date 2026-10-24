@@ -44,8 +44,8 @@ five iterations) as its instructions.
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `build_asset` | `script_path`, or `code` + `name`; `seed` | Lint summary, output paths, contact sheet image |
-| `render` | `asset`, `views`, `slices` | Contact sheet image and/or ASCII slices |
+| `build_asset` | `script_path`, or `code` + `name`; `seed` | Lint summary, output paths, contact sheet image, and the filmstrip for assets with clips |
+| `render` | `asset`, `views`, `slices`; or `clip` with `frames`, `view`, or `at` | Contact sheet image and/or ASCII slices; a clip's filmstrip, or a contact sheet posed at time `at` |
 | `diff` | `asset` | Before/after/changes image against the previous build |
 | `lint` | `asset` | Lint report (JSON) |
 | `inspect` | `asset` | Parts, bounds, pivots, sockets, colors (JSON) |

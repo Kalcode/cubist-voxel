@@ -45,6 +45,13 @@ def barrel(p):
 - **A style bible.** One `style.toml` per game fixes the palette, scale, budgets, and art rules,
   and the linter holds every asset to it: off-palette colors, out-of-bounds voxels, floating
   pieces, broken symmetry, budgets, thin walls, hidden interiors.
+- **Motion.** Hinges, slides and spins on parts, and clips written as code: the chest lid
+  opens, the drawer slides, the propeller spins. Every build with clips renders a filmstrip for
+  the agent and a GIF for you, lints the motion (limits, loops that hitch, parts passing through
+  each other), and exports glTF animations plus a manifest for your engine.
+
+  ![The chest opening](docs/images/chest-open.gif)
+
 - **Game-ready export.** `.glb` with one node per part at its pivot (lids open, arms swing),
   sockets as empty nodes, a palette texture or vertex colors, and optional baked AO, tested by
   importing into Godot 4. `.vox` keeps the part hierarchy for touch-ups in MagicaVoxel or Goxel.
@@ -129,6 +136,7 @@ come.
 | [DSL reference](docs/dsl.md) | Every primitive, op, selection, and paint call, with conventions |
 | [How it works](docs/how-it-works.md) | Architecture, build pipeline, shape stages, lint, export (with diagrams) |
 | [MCP server](docs/mcp.md) | Setup and tool reference |
+| [Manifest](docs/manifest.md) | The engine contract: parts, joints, clips, units |
 | [Design](docs/design.md) | The design of record: decisions and milestones |
 
 ## Project layout
@@ -144,8 +152,10 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 
 ## Status
 
-Milestones 1–6 of the [design](docs/design.md) are done, with human scores for the evaluation
-still to come. Next up: animation, voxel effects, and engine integration.
+Milestones 1–7 of the [design](docs/design.md) are done (7 is hinges, slides and spins), with
+human scores for the first evaluation still to come. Next up: characters, flipbooks and glow,
+voxel effects, then a motion evaluation
+([the plan](docs/superpowers/specs/2026-10-24-motion-and-effects-design.md)).
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
 `uv run ruff check . && uv run ruff format .`.

@@ -79,11 +79,11 @@ Open `export/lantern.vox` in MagicaVoxel or drag `export/lantern.glb` into Godot
 | --- | --- |
 | `cubist new <name>` | Scaffold a brief and a script stub |
 | `cubist build <script>` | Build: `.vox`, contact sheet, lint report (`--seed N`, `--check-determinism`) |
-| `cubist render <asset>` | Re-render views (`--views front,iso,silhouette`) or print `--slices y=a..b` |
+| `cubist render <asset>` | Re-render views (`--views front,iso,silhouette`) or print `--slices y=a..b`; `--clip NAME` draws a filmstrip (`--frames`, `--view`) or, with `--at T`, a posed contact sheet |
 | `cubist diff <asset> [<other>]` | Before/after/changes sheet (default: against the previous build) |
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist inspect <file.vox>` | Parts, bounds, and color counts as JSON |
-| `cubist export <asset>` | `.glb` and `.vox` (blocked by lint errors unless `--force`); `--via-vengi FORMAT` |
+| `cubist export <asset>` | `.glb`, `.vox` and the manifest `<name>.cubist.json` (blocked by lint errors unless `--force`); `--via-vengi FORMAT` |
 | `cubist style` | The parsed style bible with every palette name |
 | `cubist palette import <file>` | Use a palette file (.png, .gif, .gpl, .hex) as the palette source |
 | `cubist examples list \| search \| promote` | The example library |

@@ -1,4 +1,4 @@
-"""Regenerate the README and docs images (icon, banner, gallery) with Cubist itself.
+"""Regenerate the README and docs images (icon, banner, sheets, the chest GIF) with Cubist itself.
 
 uv run python scripts/make_images.py
 """
@@ -16,6 +16,7 @@ from cubist.build.runner import load_project_style
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import AssetDef, asset
 from cubist.core.palette import Palette
+from cubist.render.filmstrip import clip_frames, save_gif
 from cubist.render.font import draw_text, text_width
 from cubist.render.raster import iso
 
@@ -117,6 +118,17 @@ def make_sheets() -> None:
     )
 
 
+def make_motion() -> None:
+    """The demo chest opening and closing, as one looping GIF."""
+    _, a, palette = demo_built("chest")
+    frames, durations = [], []
+    for c in a.clips:
+        f, d = clip_frames(a, palette.rgba_table(), c, fps=20, scale=10)
+        frames += f
+        durations += d
+    save_gif(frames, durations, IMAGES / "chest-open.gif")
+
+
 def make_banner() -> None:
     names = ["goblin", "chest", "barrel", "torch", "hut", "tree", "mushroom", "potion", "sword"]
     tiles = [demo_iso(n, 8 if n != "hut" else 6) for n in names]
@@ -152,4 +164,5 @@ if __name__ == "__main__":
     make_icon()
     make_banner()
     make_sheets()
-    print("wrote", sorted(p.name for p in IMAGES.glob("*.png")))
+    make_motion()
+    print("wrote", sorted(p.name for p in IMAGES.glob("*.png")) + ["chest-open.gif"])

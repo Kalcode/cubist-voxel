@@ -129,6 +129,29 @@ red, recolored orange.
 
 ![Diff sheet: ears removed, a hat added, the nose recolored](images/diff-goblin.png)
 
+## Motion
+
+Parts can carry joints (`hinge`, `slide`, `spin`) and models can carry clips. One evaluator
+turns (asset, clip, time) into a transform per part, and everything that shows or exports motion
+reads from it, so what the agent sees is what an engine plays:
+
+```mermaid
+flowchart LR
+    script["Joints + clips<br/>in the script"] --> pose["Pose evaluator<br/>(asset, clip, t) → part matrices"]
+    pose --> posed["Posed renderer<br/>rotated blocks, per-part shading"]
+    posed --> strip["motion.png filmstrip<br/>+ GIF per clip"]
+    posed --> sheet["cubist render --clip --at<br/>posed contact sheet"]
+    pose --> mlint["Motion lint<br/>limits, loops, collisions, reach"]
+    pose --> anim["glTF animations<br/>30 samples/s"]
+    script --> manifest["Manifest<br/>authored keys, joints, events"]
+```
+
+The posed renderer meshes each part once, transforms its faces, and rasterizes them at pixel
+centers with the static renderer's projections, lights and outlines, so moving parts look like
+solid blocks turning, never a re-voxelized staircase.
+
+![The chest opening](images/chest-open.gif)
+
 ## Lint: what renders hide
 
 ```mermaid
@@ -142,9 +165,11 @@ flowchart TD
     asset --> budgets{Budgets}
     asset --> thin{Thin walls}
     asset --> hidden{Hidden interior}
+    asset --> motion{Motion}
     palette & bounds & pivots -->|error| block[Blocks export]
     floating & symmetry & grounding & budgets -->|warning| advice[Advice]
     thin & hidden -->|info| advice
+    motion -->|limits: error; loops, collisions: warning| advice
 ```
 
 Errors block `cubist export` unless `--force`. Determinism is checked on demand in CI.
@@ -158,12 +183,15 @@ flowchart LR
     relint -->|ok| fmt{Format}
     fmt -->|glb| glb["GLB: one node per part at its pivot,<br/>sockets as empty nodes,<br/>palette texture, optional AO"]
     fmt -->|vox| vox["MagicaVoxel .vox<br/>with the part hierarchy"]
+    fmt --> manifest["name.cubist.json<br/>parts, joints, clips"]
     fmt -->|anything else| vengi["vengi-voxconvert<br/>(OBJ, Qubicle, schematics, ...)"]
 ```
 
 GLB meshes are greedy-meshed with sealed cavities dropped, so only faces you can see are
 exported. Parts become nodes at their pivots, parented like the model, so an engine can rotate
-an arm or open a lid with no extra setup. The import is tested in headless Godot 4.
+an arm or open a lid with no extra setup, and clips become glTF animations. The import is tested
+in headless Godot 4, and animations in headless Blender. The manifest
+([manifest.md](manifest.md)) carries what glTF can't: joint limits, authored keys, events.
 
 ## Module map
 
@@ -172,10 +200,11 @@ an arm or open a lid with no extra setup. The import is tested in headless Godot
 | `cubist/core` | Voxel grids, palettes, the style bible, parts and models, topology (what is visible) |
 | `cubist/dsl` | Primitives, CSG, transforms, voxel morphology, paint ops, selections, seeded noise |
 | `cubist/build` | Runs scripts in a subprocess; writes outputs and history |
-| `cubist/render` | Rasterizer, contact sheets, ASCII slices, diff sheets, bitmap font |
+| `cubist/render` | Rasterizer, posed renderer, contact sheets, filmstrips and GIFs, ASCII slices, diff sheets, bitmap font |
+| `cubist/motion` | Joints, clips, and the pose evaluator |
 | `cubist/lint` | The checks above and the report |
 | `cubist/io` | `.vox` reader/writer, greedy meshing, GLB writer, vengi bridge |
-| `cubist/export.py` | Lint-gated export |
+| `cubist/export.py`, `manifest.py` | Lint-gated export and the engine manifest |
 | `cubist/project.py`, `examples.py` | Briefs, scaffolding, the example library |
 | `cubist/evaluation.py` | The brief-by-brief evaluation report |
 | `cubist/mcp_server.py` | MCP tools over the same functions |

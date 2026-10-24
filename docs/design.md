@@ -22,7 +22,8 @@ the repo is now the source of truth, and decisions made while building are folde
 
 - A GUI editor.
 - ML text-to-3D or image-to-3D generation.
-- Skeletal or frame-by-frame animation. v1 supports rigid parts with pivots only.
+- Skeletal animation (bones, skinning, blend shapes). Motion is rigid parts with joints and
+  clips, plus frame-by-frame flipbooks; see Motion and effects below.
 - An in-engine voxel runtime (destructible terrain, chunk streaming).
 
 ## Target asset sizes
@@ -252,6 +253,11 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Budgets | Voxel, color, part, or post-meshing triangle count over the style bible's limits | Warning |
 | Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
+| Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
+| Loop closure | A looping clip whose last pose isn't its first | Warning |
+| Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |
+| Motion bounds | How far each clip reaches beyond the rest box | Info |
+| Hand edit | An animated asset's `.vox` no longer matches its build | Error |
 
 ## Style bible and example library
 
@@ -404,6 +410,19 @@ given off-palette colors is caught too) and refuses to export when there are err
   part hierarchy, node positions and mesh sizes in metres, triangle counts, and the palette
   texture with nearest filtering. It skips when `godot` is not on PATH.
 
+### Manifest
+
+Every export writes `<name>.cubist.json` beside the `.glb` and `.vox`: parts with pivots and
+joints, sockets with their owning part, clips with their authored keys, easing and events, and
+`glb_origin` for mapping to the `.glb`. It is the contract with a game engine, versioned
+(`"cubist_manifest": 1`) and documented in [manifest.md](manifest.md) with a JSON Schema in
+`cubist/schema/`. Builds write the same content to `out/<name>/manifest.json`.
+
+Clips also become glTF animations: sampled 30 times a second from the same pose evaluator the
+previews use (more often where a part turns fast, so no step between keys turns 60° or more),
+linear, with `step` tracks kept as their keys. Blender imports them and matches Cubist's poses
+(`tests/test_blender.py`).
+
 ### Everything else
 
 `cubist export --via-vengi <format>` shells out to `vengi-voxconvert --input <vox> --output
@@ -474,6 +493,24 @@ CLAUDE.md
    `projects/eval/eval/agent-notes.md`; acceptance waits on the human scores in
    `projects/eval/eval/scores.toml`.
 
+### Motion and effects (M7–M11)
+
+The design is `docs/superpowers/specs/2026-10-24-motion-and-effects-design.md`: Cubist says what
+moves and what it looks like; the engine decides when it happens and how it is simulated.
+
+7. **Hinges, slides, spins** — done. Joints (`hinge`, `slide`, `spin`) and clips with smooth,
+   linear or step keys; one pose evaluator shared by previews, lint and export; a posed renderer
+   that draws moving parts as rotated blocks (rest frames match the static renderer pixel for
+   pixel except at part seams); filmstrips (`motion.png`), GIFs, and posed contact sheets
+   (`cubist render --clip NAME [--at T]`); motion lint; glTF animations checked in Blender; the
+   manifest. Demo: chest, door, window, desk, biplane. Plan:
+   `docs/superpowers/plans/2026-10-24-m7-hinges-slides-spins.md`.
+8. **Characters** — free tracks on any part, motion generators (`swing`, `bob`, `shake`),
+   visibility, events, travel speed, oriented sockets, the floor check, a `voxel-animate` skill.
+9. **Flipbooks, color cycles, glow, lights.**
+10. **Effects** — fracture, baked bursts, particle models and emitters.
+11. **Evaluation** — twelve motion briefs built by fresh agents, scored from their GIFs.
+
 ### v1 acceptance targets
 
 - At least 80% of prop briefs reach a lint-clean asset the user accepts within 5 iterations.
@@ -501,9 +538,10 @@ creatures above about 32 voxels tall will need better primitives or human touch-
 - [ ] Hand edits: when someone touches up a `.vox` in an editor, store the difference as a patch
   layer applied on top of the script output, or freeze the asset and stop treating the script
   as the source?
-- [ ] Animation: is rigid-part animation via glTF nodes enough, or will the game need
-  frame-by-frame voxel animation?
-- [ ] Target engine: confirm Godot 4 as the primary import test, or swap for Unity or Unreal.
+- [x] Animation: rigid parts with joints and clips, plus flipbooks for voxels that change
+  shape (fire, water); no skinning. See Motion and effects.
+- [x] Target engine: David's own engine, still to be designed around Cubist. Godot and Blender
+  stay as `.glb` checkers only; the manifest is the engine contract.
 - [x] Project name: Cubist (`cubist`).
 
 ### Prior art
