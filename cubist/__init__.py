@@ -34,6 +34,7 @@ from cubist.dsl import (
     torus,
     wedge,
 )
+from cubist.motion import hinge, slide, spin
 
 __all__ = [
     "Model",
@@ -55,6 +56,7 @@ __all__ = [
     "extrude",
     "faces",
     "heightmap",
+    "hinge",
     "inside",
     "lathe",
     "line",
@@ -62,7 +64,9 @@ __all__ = [
     "polyline",
     "pyramid",
     "region",
+    "slide",
     "sphere",
+    "spin",
     "stripes",
     "surface",
     "torus",

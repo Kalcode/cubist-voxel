@@ -1,11 +1,12 @@
-"""Named parts: a shape plus a pivot, an optional parent part, and an optional symmetry
-axis that lint checks against the asset's center plane."""
+"""Named parts: a shape plus a pivot, an optional parent part, an optional symmetry axis that
+lint checks against the asset's center plane, and an optional joint saying how it moves."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
 from cubist.dsl.shape import Shape, ShapeError
+from cubist.motion.joints import Joint
 
 Vec3 = tuple[float, float, float]
 
@@ -17,6 +18,7 @@ class Part:
     pivot: Vec3 | None = None  # None: the bottom center of the part's voxels
     parent: str | None = None
     symmetric: str | None = None
+    joint: Joint | None = None
 
     def mirrored(
         self,
@@ -37,5 +39,8 @@ class Part:
             pivot = list(self.pivot)
             pivot[i] = 2 * about - pivot[i]
             pivot = tuple(pivot)
-        twin = replace(self, name=name, shape=self.shape.reflect(axis, about), pivot=pivot)
+        joint = self.joint.reflected(i) if isinstance(self.joint, Joint) else self.joint
+        twin = replace(
+            self, name=name, shape=self.shape.reflect(axis, about), pivot=pivot, joint=joint
+        )
         return self, twin

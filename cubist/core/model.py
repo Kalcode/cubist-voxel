@@ -5,15 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 
+from cubist.core.errors import ModelError
 from cubist.core.grid import VoxelGrid
 from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
 from cubist.dsl.context import building
 from cubist.dsl.shape import Shape, ShapeError
-
-
-class ModelError(ValueError):
-    """A model's structure is invalid."""
+from cubist.motion.joints import Joint
 
 
 def check_symmetric(value, what: str) -> None:
@@ -54,6 +52,11 @@ class Model:
         for part in self.parts:
             if part.parent is not None and part.parent not in names:
                 raise ModelError(f"part {part.name!r} has unknown parent {part.parent!r}")
+            if part.joint is not None and not isinstance(part.joint, Joint):
+                raise ModelError(
+                    f"part {part.name!r} joint must be hinge(...), slide(...) or spin(...), "
+                    f"got {part.joint!r}"
+                )
         for socket, value in self.sockets.items():
             if len(value) not in (3, 4):
                 raise ModelError(f"socket {socket!r} must be (x, y, z) or (x, y, z, part)")
