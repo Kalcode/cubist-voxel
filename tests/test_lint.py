@@ -199,3 +199,15 @@ def test_empty_asset_does_not_crash():
 def test_closed_shell_walls_are_not_thin():
     a = build(lambda p: box((6, 6, 6), color=p.wood.mid).hollow(1))
     assert "thin" not in checks(lint(a, style()))
+
+
+def test_socket_with_a_named_part_is_checked_by_position():
+    def fn(p):
+        return Model(
+            parts=[Part("b", box((2, 2, 2), color=p.wood.mid))],
+            sockets={"tip": (1, 2, 1, "b"), "far": (9, 9, 9, "b")},
+        )
+
+    report = lint(build(fn), style())
+    messages = [f.message for f in report.findings if f.check == "pivots"]
+    assert len(messages) == 1 and "far" in messages[0]

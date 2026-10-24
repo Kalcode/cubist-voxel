@@ -2,11 +2,12 @@
 
 Agent-native voxel asset authoring: an agent writes a Python script, Cubist samples it into
 voxels, writes MagicaVoxel `.vox` files, renders a contact sheet to critique, and lints the
-result against the project's style bible. glTF export comes next.
+result against the project's style bible, and exports `.glb` with parts as nodes for game
+engines.
 
-Status: milestones 1–3 of the [design](docs/design.md): the full shape DSL (primitives, CSG,
-transforms, morphology, paint ops, selections), `.vox` read/write, contact sheets, ASCII slices,
-lint, and `style.toml`.
+Status: milestones 1–4 of the [design](docs/design.md): the full shape DSL (primitives, CSG,
+transforms, morphology, paint ops, selections), `.vox` read/write with part hierarchy, contact
+sheets, ASCII slices, lint, `style.toml`, and GLB export verified in Godot 4.
 
 ## Setup
 
@@ -22,6 +23,7 @@ uv run cubist build projects/demo/assets/goblin.py   # -> projects/demo/out/gobl
 uv run cubist render projects/demo/out/goblin_scout --slices y=18..19
 uv run cubist render projects/demo/out/goblin_scout --views front,iso,silhouette
 uv run cubist lint projects/demo/out/goblin_scout          # exit 2 on errors
+uv run cubist export projects/demo/out/goblin_scout --ao  # -> projects/demo/export/
 uv run cubist inspect projects/demo/out/goblin_scout/goblin_scout.vox
 uv run cubist style --style projects/demo/style.toml
 ```
@@ -29,6 +31,9 @@ uv run cubist style --style projects/demo/style.toml
 A build writes `<name>.vox`, `contact.png` (front, right, back, top, and iso views with
 voxel-coordinate rulers and a color legend), `lint.json`, and `build.json`. `--seed N` reshuffles
 every seeded op; `--check-determinism` builds twice in separate processes and compares.
+`cubist export` re-lints, refuses on errors unless `--force`, and writes `.glb` (one node per
+part at its pivot, sockets as empty nodes, metres from `voxel_size_m`) and `.vox`; other formats
+go through `--via-vengi FORMAT` when `vengi-voxconvert` is installed.
 
 An asset script (the barrel from the design doc):
 
@@ -71,7 +76,8 @@ cubist/
   core/    grid, palette, style bible, parts, models, @asset
   dsl/     SDF primitives, CSG, transforms, voxel morphology, paint, selections, noise
   build/   subprocess runner with timeout
-  io/      .vox reader/writer, greedy meshing
+  io/      .vox reader/writer, greedy meshing, GLB writer, vengi bridge
+  export.py  lint-gated export
   lint/    lint checks and report
   render/  rasterizer, contact sheet, ASCII slices, bitmap font
   cli.py

@@ -1,0 +1,266 @@
+"""glTF 2.0 binary (.glb) export.
+
+* One node per part, placed at its pivot and parented as in the model, so engines can rotate
+  parts without extra setup. Mesh vertices are in the node's space. Sockets become empty
+  nodes under the part that owns them (named, or else the nearest part).
+* Greedy-meshed, with faces only where they touch outside air (sealed cavities are dropped).
+* Colors come from a 256x1 palette texture (nearest filtering, UVs at palette cells; one
+  material per asset), or from vertex colors. Optional ambient occlusion is baked into
+  vertex colors, which glTF multiplies with the texture.
+* Y-up and +Z front, like the DSL; metres from ``voxel_size_m``. By default the root node
+  shifts the asset so its footprint is centered on the origin with its base at y = 0.
+
+Written by hand (JSON + binary chunks) so output is byte-for-byte deterministic.
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import os
+import struct
+
+import numpy as np
+from PIL import Image
+
+from cubist.core.grid import VoxelGrid
+from cubist.core.model import BuiltAsset
+from cubist.io.mesh import Quad, greedy_mesh
+
+AO_LEVELS = (0.5, 0.7, 0.85, 1.0)
+_FLOAT, _UINT, _USHORT = 5126, 5125, 5123
+_ARRAY_BUFFER, _ELEMENT_ARRAY_BUFFER = 34962, 34963
+_NEAREST, _CLAMP = 9728, 33071
+
+
+def srgb_to_linear(rgb: np.ndarray) -> np.ndarray:
+    c = np.asarray(rgb, dtype=np.float64) / 255.0
+    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def socket_position(value) -> tuple[float, float, float]:
+    return tuple(float(v) for v in value[:3])  # type: ignore[return-value]
+
+
+def socket_part(value) -> str | None:
+    return value[3] if len(value) > 3 else None
+
+
+class _Binary:
+    """Accumulates the BIN chunk, buffer views, and accessors."""
+
+    def __init__(self):
+        self.data = bytearray()
+        self.views: list[dict] = []
+        self.accessors: list[dict] = []
+
+    def view(self, payload: bytes, target: int | None = None) -> int:
+        self.data.extend(b"\x00" * (-len(self.data) % 4))
+        view = {"buffer": 0, "byteOffset": len(self.data), "byteLength": len(payload)}
+        if target is not None:
+            view["target"] = target
+        self.data.extend(payload)
+        self.views.append(view)
+        return len(self.views) - 1
+
+    def accessor(
+        self,
+        array: np.ndarray,
+        kind: str,
+        component: int,
+        target: int,
+        normalized: bool = False,
+        bounds: bool = False,
+    ) -> int:
+        acc = {
+            "bufferView": self.view(np.ascontiguousarray(array).tobytes(), target),
+            "componentType": component,
+            "count": int(len(array)),
+            "type": kind,
+        }
+        if normalized:
+            acc["normalized"] = True
+        if bounds:
+            acc["min"] = [float(v) for v in array.min(axis=0)]
+            acc["max"] = [float(v) for v in array.max(axis=0)]
+        self.accessors.append(acc)
+        return len(self.accessors) - 1
+
+
+def _quad_geometry(quads: list[Quad], pivot: np.ndarray, scale: float):
+    """Positions, normals, color indices, AO factors (per vertex) and triangle indices."""
+    n = len(quads)
+    pos = np.zeros((n, 4, 3))
+    normals = np.zeros((n, 4, 3))
+    color = np.zeros((n, 4), dtype=np.int64)
+    ao = np.ones((n, 4))
+    tris = np.zeros((n, 6), dtype=np.int64)
+    for i, q in enumerate(quads):
+        u_axis, v_axis = [a for a in range(3) if a != q.axis]
+        for c, (u, v) in enumerate(((q.u0, q.v0), (q.u1, q.v0), (q.u0, q.v1), (q.u1, q.v1))):
+            pos[i, c, q.axis] = q.layer
+            pos[i, c, u_axis] = u
+            pos[i, c, v_axis] = v
+        normals[i, :, q.axis] = q.sign
+        color[i] = q.color
+        if q.ao is not None:
+            ao[i] = [AO_LEVELS[a] for a in q.ao]
+        # e_u x e_v points along +axis for x and z, -axis for y.
+        front = q.sign * (-1 if q.axis == 1 else 1) > 0
+        # Split along the brighter diagonal so AO interpolates without a crease.
+        flip = q.ao is not None and ao[i, 0] + ao[i, 3] < ao[i, 1] + ao[i, 2]
+        if flip:
+            local = (0, 1, 2, 1, 3, 2) if front else (0, 2, 1, 1, 2, 3)
+        else:
+            local = (0, 1, 3, 0, 3, 2) if front else (0, 3, 1, 0, 2, 3)
+        tris[i] = np.array(local) + 4 * i
+    pos = (pos.reshape(-1, 3) - pivot) * scale
+    return pos, normals.reshape(-1, 3), color.reshape(-1), ao.reshape(-1), tris.reshape(-1)
+
+
+def _nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | None:
+    best, best_d = None, np.inf
+    for part in asset.parts:
+        coords, _ = part.grid.voxels()
+        if len(coords) == 0:
+            continue
+        d = float(np.min(np.sum((coords + 0.5 - np.array(point)) ** 2, axis=1)))
+        if d < best_d:
+            best, best_d = part.name, d
+    return best
+
+
+def encode_glb(
+    asset: BuiltAsset,
+    rgba: np.ndarray,
+    voxel_size_m: float = 0.0625,
+    vertex_colors: bool = False,
+    ao: bool = False,
+    center: bool = True,
+    hollow: bool = True,
+) -> bytes:
+    if not voxel_size_m > 0:
+        raise ValueError(f"voxel_size_m must be > 0, got {voxel_size_m}")
+    s = float(voxel_size_m)
+    rgba = np.asarray(rgba, dtype=np.uint8)
+    binary = _Binary()
+    use_texture = not vertex_colors
+
+    root = {"name": asset.name, "children": []}
+    if center:
+        if asset.size is not None:
+            cx, cz = asset.size[0] / 2.0, asset.size[2] / 2.0
+        else:
+            b = VoxelGrid.merge([p.grid for p in asset.parts]).bounds() or ((0, 0, 0), (0, 0, 0))
+            cx, cz = (b[0][0] + b[1][0]) / 2.0, (b[0][2] + b[1][2]) / 2.0
+        root["translation"] = [-cx * s, 0.0, -cz * s]
+    nodes: list[dict] = [root]
+    meshes: list[dict] = []
+    index_of: dict[str, int] = {}
+    pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
+
+    for part in asset.parts:
+        parent = part.parent if part.parent in pivots else None
+        offset = pivots[part.name] - (pivots[parent] if parent else 0.0)
+        node: dict = {"name": part.name, "translation": [float(v) * s for v in offset]}
+        quads = greedy_mesh(part.grid, ao=ao, seal=hollow)
+        if quads:
+            pos, nrm, color, shade, tris = _quad_geometry(quads, pivots[part.name], s)
+            attributes = {
+                "POSITION": binary.accessor(
+                    pos.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER, bounds=True
+                ),
+                "NORMAL": binary.accessor(nrm.astype(np.float32), "VEC3", _FLOAT, _ARRAY_BUFFER),
+            }
+            if use_texture:
+                uv = np.stack([(color + 0.5) / 256.0, np.full(len(color), 0.5)], axis=1)
+                attributes["TEXCOORD_0"] = binary.accessor(
+                    uv.astype(np.float32), "VEC2", _FLOAT, _ARRAY_BUFFER
+                )
+            if vertex_colors or ao:
+                # COLOR_0 is linear in glTF; the palette is sRGB.
+                rgb = srgb_to_linear(rgba[color, :3]) if vertex_colors else np.ones((len(color), 3))
+                col = np.concatenate([rgb * shade[:, None], np.ones((len(rgb), 1))], axis=1)
+                attributes["COLOR_0"] = binary.accessor(
+                    col.astype(np.float32), "VEC4", _FLOAT, _ARRAY_BUFFER
+                )
+            big = len(pos) > 65535
+            indices = binary.accessor(
+                tris.astype(np.uint32 if big else np.uint16),
+                "SCALAR",
+                _UINT if big else _USHORT,
+                _ELEMENT_ARRAY_BUFFER,
+            )
+            meshes.append(
+                {
+                    "name": part.name,
+                    "primitives": [
+                        {"attributes": attributes, "indices": indices, "material": 0, "mode": 4}
+                    ],
+                }
+            )
+            node["mesh"] = len(meshes) - 1
+        index_of[part.name] = len(nodes)
+        nodes.append(node)
+
+    for part in asset.parts:
+        parent = part.parent if part.parent in index_of else None
+        owner = nodes[index_of[parent]] if parent else root
+        owner.setdefault("children", []).append(index_of[part.name])
+
+    for name, value in asset.sockets.items():
+        point = socket_position(value)
+        owner_name = socket_part(value) or _nearest_part(asset, point)
+        offset = np.array(point) - (pivots[owner_name] if owner_name in pivots else 0.0)
+        nodes.append({"name": name, "translation": [float(v) * s for v in offset]})
+        owner = nodes[index_of[owner_name]] if owner_name in index_of else root
+        owner.setdefault("children", []).append(len(nodes) - 1)
+
+    material: dict = {
+        "name": "palette",
+        "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 1.0},
+    }
+    doc: dict = {
+        "asset": {"version": "2.0", "generator": "cubist"},
+        "scene": 0,
+        "scenes": [{"name": asset.name, "nodes": [0]}],
+        "nodes": nodes,
+        "meshes": meshes,
+        "materials": [material],
+    }
+    if use_texture:
+        png = io.BytesIO()
+        Image.fromarray(rgba[None, :, :], "RGBA").save(png, format="PNG")
+        doc["images"] = [
+            {"name": "palette", "mimeType": "image/png", "bufferView": binary.view(png.getvalue())}
+        ]
+        doc["samplers"] = [
+            {"magFilter": _NEAREST, "minFilter": _NEAREST, "wrapS": _CLAMP, "wrapT": _CLAMP}
+        ]
+        doc["textures"] = [{"sampler": 0, "source": 0}]
+        material["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
+    doc["extras"] = {
+        "cubist": {"voxel_size_m": s, "size": list(asset.size) if asset.size else None}
+    }
+    doc["bufferViews"] = binary.views
+    doc["accessors"] = binary.accessors
+    bin_chunk = bytes(binary.data) + b"\x00" * (-len(binary.data) % 4)
+    doc["buffers"] = [{"byteLength": len(bin_chunk)}]
+
+    json_chunk = json.dumps(doc, separators=(",", ":"), sort_keys=True).encode()
+    json_chunk += b" " * (-len(json_chunk) % 4)
+    total = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    return b"".join(
+        [
+            struct.pack("<4sII", b"glTF", 2, total),
+            struct.pack("<I4s", len(json_chunk), b"JSON"),
+            json_chunk,
+            struct.pack("<I4s", len(bin_chunk), b"BIN\x00"),
+            bin_chunk,
+        ]
+    )
+
+
+def write_glb(path: str | os.PathLike, asset: BuiltAsset, rgba: np.ndarray, **options) -> None:
+    with open(path, "wb") as f:
+        f.write(encode_glb(asset, rgba, **options))

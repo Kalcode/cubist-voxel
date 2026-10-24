@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 from cubist.build.runner import (
@@ -16,10 +15,9 @@ from cubist.build.runner import (
     find_style,
     load_project_style,
 )
-from cubist.core.grid import VoxelGrid
-from cubist.core.model import BuiltAsset
-from cubist.io.vox import VoxError, VoxScene, read_vox
-from cubist.lint import lint
+from cubist.export import NATIVE, ExportBlocked, export_asset, lint_loaded, load_asset
+from cubist.io.vengi import VengiError
+from cubist.io.vox import read_vox
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
 
@@ -31,36 +29,6 @@ def _hex(rgba) -> str:
 
 def _print(data) -> None:
     print(json.dumps(data, indent=2))
-
-
-@dataclass
-class LoadedAsset:
-    vox: Path
-    scene: VoxScene
-    summary: dict  # build.json, or {} when the .vox has none beside it
-
-    @property
-    def grid(self) -> VoxelGrid:
-        return VoxelGrid.merge([p.grid for p in self.scene.parts])
-
-    @property
-    def names(self) -> dict[int, str]:
-        return {int(k): v for k, v in self.summary.get("palette_names", {}).items()}
-
-
-def load_asset(path: Path) -> LoadedAsset:
-    """A built asset from its .vox file or its out/<name>/ directory."""
-    vox = path
-    if path.is_dir():
-        vox = path / f"{path.name}.vox"
-        if not vox.exists():
-            found = sorted(path.glob("*.vox"))
-            if len(found) != 1:
-                raise VoxError(f"expected one .vox file in {path}, found {len(found)}")
-            vox = found[0]
-    summary_path = vox.parent / "build.json"
-    summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
-    return LoadedAsset(vox, read_vox(vox), summary)
 
 
 def cmd_build(args: argparse.Namespace) -> int:
@@ -103,8 +71,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 def cmd_render(args: argparse.Namespace) -> int:
     asset = load_asset(args.asset)
-    grid, size = asset.grid, asset.summary.get("size")
-    name = asset.summary.get("name", asset.vox.stem)
+    grid, size, name = asset.grid, asset.summary.get("size"), asset.name
     if args.slices:
         axis, start, stop = parse_slices(args.slices)
         print(slices(grid, axis, start, stop, asset.names, asset_region(grid, size)), end="")
@@ -122,10 +89,29 @@ def cmd_render(args: argparse.Namespace) -> int:
 def cmd_lint(args: argparse.Namespace) -> int:
     asset = load_asset(args.asset)
     style = load_project_style(args.style or find_style(asset.vox))
-    built = BuiltAsset.from_vox(asset.scene, asset.summary, style.palette)
-    report = lint(built, style, rgba=asset.scene.palette)
+    _, report = lint_loaded(asset, style)
     _print(report.to_dict())
     return 0 if report.ok else 2
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    formats = [f for f in NATIVE if getattr(args, f)] + (args.via_vengi or [])
+    try:
+        written = export_asset(
+            args.asset,
+            formats=formats or NATIVE,
+            out_dir=args.out,
+            force=args.force,
+            style=args.style,
+            vertex_colors=args.vertex_colors,
+            ao=args.ao,
+            center=not args.no_center,
+        )
+    except ExportBlocked as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    _print({"exported": written})
+    return 0
 
 
 def cmd_style(args: argparse.Namespace) -> int:
@@ -163,6 +149,32 @@ def parser() -> argparse.ArgumentParser:
     li.add_argument("--style", type=Path, help="style.toml (default: nearest above the asset)")
     li.set_defaults(fn=cmd_lint)
 
+    e = sub.add_parser("export", help="export .glb/.vox (blocked by lint errors unless --force)")
+    e.add_argument("asset", type=Path, help="a .vox file or its out/<name>/ directory")
+    e.add_argument("--glb", action="store_true", help="glTF binary (default: --glb --vox)")
+    e.add_argument("--vox", action="store_true", help="MagicaVoxel .vox")
+    e.add_argument(
+        "--via-vengi",
+        action="append",
+        metavar="FORMAT",
+        help="any format vengi-voxconvert writes (obj, qb, schematic, ...)",
+    )
+    e.add_argument("--out", type=Path, help="output directory (default: <project>/export)")
+    e.add_argument("--force", action="store_true", help="export despite lint errors")
+    e.add_argument(
+        "--vertex-colors",
+        action="store_true",
+        help="colors in vertices instead of a palette texture",
+    )
+    e.add_argument("--ao", action="store_true", help="bake ambient occlusion into vertex colors")
+    e.add_argument(
+        "--no-center",
+        action="store_true",
+        help="keep the asset's origin instead of centering its footprint",
+    )
+    e.add_argument("--style", type=Path, help="style.toml (default: nearest above the asset)")
+    e.set_defaults(fn=cmd_export)
+
     i = sub.add_parser("inspect", help="parts, bounds, and color counts of a .vox file")
     i.add_argument("asset", type=Path)
     i.set_defaults(fn=cmd_inspect)
@@ -177,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         return args.fn(args)
-    except (BuildError, ValueError, OSError) as e:
+    except (BuildError, VengiError, ValueError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
 

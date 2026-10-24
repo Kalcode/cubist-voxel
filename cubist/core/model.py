@@ -39,6 +39,11 @@ class Model:
         for part in self.parts:
             if part.parent is not None and part.parent not in names:
                 raise ModelError(f"part {part.name!r} has unknown parent {part.parent!r}")
+        for socket, value in self.sockets.items():
+            if len(value) not in (3, 4):
+                raise ModelError(f"socket {socket!r} must be (x, y, z) or (x, y, z, part)")
+            if len(value) == 4 and value[3] not in names:
+                raise ModelError(f"socket {socket!r} names unknown part {value[3]!r}")
         parents = {p.name: p.parent for p in self.parts}
         for name in names:
             seen = set()
@@ -109,7 +114,9 @@ class BuiltAsset:
     def to_vox_scene(self):
         from cubist.io.vox import VoxPart, VoxScene
 
-        return VoxScene([VoxPart(p.name, p.grid) for p in self.parts], self.palette.rgba_table())
+        return VoxScene(
+            [VoxPart(p.name, p.grid, p.parent) for p in self.parts], self.palette.rgba_table()
+        )
 
     def summary(self) -> dict:
         def part_info(p: BuiltPart) -> dict:

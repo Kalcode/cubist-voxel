@@ -66,3 +66,26 @@ def test_quad_planes_are_in_world_coordinates():
 
 def test_empty_grid_has_no_quads():
     assert greedy_mesh(VoxelGrid(np.zeros((0, 0, 0), dtype=np.uint8))) == []
+
+
+def test_ao_meshing_keeps_open_faces_merged_and_occluded_faces_separate():
+    floor = solid((5, 1, 5))
+    floor.data[2, 0, 2] = 1
+    g = VoxelGrid.merge([floor, grid({(2, 1, 2): 2})])
+    plain = greedy_mesh(g)
+    shaded = greedy_mesh(g, ao=True)
+    assert area(shaded) == area(plain) == exposed_faces(g)
+    occluded = [q for q in shaded if q.ao is not None]
+    # The 8 floor faces around the post's foot see it in their outward layer.
+    assert len([q for q in occluded if q.axis == 1 and q.sign == 1]) == 8
+    assert all((q.u1 - q.u0) * (q.v1 - q.v0) == 1 for q in occluded)
+    assert all(q.ao is None for q in plain)
+
+
+def test_ao_corner_values():
+    g = VoxelGrid.merge([solid((3, 1, 3)), grid({(1, 1, 1): 2})])
+    quads = greedy_mesh(g, ao=True)
+    # Floor face at x=2, z=1 (just right of the post): its two corners at x=2 touch the post.
+    face = next(q for q in quads if q.axis == 1 and q.sign == 1 and (q.u0, q.v0) == (2, 1))
+    # corners ordered (u0,v0), (u1,v0), (u0,v1), (u1,v1); u = x, v = z
+    assert face.ao == (2, 3, 2, 3)

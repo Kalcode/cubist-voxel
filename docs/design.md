@@ -368,7 +368,7 @@ image content so the agent sees them without opening files.
 | `cubist render <asset> --views front,side,iso --slices y=10..14` | Re-render or print ASCII slices |
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist style` | Parsed `style.toml` with palette names |
-| `cubist export <asset> --vox --glb` | Export (blocked by lint errors unless `--force`) |
+| `cubist export <asset> [--glb] [--vox] [--via-vengi FMT] [--ao] [--vertex-colors]` | Export (blocked by lint errors unless `--force`; exit 2) |
 | `cubist inspect <asset>` | Bounds, parts, pivots, voxel counts, color histogram as JSON |
 | `cubist diff <a> <b>` | Before/after contact sheet |
 | `cubist palette import <file>` | Import a palette into `style.toml` |
@@ -392,7 +392,9 @@ add it as a DSL feature.
 ## Export pipeline
 
 Cubist writes `.vox` and `.glb` natively and hands every other format to vengi's `voxconvert`
-CLI when it is installed.
+CLI when it is installed. `cubist export` re-runs lint first (so a `.vox` edited by hand and
+given off-palette colors is caught too) and refuses to export when there are errors unless
+`--force`; it writes to `<project>/export/` by default.
 
 ### `.vox`
 
@@ -401,6 +403,9 @@ CLI when it is installed.
 - Multi-part models use the scene graph chunks (`nTRN`, `nGRP`, `nSHP`) so parts keep names and
   transforms; the palette goes in the `RGBA` chunk. A model is placed by its center,
   `floor(size / 2)` from its min corner.
+- The part hierarchy is kept: a part with children becomes a named group holding its own shape
+  and its child parts; the reader rebuilds parents from that nesting (third-party groups that
+  aren't parts are ignored). Pivots and sockets live in `build.json` and the GLB, not the `.vox`.
 - Parts over 256 voxels on any axis are rejected by the writer (they are a lint error anyway).
   Splitting them into several models is deferred until an asset needs it.
 - The reader rejects rotated scene-graph nodes for now.
@@ -409,19 +414,32 @@ CLI when it is installed.
 
 ### glTF / GLB
 
-- Greedy meshing with interior faces removed and coplanar faces merged.
-- Colors via a 256×1 palette texture with UVs pointing at palette cells (engine-friendly, one
-  material per asset). Vertex colors as an option.
-- Optional ambient occlusion baked into vertex colors.
-- Each part becomes a glTF node at its pivot, parented as in the model, so engines can rotate
-  parts without extra setup. Sockets become empty nodes.
-- Scale from `voxel_size_m`. Y-up, matching glTF.
-- Acceptance target: GLB imports into Godot 4 with correct scale, colors, and part hierarchy.
+- Written by hand (JSON and BIN chunks, sorted keys), so the same asset always gives the same
+  bytes.
+- Greedy meshing with interior faces removed and coplanar faces merged; sealed cavities are
+  treated as solid, so only faces open to outside air are meshed (the export side of "hidden
+  interior").
+- Colors via a 256×1 palette texture with UVs pointing at palette cells and a nearest-filtered,
+  clamped sampler (one material per asset). `--vertex-colors` puts colors in `COLOR_0` instead,
+  converted to linear floats as glTF requires (the palette is sRGB).
+- `--ao` bakes per-corner ambient occlusion into `COLOR_0` (multiplied with the texture). Only
+  fully open faces merge when AO is on; occluded faces keep their own corners, and each quad
+  splits along its brighter diagonal so AO interpolates without creases.
+- Each part becomes a glTF node at its pivot, parented as in the model, with mesh vertices in
+  the node's space, so engines can rotate parts without extra setup. Sockets become empty nodes
+  under the part named in `(x, y, z, "part")`, or else the part with the nearest voxel.
+- Scale from `voxel_size_m`. Y-up and +Z front, matching glTF. By default the root node shifts
+  the asset so its footprint is centered on the origin with its base at y = 0 (`--no-center`
+  keeps the DSL origin).
+- Acceptance (met in M4): `tests/test_godot.py` loads GLBs in headless Godot 4 and checks the
+  part hierarchy, node positions and mesh sizes in metres, triangle counts, and the palette
+  texture with nearest filtering. It skips when `godot` is not on PATH.
 
 ### Everything else
 
-`cubist export --via-vengi <format>` shells out to `vengi-voxconvert` for OBJ, Qubicle,
-Minecraft schematics, and the other formats vengi supports. Cubist does not reimplement them.
+`cubist export --via-vengi <format>` shells out to `vengi-voxconvert --input <vox> --output
+<file>` for OBJ, Qubicle, Minecraft schematics, and the other formats vengi supports. Cubist
+does not reimplement them.
 
 ## Build plan
 
@@ -432,20 +450,22 @@ to an approved, exported asset without human help.
 
 Python 3.11+, `numpy`, `scipy` (`ndimage`: exact distance transforms and connected components
 for morphology and lint), `Pillow`, `pygltflib` (or `trimesh`) for glTF, the official MCP Python
-SDK, `pytest`, `ruff`, `uv`. Optional: `vengi-voxconvert` on PATH. Before adding any
+SDK, `pytest`, `ruff`, `uv`. Dev only: `pygltflib` to read GLBs back in tests; Godot 4 on PATH
+for the import acceptance test. Optional: `vengi-voxconvert` on PATH. Before adding any
 third-party `.vox` library, check its license; a native writer is small enough to own.
 
 ### Repo layout
 
 ```text
 cubist/
-  core/      grid.py  palette.py  part.py  model.py  style.py
+  core/      grid.py  palette.py  part.py  model.py  style.py  topology.py
   dsl/       sdf.py  shape.py  ops.py  primitives.py  gridops.py  paint.py  select.py
              noise.py  context.py
   build/     runner.py
   render/    raster.py  contact_sheet.py  ascii.py  font.py
   lint/      __init__.py (report)  checks.py
   io/        vox.py  mesh.py  gltf.py  vengi.py
+  export.py
   cli.py
   mcp_server.py
 projects/
@@ -468,8 +488,9 @@ CLAUDE.md
 3. **Full DSL, lint, style bible** — done. Remaining primitives and ops, paint ops, all lint
    checks, `style.toml` loading, named palette ramps. The design doc's barrel example builds as
    written; every demo asset lints with no errors or warnings.
-4. **Parts and glTF.** Parts, pivots, sockets, multi-part `.vox`, GLB export. Done when a
-   multi-part GLB imports into Godot 4 with the right hierarchy and scale.
+4. **Parts and glTF** — done. Parts, pivots, sockets, multi-part `.vox`, GLB export. Done when a
+   multi-part GLB imports into Godot 4 with the right hierarchy and scale (verified headless
+   against Godot 4.6).
 5. **Agent integration.** CLI polish, MCP server, `CLAUDE.md` workflow, example library with 10
    seed examples (hand-checked).
 6. **Evaluation.** 20 briefs across props, buildings, and characters. Track lint pass rate,

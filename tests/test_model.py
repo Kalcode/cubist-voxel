@@ -94,3 +94,10 @@ def test_star_import_exposes_the_whole_dsl():
     import cubist.dsl
 
     assert set(cubist.dsl.__all__) - {"building"} <= set(cubist.__all__)
+
+
+def test_socket_naming_an_unknown_part_is_an_error():
+    body = Part("body", box((1, 1, 1), color=P.wood.dark))
+    with pytest.raises(ModelError, match="arm"):
+        Model(parts=[body], sockets={"hand": (0, 0, 0, "arm")})
+    Model(parts=[body], sockets={"hand": (0, 0, 0, "body")})

@@ -10,11 +10,11 @@ from scipy import ndimage
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.core.style import StyleBible
+from cubist.core.topology import SIX, hidden_mask, outside_air
 from cubist.io.mesh import greedy_mesh
 
 MAX_PART_AXIS = 256
 _FACE_DIRS = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-_SIX = ndimage.generate_binary_structure(3, 1)
 
 
 @dataclass
@@ -139,7 +139,8 @@ def check_pivots(asset: BuiltAsset) -> list[Finding]:
     merged = VoxelGrid.merge([p.grid for p in asset.parts]).bounds()
     if merged is not None:
         lo, hi = np.array(merged[0]), np.array(merged[1])
-        for name, pos in asset.sockets.items():
+        for name, value in asset.sockets.items():
+            pos = tuple(value[:3])
             p = np.array(pos, dtype=float)
             if np.any(p < lo) or np.any(p > hi):
                 out.append(
@@ -157,7 +158,7 @@ def check_pivots(asset: BuiltAsset) -> list[Finding]:
 def check_floating(asset: BuiltAsset, merged: VoxelGrid) -> list[Finding]:
     if asset.allow_floating or merged.count() == 0:
         return []
-    labels, n = ndimage.label(merged.data > 0, structure=_SIX)
+    labels, n = ndimage.label(merged.data > 0, structure=SIX)
     if n <= 1:
         return []
     sizes = np.bincount(labels.ravel())[1:]
@@ -269,18 +270,12 @@ def check_budgets(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> li
     return out
 
 
-def _outside_air(filled: np.ndarray) -> np.ndarray:
-    """Empty cells connected to the outside of a padded grid (enclosed cavities excluded)."""
-    labels, _ = ndimage.label(~filled, structure=_SIX)
-    return labels == labels[0, 0, 0]
-
-
 def check_thin(merged: VoxelGrid) -> list[Finding]:
     """Voxels with outside air on both sides along some axis: walls you can see past."""
     if merged.count() == 0:
         return []
     filled = np.pad(merged.data > 0, 1)
-    air = _outside_air(filled)
+    air = outside_air(filled)
     thin = np.zeros_like(filled)
     for axis in range(3):
         thin |= filled & np.roll(air, 1, axis) & np.roll(air, -1, axis)
@@ -298,17 +293,6 @@ def check_thin(merged: VoxelGrid) -> list[Finding]:
             {"voxels": n, "lo": lo, "hi": hi},
         )
     ]
-
-
-def hidden_mask(grid: VoxelGrid) -> np.ndarray:
-    """Filled voxels with no face open to the outside air (enclosed cavities don't count)."""
-    filled = np.pad(grid.data > 0, 1)
-    outside = _outside_air(filled)
-    visible = np.zeros_like(filled)
-    for axis in range(3):
-        for shift in (1, -1):
-            visible |= filled & np.roll(outside, shift, axis)
-    return (filled & ~visible)[1:-1, 1:-1, 1:-1]
 
 
 def check_hidden(merged: VoxelGrid) -> list[Finding]:

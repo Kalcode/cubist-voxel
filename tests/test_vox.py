@@ -166,3 +166,34 @@ def test_scene_graph_cycle_is_a_vox_error():
     data = b"VOX " + struct.pack("<i", 150) + b"MAIN" + struct.pack("<ii", 0, len(body)) + body
     with pytest.raises(VoxError):
         decode_vox(data)
+
+
+def test_round_trip_keeps_the_part_hierarchy():
+    parts = [
+        VoxPart("torso", grid({(0, 0, 0): 1})),
+        VoxPart("head", grid({(0, 2, 0): 2}), parent="torso"),
+        VoxPart("hat", grid({(0, 4, 0): 3}), parent="head"),
+        VoxPart("arm", grid({(2, 0, 0): 4}), parent="torso"),
+        VoxPart("flag", grid({(5, 0, 0): 5})),
+    ]
+    back = decode_vox(encode_vox(VoxScene(parts, P.rgba_table())))
+    assert {p.name: p.parent for p in back.parts} == {
+        "torso": None,
+        "head": "torso",
+        "hat": "head",
+        "arm": "torso",
+        "flag": None,
+    }
+    for a, b in zip(
+        sorted(parts, key=lambda p: p.name), sorted(back.parts, key=lambda p: p.name), strict=True
+    ):
+        assert a.grid == b.grid
+
+
+def test_parent_parts_are_groups_in_the_scene_graph():
+    parts = [
+        VoxPart("torso", grid({(0, 0, 0): 1})),
+        VoxPart("head", grid({(0, 2, 0): 2}), parent="torso"),
+    ]
+    found = [cid for cid, _ in chunks(encode_vox(VoxScene(parts, P.rgba_table())))]
+    assert found.count(b"nGRP") == 2  # root group plus torso's group

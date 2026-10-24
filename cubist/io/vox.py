@@ -32,6 +32,7 @@ class VoxError(ValueError):
 class VoxPart:
     name: str
     grid: VoxelGrid
+    parent: str | None = None
 
 
 @dataclass
@@ -80,10 +81,38 @@ def _to_mv(grid: VoxelGrid) -> tuple[np.ndarray, tuple[int, int, int]]:
     return mv, (int(t[0]), int(t[1]), int(t[2]))
 
 
+def _trn(node_id: int, name: str | None, child: int, layer: int, t=None) -> bytes:
+    attrs = {"_name": name} if name else {}
+    frame = {"_t": f"{t[0]} {t[1]} {t[2]}"} if t is not None else {}
+    return _chunk(
+        b"nTRN",
+        struct.pack("<i", node_id)
+        + _dict(attrs)
+        + struct.pack("<iiii", child, -1, layer, 1)
+        + _dict(frame),
+    )
+
+
+def _grp(node_id: int, children: list[int]) -> bytes:
+    return _chunk(
+        b"nGRP",
+        struct.pack("<i", node_id)
+        + _dict({})
+        + struct.pack(f"<i{len(children)}i", len(children), *children),
+    )
+
+
+def _shp(node_id: int, model: int) -> bytes:
+    return _chunk(
+        b"nSHP", struct.pack("<i", node_id) + _dict({}) + struct.pack("<ii", 1, model) + _dict({})
+    )
+
+
 def encode_vox(scene: VoxScene) -> bytes:
-    models, nodes = [], []
-    shape_ids = []
-    for i, part in enumerate(scene.parts):
+    """Parts with children become named groups holding their own shape and their child parts,
+    so editors show the part hierarchy."""
+    models, translations = [], []
+    for part in scene.parts:
         grid = part.grid.cropped()
         if grid.count() == 0:
             raise VoxError(f"part {part.name!r} is empty")
@@ -97,36 +126,53 @@ def encode_vox(scene: VoxScene) -> bytes:
         xyzi = np.column_stack([filled, mv[tuple(filled.T)]]).astype(np.uint8)
         models.append(_chunk(b"SIZE", struct.pack("<iii", *mv.shape)))
         models.append(_chunk(b"XYZI", struct.pack("<i", len(xyzi)) + xyzi.tobytes()))
-        trn_id, shp_id = 2 + 2 * i, 3 + 2 * i
-        shape_ids.append(trn_id)
-        nodes.append(
-            _chunk(
-                b"nTRN",
-                struct.pack("<i", trn_id)
-                + _dict({"_name": part.name})
-                + struct.pack("<iiii", shp_id, -1, 0, 1)
-                + _dict({"_t": f"{t[0]} {t[1]} {t[2]}"}),
-            )
-        )
-        nodes.append(
-            _chunk(
-                b"nSHP",
-                struct.pack("<i", shp_id) + _dict({}) + struct.pack("<ii", 1, i) + _dict({}),
-            )
-        )
-    root = _chunk(
-        b"nTRN", struct.pack("<i", 0) + _dict({}) + struct.pack("<iiii", 1, -1, -1, 1) + _dict({})
-    )
-    group = _chunk(
-        b"nGRP",
-        struct.pack("<i", 1)
-        + _dict({})
-        + struct.pack(f"<i{len(shape_ids)}i", len(shape_ids), *shape_ids),
-    )
+        translations.append(t)
+
+    names = {p.name for p in scene.parts}
+    kids: dict[str, list[int]] = {}
+    roots = []
+    for i, part in enumerate(scene.parts):
+        if part.parent in names and part.parent != part.name:
+            kids.setdefault(part.parent, []).append(i)
+        else:
+            roots.append(i)
+
+    nodes: list[bytes] = []
+    next_id = [2]
+    placed: set[int] = set()
+
+    def new_id() -> int:
+        next_id[0] += 1
+        return next_id[0] - 1
+
+    def subtree(i: int) -> int:
+        placed.add(i)
+        part = scene.parts[i]
+        children = [k for k in kids.get(part.name, []) if k not in placed]
+        if not children:
+            trn_id, shp_id = new_id(), new_id()
+            nodes.append(_trn(trn_id, part.name, shp_id, 0, translations[i]))
+            nodes.append(_shp(shp_id, i))
+            return trn_id
+        group_trn, group, own_trn, own_shp = new_id(), new_id(), new_id(), new_id()
+        nodes.append(_trn(group_trn, part.name, group, 0))
+        nodes.append(_trn(own_trn, part.name, own_shp, 0, translations[i]))
+        nodes.append(_shp(own_shp, i))
+        child_ids = [own_trn]
+        for k in children:
+            if k not in placed:
+                child_ids.append(subtree(k))
+        nodes.append(_grp(group, child_ids))
+        return group_trn
+
+    top = [subtree(i) for i in roots]
+    # Parts caught in a parent cycle never hang off a root; put them at the top level.
+    top += [subtree(i) for i in range(len(scene.parts)) if i not in placed]
+    root = _trn(0, None, 1, -1)
     layer = _chunk(b"LAYR", struct.pack("<i", 0) + _dict({}) + struct.pack("<i", -1))
     palette = np.asarray(scene.palette, dtype=np.uint8)
     rgba = _chunk(b"RGBA", palette[1:256].tobytes() + bytes(4))
-    children = b"".join(models) + root + group + b"".join(nodes) + layer + rgba
+    children = b"".join(models) + root + _grp(1, top) + b"".join(nodes) + layer + rgba
     return b"VOX " + struct.pack("<i", VERSION) + _chunk(b"MAIN", b"", children)
 
 
@@ -236,22 +282,33 @@ def _decode(data: bytes) -> VoxScene:
 
     parts: list[VoxPart] = []
 
-    def visit(node_id: int, offset: np.ndarray, name: str | None) -> None:
+    def visit(node_id: int, offset: np.ndarray, name: str | None, owners: tuple) -> None:
         kind, node = nodes[node_id]
         if kind == b"nTRN":
             frame = node["frames"][0] if node["frames"] else {}
             if frame.get("_r", _IDENTITY_ROTATION) != _IDENTITY_ROTATION:
                 raise VoxError(f"rotated node {node_id} is not supported yet")
             t = np.array([int(v) for v in frame.get("_t", "0 0 0").split()])
-            visit(node["child"], offset + t, node["attrs"].get("_name") or name)
+            own = node["attrs"].get("_name") or name
+            child_kind = nodes[node["child"]][0]
+            inner = owners + (own,) if child_kind == b"nGRP" and own else owners
+            visit(node["child"], offset + t, own, inner)
         elif kind == b"nGRP":
             for child in node["children"]:
-                visit(child, offset, name)
+                visit(child, offset, None, owners)
         else:
             model_id = node["models"][0]
-            parts.append(VoxPart(name or f"model{model_id}", _from_mv(models[model_id], offset)))
+            part_name = name or f"model{model_id}"
+            # A shape named like the group it sits in is that group's own shape.
+            chain = owners[:-1] if owners and owners[-1] == part_name else owners
+            parent = chain[-1] if chain else None
+            parts.append(VoxPart(part_name, _from_mv(models[model_id], offset), parent))
 
-    visit(0, np.zeros(3, dtype=np.int64), None)
+    visit(0, np.zeros(3, dtype=np.int64), None, ())
+    known = {p.name for p in parts}
+    for p in parts:
+        if p.parent not in known:
+            p.parent = None
     return VoxScene(parts, palette)
 
 

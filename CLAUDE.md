@@ -5,7 +5,8 @@ changing behavior, and update it when a decision changes.
 
 ## Commands
 
-- `uv run pytest` — full suite (must stay green)
+- `uv run pytest` — full suite (must stay green; `tests/test_godot.py` needs `godot` on PATH
+  and checks GLB imports in headless Godot 4)
 - `uv run ruff check . && uv run ruff format .`
 - `uv run cubist build projects/demo/assets/<name>.py`, `uv run cubist render <out dir> --slices y=0..3`
 - `CUBIST_UPDATE_GOLDEN=1 uv run pytest tests/test_golden.py` after an intentional rendering
