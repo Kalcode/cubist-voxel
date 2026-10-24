@@ -457,14 +457,14 @@ class AssetDef:
 
 
 def asset(
-    name: str | None = None,
+    name: str | Callable | None = None,
     size: Vec3 | None = None,
     tags: Sequence[str] = (),
     grounded: bool = False,
     symmetric: str | None = None,
     allow_floating: bool = False,
 ):
-    """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset.
+    """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset (``@asset(...)`` or bare).
 
     ``grounded``: the asset should touch y = 0. ``symmetric``: the whole asset mirrors across
     the center plane of that axis. ``allow_floating``: pieces may float free of the main body.
@@ -482,4 +482,7 @@ def asset(
             allow_floating=allow_floating,
         )
 
+    if callable(name):  # bare @asset, without parentheses
+        fn, name = name, None
+        return wrap(fn)
     return wrap

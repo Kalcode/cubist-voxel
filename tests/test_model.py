@@ -19,6 +19,15 @@ def test_asset_decorator_records_metadata_and_builds():
     assert built.parts[0].pivot == (2, 0, 2)
 
 
+def test_bare_asset_decorator_works_like_the_called_form():
+    @asset
+    def crate(p):
+        return box((4, 4, 4), color=p.wood.dark)
+
+    assert (crate.name, crate.size, crate.tags) == ("crate", None, ())
+    assert crate.build(P).parts[0].grid.count() == 64
+
+
 def test_unset_pivot_defaults_to_the_bottom_center_of_the_part():
     @asset(name="post", size=(3, 6, 3))
     def post(p):

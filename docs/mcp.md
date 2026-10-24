@@ -37,7 +37,10 @@ Any client that takes a JSON config:
 ```
 
 `--project` is the directory with `style.toml`; everything the tools read and write stays inside
-it. The server sends the authoring workflow (brief, examples, build, critique, revise, at most
+it. `uv run --directory` runs from the Cubist checkout, so a relative `--project` resolves
+there; for a project in another repo (say a game's `assets/cubist/`), give its absolute path,
+and commit the JSON above as that repo's `.mcp.json` to share it with Claude Code sessions
+there. The server sends the authoring workflow (brief, examples, build, critique, revise, at most
 five iterations) as its instructions.
 
 ## Tools
