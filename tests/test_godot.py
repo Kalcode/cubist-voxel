@@ -139,6 +139,7 @@ def test_goblin_imports_with_every_part_under_the_torso(tmp_path):
         ("blaster", "fire", None),
         ("goblin", "walk", None),
         ("campfire", "flames_frames", "fire"),
+        ("barrel", "explode", None),
     ],
 )
 def test_moving_demo_assets_import_with_clips_lights_and_glow(name, clip, light, tmp_path):
