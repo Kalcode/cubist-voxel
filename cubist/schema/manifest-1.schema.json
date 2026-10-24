@@ -63,7 +63,8 @@
       "required": ["part", "channel", "times", "values", "ease"],
       "properties": {
         "part": {"type": "string"},
-        "channel": {"enum": ["joint"]},
+        "channel": {"enum": ["joint", "rotate_x", "rotate_y", "rotate_z", "move_x", "move_y",
+                             "move_z", "visible"]},
         "times": {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 1},
         "values": {"type": "array", "items": {"type": "number"}, "minItems": 1},
         "ease": {"enum": ["smooth", "linear", "step", null]}

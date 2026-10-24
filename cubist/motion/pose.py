@@ -72,12 +72,36 @@ def joint_motion(joint: Joint, value: float) -> tuple[np.ndarray, np.ndarray]:
 def local_motion(
     asset: BuiltAsset, clip: Clip, t: float
 ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
-    """Every part's (translation, rotation) relative to rest at ``t``; identity if still."""
+    """Every part's (translation, rotation) relative to rest at ``t``; identity if still.
+
+    Translation is the joint's slide plus the ``move_*`` tracks; rotation is
+    ``R_joint @ R_z @ R_y @ R_x`` (free rotations about the parent's axes, x first, then the
+    joint)."""
     out = {p.name: (np.zeros(3), np.eye(3)) for p in asset.parts}
+    joint_motion_of: dict[str, tuple[np.ndarray, np.ndarray]] = {}
+    turns: dict[str, np.ndarray] = {}
+    moves: dict[str, np.ndarray] = {}
     for track in clip.tracks:
-        joint = asset.part(track.part).joint
-        if track.channel == "joint" and joint is not None:
-            out[track.part] = joint_motion(joint, track_value(track, t, clip))
+        if track.channel == "joint":
+            joint = asset.part(track.part).joint
+            if joint is not None:
+                joint_motion_of[track.part] = joint_motion(joint, track_value(track, t, clip))
+        elif track.channel.startswith(("rotate_", "move_")):
+            kind, axis = track.channel.split("_")
+            store = turns if kind == "rotate" else moves
+            vec = store.setdefault(track.part, np.zeros(3))
+            vec["xyz".index(axis)] += track_value(track, t, clip)
+    for name in {*joint_motion_of, *turns, *moves}:
+        trans, rot = joint_motion_of.get(name, (np.zeros(3), np.eye(3)))
+        if name in turns:
+            free = np.eye(3)
+            for i, axis in enumerate("xyz"):
+                if turns[name][i]:
+                    free = rotation(turns[name][i], axis, np.zeros(3))[:3, :3] @ free
+            rot = rot @ free
+        if name in moves:
+            trans = trans + moves[name]
+        out[name] = (trans, rot)
     return out
 
 

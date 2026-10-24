@@ -98,7 +98,7 @@ class Model:
                 if t.channel == "joint" and joints[t.part] is None:
                     raise ModelError(
                         f"clip {c.name!r} drives part {t.part!r}, which has no joint; give it "
-                        "joint=hinge(...), slide(...) or spin(...)"
+                        "joint=hinge(...), slide(...) or spin(...), or use turn(...) / move(...)"
                     )
 
 

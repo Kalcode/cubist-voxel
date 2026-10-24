@@ -1,19 +1,28 @@
 """Clips: named, timed motion made of tracks of keys.
 
-A track drives one channel of one part. In M7 the only channel is ``"joint"``: the value of the
-part's joint (degrees for a hinge, voxels for a slide, turns for a spin), relative to rest.
+A track drives one channel of one part, relative to rest:
+
+* ``joint``: the part's joint value (degrees for a hinge, voxels for a slide, turns for a spin);
+* ``rotate_x|y|z``: degrees about the part's pivot along the parent's axes, on any part;
+* ``move_x|y|z``: voxels along the parent's axes, on any part;
+* ``visible``: 1 shown, 0 hidden (always stepped).
+
+Track specs (``turn``, ``move``, the generators) describe keys before the clip's length is
+known; ``clip()`` resolves them into plain tracks, so a clip only ever holds keys.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from cubist.core.errors import ModelError
 
 EASES = ("smooth", "linear", "step")
-CHANNELS = ("joint",)
+ROTATE = ("rotate_x", "rotate_y", "rotate_z")
+MOVE = ("move_x", "move_y", "move_z")
+CHANNELS = ("joint", *ROTATE, *MOVE, "visible")
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _EPS = 1e-9
 
@@ -80,6 +89,61 @@ class Clip:
         )
 
 
+@dataclass(frozen=True)
+class TrackSpec:
+    """Keys for one channel of one part, resolved against the clip's length by ``clip()``.
+
+    ``keys``: values spread evenly from 0 to the length, ``(time, value)`` pairs, or a function
+    of ``u`` in [0, 1] sampled at ``samples`` evenly spaced points (ends included). ``make``,
+    when given, takes the length and returns ``(times, values)`` itself."""
+
+    part: str
+    channel: str
+    keys: Sequence | Callable[[float], float] | None = None
+    ease: str | None = None
+    samples: int | None = None
+    make: Callable[[float], tuple[Sequence[float], Sequence[float]]] | None = None
+
+    def resolve(self, clip_name: str, length: float) -> Track:
+        if self.make is not None:
+            times, values = self.make(length)
+            return Track(self.part, self.channel, tuple(map(float, times)),
+                         tuple(map(float, values)), self.ease)  # fmt: skip
+        keys = self.keys
+        if callable(keys):
+            n = max(2, int(self.samples or 9))
+            us = [i / (n - 1) for i in range(n)]
+            times = tuple(length * u for u in us)
+            values = tuple(_float(keys(u), f"clip {clip_name!r} track {self.part!r}") for u in us)
+            return Track(self.part, self.channel, times, values, self.ease)
+        times, values = _keys(clip_name, self.part, keys, length)
+        return Track(self.part, self.channel, times, values, self.ease)
+
+
+def _free(kind: str, part: str, axis: str, keys, ease: str | None) -> TrackSpec:
+    name = str(axis).strip().lower()
+    sign = -1.0 if name.startswith("-") else 1.0
+    name = name.lstrip("+-")
+    if name not in ("x", "y", "z"):
+        raise ModelError(f"{kind} axis must be 'x', 'y', 'z' (or '-x', ...), got {axis!r}")
+    if sign < 0 and not callable(keys):
+        keys = [(k[0], -k[1]) if isinstance(k, (tuple, list)) else -k for k in keys]
+    elif sign < 0:
+        f = keys
+        keys = lambda u: -f(u)  # noqa: E731
+    return TrackSpec(part, f"{kind}_{name}", keys, ease)
+
+
+def turn(part: str, axis: str, keys, ease: str | None = None) -> TrackSpec:
+    """Rotate any part about its pivot: degrees along the parent's ``axis`` ('x', '-y', ...)."""
+    return _free("rotate", part, axis, keys, ease)
+
+
+def move(part: str, axis: str, keys, ease: str | None = None) -> TrackSpec:
+    """Move any part: voxels along the parent's ``axis`` ('y', '-z', ...)."""
+    return _free("move", part, axis, keys, ease)
+
+
 def _float(value, what: str) -> float:
     if isinstance(value, bool):
         raise ModelError(f"{what} must be a number, got {value!r}")
@@ -141,8 +205,9 @@ def clip(
     """A named clip ``length`` seconds long.
 
     ``tracks`` maps part names to keys for their joints: plain values spread evenly from 0 to
-    ``length`` (one value holds at t = 0), or ``(time, value)`` pairs. A list of ``Track``
-    objects also works. ``ease`` is ``smooth`` (default), ``linear`` or ``step``.
+    ``length`` (one value holds at t = 0), or ``(time, value)`` pairs. Or it is a list of
+    tracks: ``turn(...)``, ``move(...)``, ``visible(...)``, generators like ``swing(...)``
+    (nested lists are fine). ``ease`` is ``smooth`` (default), ``linear`` or ``step``.
     """
     if not isinstance(name, str) or not _NAME.match(name):
         raise ModelError(
@@ -160,11 +225,21 @@ def clip(
             times, values = _keys(name, part, keys, length)
             built.append(Track(part, "joint", times, values))
     elif tracks is not None:
-        for t in tracks:
+
+        def flatten(items):
+            for t in items:
+                if isinstance(t, (list, tuple)):
+                    yield from flatten(t)
+                else:
+                    yield t
+
+        for t in flatten(tracks):
+            if isinstance(t, TrackSpec):
+                t = t.resolve(name, length)
             if not isinstance(t, Track):
                 raise ModelError(
-                    f"clip {name!r} tracks must be a dict of part -> keys or a list of Track, "
-                    f"got {t!r}"
+                    f"clip {name!r} tracks must be a dict of part -> keys, or a list of tracks "
+                    f"(turn(...), move(...), swing(...), ...), got {t!r}"
                 )
             built.append(t)
     for t in built:

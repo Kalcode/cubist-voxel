@@ -34,7 +34,7 @@ from cubist.dsl import (
     torus,
     wedge,
 )
-from cubist.motion import Track, clip, hinge, slide, spin
+from cubist.motion import Track, TrackSpec, clip, hinge, move, slide, spin, turn
 
 __all__ = [
     "Model",
@@ -43,6 +43,7 @@ __all__ = [
     "Shape",
     "ShapeError",
     "Track",
+    "TrackSpec",
     "asset",
     "band",
     "box",
@@ -61,6 +62,7 @@ __all__ = [
     "hinge",
     "inside",
     "lathe",
+    "move",
     "line",
     "panel",
     "polyline",
@@ -72,5 +74,6 @@ __all__ = [
     "stripes",
     "surface",
     "torus",
+    "turn",
     "wedge",
 ]

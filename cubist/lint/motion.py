@@ -113,12 +113,22 @@ def check_loops(asset: BuiltAsset) -> list[Finding]:
 
 def _driver(asset: BuiltAsset, name: str, clip: Clip) -> tuple[str, Joint] | None:
     """The part (itself or an ancestor) whose joint moves ``name`` in this clip."""
-    driven = {t.part for t in clip.tracks}
+    driven = {t.part for t in clip.tracks if t.channel == "joint"}
     while name is not None:
         p = asset.part(name)
         if name in driven and p.joint is not None:
             return name, p.joint
         name = p.parent
+    return None
+
+
+def _free_turner(asset: BuiltAsset, name: str, clip: Clip) -> str | None:
+    """The part (itself or an ancestor) turned by free rotate tracks in this clip."""
+    turned = {t.part for t in clip.tracks if t.channel.startswith("rotate_")}
+    while name is not None:
+        if name in turned:
+            return name
+        name = asset.part(name).parent
     return None
 
 
@@ -147,6 +157,10 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
                 rel = pts - pivot
                 dist = np.linalg.norm(rel - np.outer(rel @ axis, axis), axis=1)
                 near = dist < AXIS_FORGIVENESS
+            turner = _free_turner(asset, name, c)
+            if turner is not None:  # free rotations: forgive around the pivot point
+                pivot = np.asarray(asset.part(turner).pivot, dtype=np.float64)
+                near |= np.linalg.norm(pts - pivot, axis=1) < AXIS_FORGIVENESS
             forgiven[name] = near
             if drv is not None and drv[1].kind == "hinge":
                 flip = axis_name(-np.asarray(drv[1].axis))
@@ -156,6 +170,8 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
                 )
             elif drv is not None and drv[1].kind == "slide":
                 hint[name] = "check the slide direction and distance"
+            elif turner is not None:
+                hint[name] = "turn it less, or move its pivot to where it really joins"
             else:
                 hint[name] = "check the joint axis and the keys"
 

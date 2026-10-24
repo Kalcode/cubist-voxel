@@ -174,11 +174,15 @@ def _turn(asset: BuiltAsset, clip: Clip, part: str, t0: float, t1: float) -> flo
     """Degrees a part's own rotating tracks travel between two times."""
     total = 0.0
     for track in clip.tracks:
-        joint = asset.part(track.part).joint
-        if track.part != part or joint is None or joint.kind == "slide":
+        if track.part != part:
             continue
         dv = abs(track_value(track, t1, clip) - track_value(track, t0, clip))
-        total += dv * (360.0 if joint.kind == "spin" else 1.0)
+        if track.channel.startswith("rotate_"):
+            total += dv
+        elif track.channel == "joint":
+            joint = asset.part(track.part).joint
+            if joint is not None and joint.kind != "slide":
+                total += dv * (360.0 if joint.kind == "spin" else 1.0)
     return total
 
 
