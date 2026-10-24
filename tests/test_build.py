@@ -67,14 +67,18 @@ def test_build_writes_vox_and_summary_under_project_out(project):
     summary = json.loads((out / "build.json").read_text())
     assert summary["name"] == "crate"
     assert summary["voxels"] == 64
-    assert summary["parts"][0] == {
+    part = dict(summary["parts"][0])
+    assert len(part.pop("voxel_sha256")) == 64
+    assert part == {
         "name": "crate",
         "voxels": 64,
         "bounds": [[0, 0, 0], [4, 4, 4]],
         "pivot": [2, 0, 2],
         "parent": None,
         "symmetric": None,
+        "joint": None,
     }
+    assert summary["clips"] == []
     assert summary["colors"] == {"wood.dark": 64}
     assert summary["palette_names"] == {"1": "wood.dark"}
     assert result.contact_path == out / "contact.png"

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 
@@ -11,6 +12,7 @@ from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
 from cubist.dsl.context import building
 from cubist.dsl.shape import Shape, ShapeError
+from cubist.motion.clips import Clip
 from cubist.motion.joints import Joint
 
 
@@ -42,9 +44,15 @@ def _flatten(parts: Iterable) -> list[Part]:
 
 
 class Model:
-    def __init__(self, parts: Sequence, sockets: dict[str, Vec3] | None = None):
+    def __init__(
+        self,
+        parts: Sequence,
+        sockets: dict[str, Vec3] | None = None,
+        clips: Sequence[Clip] | None = None,
+    ):
         self.parts = _flatten(parts)
         self.sockets = dict(sockets or {})
+        self.clips = list(clips or [])
         names = [p.name for p in self.parts]
         dupes = sorted({n for n in names if names.count(n) > 1})
         if dupes:
@@ -62,6 +70,7 @@ class Model:
                 raise ModelError(f"socket {socket!r} must be (x, y, z) or (x, y, z, part)")
             if len(value) == 4 and value[3] not in names:
                 raise ModelError(f"socket {socket!r} names unknown part {value[3]!r}")
+        self._check_clips()
         parents = {p.name: p.parent for p in self.parts}
         for name in names:
             seen = set()
@@ -70,6 +79,27 @@ class Model:
                     raise ModelError(f"parent cycle through part {name!r}")
                 seen.add(name)
                 name = parents[name]
+
+    def _check_clips(self) -> None:
+        joints = {p.name: p.joint for p in self.parts}
+        seen: set[str] = set()
+        for c in self.clips:
+            if not isinstance(c, Clip):
+                raise ModelError(f"Model clips must be made with clip(...), got {c!r}")
+            if c.name in seen:
+                raise ModelError(f"duplicate clip name {c.name!r}")
+            seen.add(c.name)
+            for t in c.tracks:
+                if t.part not in joints:
+                    raise ModelError(
+                        f"clip {c.name!r} has a track for unknown part {t.part!r}; parts are "
+                        f"{', '.join(sorted(joints))}"
+                    )
+                if t.channel == "joint" and joints[t.part] is None:
+                    raise ModelError(
+                        f"clip {c.name!r} drives part {t.part!r}, which has no joint; give it "
+                        "joint=hinge(...), slide(...) or spin(...)"
+                    )
 
 
 def default_pivot(grid: VoxelGrid) -> Vec3:
@@ -92,6 +122,14 @@ class BuiltPart:
     pivot: Vec3
     parent: str | None
     symmetric: str | None = None
+    joint: Joint | None = None
+
+
+def voxel_sha256(grid: VoxelGrid) -> str:
+    """A hash of a grid's voxels and colors, to tell whether a file was edited."""
+    coords, colors = grid.voxels()
+    payload = coords.astype("<i4").tobytes() + colors.astype("u1").tobytes()
+    return hashlib.sha256(payload).hexdigest()
 
 
 @dataclass
@@ -107,6 +145,16 @@ class BuiltAsset:
     allow_floating: bool = False
     seed: int = 0
     ops_used: set[str] = field(default_factory=set)
+    clips: list[Clip] = field(default_factory=list)
+
+    def is_animated(self) -> bool:
+        return bool(self.clips) or any(p.joint is not None for p in self.parts)
+
+    def part(self, name: str) -> BuiltPart:
+        for p in self.parts:
+            if p.name == name:
+                return p
+        raise KeyError(name)
 
     def voxel_count(self) -> int:
         return sum(p.grid.count() for p in self.parts)
@@ -146,6 +194,8 @@ class BuiltAsset:
                 "pivot": list(p.pivot),
                 "parent": p.parent,
                 "symmetric": p.symmetric,
+                "joint": p.joint.to_dict() if p.joint else None,
+                "voxel_sha256": voxel_sha256(p.grid),
             }
 
         return {
@@ -163,6 +213,7 @@ class BuiltAsset:
             "colors": self.color_counts(),
             "palette_names": {str(i): n for i, n in self.palette_names().items()},
             "ops_used": sorted(self.ops_used),
+            "clips": [c.to_dict() for c in self.clips],
         }
 
     @classmethod
@@ -174,6 +225,7 @@ class BuiltAsset:
         parts = []
         for part in scene.parts:
             meta = info.get(part.name, {})
+            joint = meta.get("joint")
             parts.append(
                 BuiltPart(
                     part.name,
@@ -181,6 +233,7 @@ class BuiltAsset:
                     tuple(meta.get("pivot", (0, 0, 0))),
                     meta.get("parent"),
                     meta.get("symmetric"),
+                    Joint.from_dict(joint) if joint else None,
                 )
             )
         size = summary.get("size")
@@ -196,6 +249,7 @@ class BuiltAsset:
             allow_floating=bool(summary.get("allow_floating", False)),
             seed=int(summary.get("seed", 0)),
             ops_used=set(summary.get("ops_used", ())),
+            clips=[Clip.from_dict(c) for c in summary.get("clips", ())],
         )
 
 
@@ -234,7 +288,7 @@ class AssetDef:
                 except ShapeError as e:
                     raise ShapeError(f"part {p.name!r}: {e}") from None
                 pivot = tuple(p.pivot) if p.pivot is not None else default_pivot(grid)
-                parts.append(BuiltPart(p.name, grid, pivot, p.parent, p.symmetric))
+                parts.append(BuiltPart(p.name, grid, pivot, p.parent, p.symmetric, p.joint))
         return BuiltAsset(
             self.name,
             self.size,
@@ -247,6 +301,7 @@ class AssetDef:
             allow_floating=self.allow_floating,
             seed=int(seed),
             ops_used=set(ctx.ops_used),
+            clips=list(result.clips),
         )
 
     def __repr__(self) -> str:

@@ -34,7 +34,7 @@ from cubist.dsl import (
     torus,
     wedge,
 )
-from cubist.motion import hinge, slide, spin
+from cubist.motion import Track, clip, hinge, slide, spin
 
 __all__ = [
     "Model",
@@ -42,12 +42,14 @@ __all__ = [
     "Part",
     "Shape",
     "ShapeError",
+    "Track",
     "asset",
     "band",
     "box",
     "capsule",
     "carve",
     "checker",
+    "clip",
     "colored",
     "cone",
     "cylinder",
