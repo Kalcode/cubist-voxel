@@ -15,8 +15,8 @@ DEMO = Path(__file__).parent.parent / "projects" / "demo"
 SCRIPTS = sorted((DEMO / "assets").glob("*.py"))
 
 
-def test_there_are_ten_demo_scripts():
-    assert len(SCRIPTS) == 10
+def test_there_are_fourteen_demo_scripts():
+    assert len(SCRIPTS) == 14
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
