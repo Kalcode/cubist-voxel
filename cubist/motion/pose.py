@@ -7,6 +7,8 @@ its voxels as modeled to where they are at time ``t``.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import numpy as np
 
 from cubist.core.model import BuiltAsset
@@ -36,6 +38,11 @@ def _tangents(times: np.ndarray, values: np.ndarray, loop: bool, length: float) 
     return m
 
 
+@lru_cache(maxsize=4096)
+def _tangents_for(times: tuple, values: tuple, loop: bool, length: float) -> tuple:
+    return tuple(_tangents(np.array(times), np.array(values), loop, length))
+
+
 def track_value(track: Track, t: float, clip: Clip) -> float:
     """The track's value at time ``t`` (held flat before the first and after the last key)."""
     times = np.asarray(track.times, dtype=np.float64)
@@ -56,7 +63,7 @@ def track_value(track: Track, t: float, clip: Clip) -> float:
         return float(values[k] + s * s * (values[k + 1] - values[k]))
     if ease == "out":  # decelerating into each key
         return float(values[k] + (1 - (1 - s) ** 2) * (values[k + 1] - values[k]))
-    m = _tangents(times, values, clip.loop, clip.length)
+    m = _tangents_for(track.times, track.values, clip.loop, clip.length)
     h00 = 2 * s**3 - 3 * s**2 + 1
     h10 = s**3 - 2 * s**2 + s
     h01 = -2 * s**3 + 3 * s**2
@@ -80,7 +87,17 @@ def local_motion(
 
     Translation is the joint's slide plus the ``move_*`` tracks; rotation is
     ``R_joint @ R_z @ R_y @ R_x`` (free rotations about the parent's axes, x first, then the
-    joint)."""
+    joint). Cached on the asset: the same clip and time always give the same motion."""
+    cache = asset.__dict__.setdefault("_local_motion", {})
+    key = (clip, float(t))
+    if key not in cache:
+        cache[key] = _local_motion(asset, clip, t)
+    return cache[key]
+
+
+def _local_motion(
+    asset: BuiltAsset, clip: Clip, t: float
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
     out = {p.name: (np.zeros(3), np.eye(3)) for p in asset.parts}
     joint_motion_of: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     turns: dict[str, np.ndarray] = {}
@@ -295,17 +312,59 @@ def dense_times(
     parts: list[str] | None = None,
     max_move: float | None = None,
 ) -> np.ndarray:
-    """``sample_times``, subdivided wherever the parts (default: all) together turn more than
-    ``max_turn`` degrees between samples (or, with ``max_move``, move more than that many
-    voxels), so fast spins and snaps are sampled finely enough to see and to play back."""
+    """``sample_times``, subdivided wherever a part turns more than ``max_turn`` degrees
+    between samples, counting the turns of the parts it hangs from (or, with ``max_move``,
+    moves more than that many voxels), so fast spins and snaps are sampled finely enough to
+    see and to play back. Results are cached on the asset."""
+    names = tuple(parts if parts is not None else [p.name for p in asset.parts])
+    cache = asset.__dict__.setdefault("_dense_times", {})
+    key = (clip, rate, max_turn, names, max_move)
+    if key in cache:
+        return cache[key]
     base = sample_times(clip, rate)
-    names = parts if parts is not None else [p.name for p in asset.parts]
+    turning: dict[str, list[tuple[Track, float]]] = {}
+    for track in clip.tracks:
+        factor = 0.0
+        if track.channel.startswith("rotate_"):
+            factor = 1.0
+        elif track.channel == "joint":
+            joint = asset.part(track.part).joint
+            if joint is not None and joint.kind != "slide":
+                factor = 360.0 if joint.kind == "spin" else 1.0
+        if factor:
+            turning.setdefault(track.part, []).append((track, factor))
+    parents = {p.name: p.parent for p in asset.parts}
+    chains = {}
+    for n in names:  # the part and everything it hangs from, as far as they turn
+        chain, m = [], n
+        while m is not None and m in parents:
+            if m in turning:
+                chain.append(m)
+            m = parents[m]
+        chains[n] = chain
+    values: dict[tuple[int, float], float] = {}
+
+    def value(track: Track, t: float) -> float:
+        k = (id(track), t)
+        if k not in values:
+            values[k] = track_value(track, t, clip)
+        return values[k]
+
+    motions: dict[float, dict] = {}
+
+    def motion(t: float) -> dict:
+        if t not in motions:
+            motions[t] = local_motion(asset, clip, t)
+        return motions[t]
 
     def too_far(t0: float, t1: float) -> bool:
-        if sum(turn_degrees(asset, clip, n, t0, t1) for n in names) > max_turn + 1e-9:
+        own = {
+            n: sum(f * abs(value(tr, t1) - value(tr, t0)) for tr, f in turning[n]) for n in turning
+        }
+        if any(sum(own[m] for m in chains[n]) > max_turn + 1e-9 for n in names):
             return True
         if max_move:
-            a, b = local_motion(asset, clip, t0), local_motion(asset, clip, t1)
+            a, b = motion(t0), motion(t1)
             return max(float(np.linalg.norm(b[n][0] - a[n][0])) for n in names) > max_move + 1e-9
         return False
 
@@ -319,7 +378,8 @@ def dense_times(
     out = [float(base[0])]
     for t0, t1 in zip(base, base[1:], strict=False):
         out.extend(split(float(t0), float(t1)))
-    return np.array(out)
+    cache[key] = np.array(out)
+    return cache[key]
 
 
 def sample_times(clip: Clip, rate: float = 30.0) -> np.ndarray:

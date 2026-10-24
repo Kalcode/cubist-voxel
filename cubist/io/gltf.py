@@ -183,6 +183,7 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
     pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
     out = {}
     motion = [t for t in clip.tracks if t.channel not in STEPPED]
+    motions: dict[float, dict] = {}  # local_motion covers every part; reuse it across parts
     for name in dict.fromkeys(t.part for t in motion):
         tracks = [t for t in motion if t.part == name]
         part = asset.part(name)
@@ -204,7 +205,9 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
         offset = pivots[name] - (pivots[part.parent] if part.parent in pivots else 0.0)
         trans, rots = [], []
         for t in times:
-            tr, rot = local_motion(asset, clip, float(t))[name]
+            if t not in motions:
+                motions[t] = local_motion(asset, clip, float(t))
+            tr, rot = motions[t][name]
             trans.append((offset + tr) * voxel_size_m)
             q = _quat(rot)
             if rots and np.dot(q, rots[-1]) < 0:

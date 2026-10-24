@@ -204,3 +204,25 @@ def test_hinge_helper_still_works_with_mirroring():
     p = Part("door_r", box((1, 4, 3)), pivot=(0, 0, 0), joint=hinge("y", (0, 90)))
     assert p.mirrored("door_l", about_x=4)[1].joint is not None
     assert turn  # exported
+
+
+def test_a_ten_chunk_fast_spinning_burst_lints_and_exports_quickly():
+    """A powder keg from the eval (10 chunks, keys at 60/s, spin 720) once took over 30 s."""
+    import time
+
+    from cubist.core.style import StyleBible
+    from cubist.io.gltf import encode_glb
+    from cubist.lint import lint
+
+    def fn(p):
+        body = cylinder(r=4, h=10, color=p.wood.mid).at(5, 0, 5)
+        pieces = chunks("stave", body, pieces=10, seed=1)
+        boom = clip("explode", 1.5, burst(pieces, up=20, spin=720, rate=60, seed=3),
+                    collisions=False)  # fmt: skip
+        return Model(pieces, clips=[boom])
+
+    a = asset(name="keg", size=(10, 10, 10), grounded=True)(fn).build(P)
+    start = time.perf_counter()
+    lint(a, StyleBible(path=None, name="t", voxel_size_m=1, palette=P))
+    encode_glb(a, P.rgba_table())
+    assert time.perf_counter() - start < 5
