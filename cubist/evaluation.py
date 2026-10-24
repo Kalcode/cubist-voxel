@@ -1,14 +1,16 @@
-"""Evaluation (milestone 6): how far briefs got.
+"""Evaluation (milestones 6 and 11): how far briefs got.
 
 For every brief in a project: was it built, does it lint without errors, how many iterations
 (distinct script versions built, from ``out/<name>/history.jsonl``), and the person's 1-5
 score from ``eval/scores.toml`` (0 = not scored yet). An asset is accepted when it lints without
-errors within 5 iterations and scores at least 3.
+errors within 5 iterations and scores at least 3. Animated assets list their clips, and their
+GIFs are copied to ``eval/gifs/`` so the report can show them.
 """
 
 from __future__ import annotations
 
 import json
+import shutil
 import tomllib
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from PIL import Image
 
 from cubist.build.runner import load_project_style
 from cubist.export import lint_loaded, load_asset
+from cubist.motion.pose import preview_clips
 from cubist.project import load_brief
 from cubist.render.contact_sheet import INK, MUTED, SHEET_BG
 from cubist.render.font import draw_text, text_height
@@ -63,15 +66,18 @@ def evaluate(project: str | Path) -> dict:
             "warnings": None,
             "iterations": iterations(project, name),
             "score": scores.get(name, 0),
+            "clips": [],
         }
         asset_dir = project / "out" / name
         if (asset_dir / f"{name}.vox").exists():
-            _, report = lint_loaded(load_asset(asset_dir), style)
+            loaded = load_asset(asset_dir)
+            built, report = lint_loaded(loaded, style)
             row.update(
                 built=True,
                 lint_ok=report.ok,
                 errors=report.count("error"),
                 warnings=report.count("warning"),
+                clips=[c.name for c in preview_clips(built, with_previews=True)],
             )
         passing = row["built"] and row["lint_ok"] and row["iterations"] <= MAX_ITERATIONS
         if not passing:
@@ -130,13 +136,24 @@ def write_report(project: str | Path, report: dict) -> dict[str, Path]:
             ""
             if scores_path.exists()
             else (
-                "# Score each asset 1-5 after looking at out/<name>/contact.png (0 = not scored).\n"
+                "# Score each asset 1-5 after looking at out/<name>/contact.png and, for moving\n"
+                "# assets, its GIFs in eval/gifs/ (0 = not scored).\n"
                 "# 1 unusable, 2 needs major work, 3 usable, 4 good, 5 excellent.\n"
             )
         )
         with open(scores_path, "a") as f:
             f.write(header + "".join(f"{name} = 0\n" for name in missing))
 
+    gifs_dir = out / "gifs"
+    for r in report["assets"]:
+        r["gifs"] = []
+        for clip_name in r.get("clips", []):
+            source = project / "out" / r["name"] / f"{clip_name}.gif"
+            if source.exists():
+                gifs_dir.mkdir(exist_ok=True)
+                target = gifs_dir / f"{r['name']}-{clip_name}.gif"
+                shutil.copyfile(source, target)
+                r["gifs"].append(f"gifs/{target.name}")
     (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     s = report["summary"]
     lines = [
@@ -175,6 +192,13 @@ def write_report(project: str | Path, report: dict) -> dict[str, Path]:
             f"| {r['name']} | {r['category']} | {'yes' if r['built'] else 'no'} | "
             f"{lint} | {r['iterations']} | {r['score'] or '—'} | {accepted} |"
         )
+    moving = [r for r in report["assets"] if r.get("gifs")]
+    if moving:
+        lines += ["", "## Motion", ""]
+        for r in moving:
+            lines += [f"### {r['name']}", ""]
+            lines += [f"![{r['name']} {g}]({g})" for g in r["gifs"]]
+            lines.append("")
     (out / "report.md").write_text("\n".join(lines) + "\n")
     _gallery(project, report).save(out / "gallery.png")
     return {

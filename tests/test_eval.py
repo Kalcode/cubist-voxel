@@ -77,3 +77,30 @@ def test_cli_eval_writes_report_gallery_and_score_template(project, capsys):
     scores = (project / "eval" / "scores.toml").read_text()
     assert "crate = 0" in scores
     assert "| crate |" in (project / "eval" / "report.md").read_text()
+
+
+def test_eval_reports_clips_and_keeps_gifs_beside_the_report(project, capsys):
+    new_asset(project, "lid")
+    path = project / "assets" / "lid.py"
+    path.write_text(
+        textwrap.dedent("""
+        from cubist import *
+
+        @asset(name="lid", size=(4, 5, 4), grounded=True)
+        def make(p):
+            body = Part("body", box((4, 4, 4), color=p.wood.mid), pivot=(2, 0, 2))
+            lid = Part("lid", box((4, 1, 4), color=p.wood.light).at(0, 4, 0), parent="body",
+                       pivot=(2, 4, 0), joint=hinge("-x", (0, 120)))
+            return Model([body, lid], clips=[clip("open", 0.5, {"lid": [0, 100]})])
+    """)
+    )
+    build_script(path)
+    report = evaluate(project)
+    [row] = report["assets"]
+    assert row["clips"] == ["open"]
+    capsys.readouterr()
+    assert main(["eval", "--project", str(project)]) == 0
+    assert (project / "eval" / "gifs" / "lid-open.gif").is_file()
+    text = (project / "eval" / "report.md").read_text()
+    assert "gifs/lid-open.gif" in text
+    assert "GIF" in (project / "eval" / "scores.toml").read_text()
