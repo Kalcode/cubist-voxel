@@ -34,6 +34,8 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Evaluation scripts are written by agents under test; keep them exactly as authored.
+extend-exclude = ["projects/eval/assets"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

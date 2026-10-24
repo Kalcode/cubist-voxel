@@ -1,59 +1,19 @@
-# Cubist
+<p align="center">
+  <img src="docs/images/icon-256.png" width="128" alt="Cubist logo: a voxel cube with one block lifted out">
+</p>
 
-Agent-native voxel asset authoring: an agent writes a Python script, Cubist samples it into
-voxels, writes MagicaVoxel `.vox` files, renders a contact sheet to critique, and lints the
-result against the project's style bible, and exports `.glb` with parts as nodes for game
-engines.
+<h1 align="center">Cubist</h1>
 
-Status: milestones 1–5 of the [design](docs/design.md): the full shape DSL, `.vox` read/write
-with part hierarchy, contact sheets, ASCII slices, diffs, lint, `style.toml`, GLB export
-verified in Godot 4, an MCP server, and an example library of ten seed assets.
+<p align="center"><b>Voxel assets, written as code by agents.</b></p>
 
-## Use it from Claude Code
+<p align="center">
+  <img src="docs/images/banner.png" alt="Voxel assets built with Cubist: a goblin, chest, barrel, torch, hut, tree, mushroom, potion, and sword">
+</p>
 
-`CLAUDE.md` holds the authoring workflow (brief → examples → script → build → critique →
-revise, at most 5 iterations), so Claude Code follows it when you ask for an asset:
-
-> Make a lantern prop for the demo project: iron frame, glowing glass, a ring on top.
-
-To give any MCP client the same tools (build, render, lint, inspect, export, style bible,
-examples, diff), register the server:
-
-```sh
-claude mcp add cubist -- uv run --directory /path/to/voxel-auther-system cubist mcp --project projects/demo
-```
-
-## Setup
-
-```sh
-uv sync
-uv run pytest
-```
-
-## Build an asset
-
-```sh
-uv run cubist build projects/demo/assets/goblin.py   # -> projects/demo/out/goblin_scout/
-uv run cubist render projects/demo/out/goblin_scout --slices y=18..19
-uv run cubist render projects/demo/out/goblin_scout --views front,iso,silhouette
-uv run cubist lint projects/demo/out/goblin_scout          # exit 2 on errors
-uv run cubist export projects/demo/out/goblin_scout --ao  # -> projects/demo/export/
-uv run cubist inspect projects/demo/out/goblin_scout/goblin_scout.vox
-uv run cubist style --style projects/demo/style.toml
-uv run cubist new lantern --category prop --project projects/demo   # brief + script stub
-uv run cubist diff projects/demo/out/goblin_scout                   # vs. the previous build
-uv run cubist examples search --tags wood --category prop --project projects/demo
-uv run cubist palette import some-lospec-palette.hex --style projects/demo/style.toml
-```
-
-A build writes `<name>.vox`, `contact.png` (front, right, back, top, and iso views with
-voxel-coordinate rulers and a color legend), `lint.json`, and `build.json`. `--seed N` reshuffles
-every seeded op; `--check-determinism` builds twice in separate processes and compares.
-`cubist export` re-lints, refuses on errors unless `--force`, and writes `.glb` (one node per
-part at its pivot, sockets as empty nodes, metres from `voxel_size_m`) and `.vox`; other formats
-go through `--via-vengi FORMAT` when `vengi-voxconvert` is installed.
-
-An asset script (the barrel from the design doc):
+Cubist is a headless voxel modeling toolkit for AI agents. An agent writes a short Python
+script, Cubist turns it into voxels, renders a contact sheet the agent can look at, checks it
+against your game's style bible, and exports MagicaVoxel `.vox` and engine-ready `.glb` files.
+The agent never places voxels by hand: it writes code, looks, and revises.
 
 ```python
 from cubist import *
@@ -69,37 +29,102 @@ def barrel(p):
     return Model(parts=[Part("body", body, pivot=(6, 0, 6))])
 ```
 
-The DSL reference (every primitive, op, selection, and its conventions) is in
-[docs/design.md](docs/design.md#the-dsl).
+## What you get
 
-Colors come from the project's `style.toml` by name (`p.<ramp>.dark|mid|light`,
-`p.<ramp>[i]`, or named shades); an unknown name is a build error.
+- **A shape DSL built for agents.** Primitives (box, sphere, cylinder, cone, capsule, torus,
+  wedge, lathe, extrude, heightmap), CSG with smooth blends, transforms, mirroring, voxel
+  morphology (round, chamfer, hollow), paint ops (gradients, dithering, crevice shading, edge
+  highlights), and selections. Colors come from named palette ramps, never indices.
+- **Eyes for the agent.** Every build renders front, side, back, top, and iso views with
+  voxel-coordinate rulers and a palette legend, so feedback can be exact. ASCII slices and
+  before/after diffs cover the details.
 
-Conventions: Y-up, right-handed, +Z is the front, integer voxel coordinates. A voxel is
-filled when its center is inside or on a shape. Primitives start at their local origin
-(`box` at its min corner, `sphere` at its center, `cylinder`/`cone` at the center of their
-base) and `.at()` moves them. Union gives overlaps the later shape's color; subtract and
-intersect keep the left shape's colors.
+  ![A contact sheet](docs/images/contact-goblin.png)
 
-## Viewing output
+- **A style bible.** One `style.toml` per game fixes the palette, scale, budgets, and art rules,
+  and the linter holds every asset to it: off-palette colors, out-of-bounds voxels, floating
+  pieces, broken symmetry, budgets, thin walls, hidden interiors.
+- **Game-ready export.** `.glb` with one node per part at its pivot (lids open, arms swing),
+  sockets as empty nodes, a palette texture or vertex colors, and optional baked AO, tested by
+  importing into Godot 4. `.vox` keeps the part hierarchy for touch-ups in MagicaVoxel or Goxel.
+  Everything else goes through vengi.
+- **Agent integration.** A `CLAUDE.md` workflow and Claude Code skills, an MCP server for other
+  clients, a library of approved examples for few-shot references, and an evaluation harness.
+- **Deterministic.** The same script and seed give the same bytes, every time, on any machine.
 
-Open `.vox` files in [MagicaVoxel](https://ephtracy.github.io/)
-(`brew install --cask magicavoxel`) or [Goxel](https://goxel.xyz/)
-(`brew install --cask goxel`).
+## Install
 
-## Layout
+Python 3.11+ and [uv](https://docs.astral.sh/uv/):
+
+```sh
+git clone ssh://git@192.168.50.249/kalcode/voxel-auther-system.git
+cd voxel-auther-system
+uv sync
+```
+
+Optional: [MagicaVoxel](https://ephtracy.github.io/) or [Goxel](https://goxel.xyz/) to view and
+edit `.vox` (`brew install --cask magicavoxel goxel`), [Godot 4](https://godotengine.org/) for the
+`.glb`, and [vengi](https://vengi-voxel.github.io/vengi/) for other formats.
+
+## Run it
+
+```sh
+cd projects/demo
+uv run cubist build assets/goblin.py            # out/goblin_scout/: .vox, contact.png, lint
+uv run cubist diff out/goblin_scout             # what changed since the last build
+uv run cubist render out/goblin_scout --slices y=18..19
+uv run cubist export out/goblin_scout --ao      # export/goblin_scout.glb and .vox
+```
+
+The full walkthrough is in [docs/getting-started.md](docs/getting-started.md).
+
+## Let Claude make the assets
+
+Open [Claude Code](https://claude.com/claude-code) in the repo and ask like an art director.
+The `CLAUDE.md` workflow and the skills in `.claude/skills/` take it from there: read the brief
+and similar examples, write the script, build, look, critique, revise (at most five times), and
+show you the result.
+
+| You want to | Say something like | Skill |
+| --- | --- | --- |
+| Create | "Make a wooden signpost with two arrows and moss at the base, about goblin height." | `voxel-create` |
+| Edit or refine | "The goblin's ears look like nubs; make them longer and pointier." | `voxel-refine` |
+| Get ideas | "Suggest ten props for a blacksmith's yard and write briefs for the best five." | `voxel-ideas` |
+| Start a game | "Set up a snowy mountain project from this Lospec palette." | `voxel-project` |
+
+Every revision comes with a diff sheet: added voxels green, removed red, recolored orange.
+
+![A diff sheet](docs/images/diff-goblin.png)
+
+More in [docs/working-with-claude.md](docs/working-with-claude.md). Other MCP clients can use the
+same tools: `claude mcp add cubist -- uv run --directory "$PWD" cubist mcp --project
+projects/demo` ([docs/mcp.md](docs/mcp.md)).
+
+## Docs
+
+| | |
+| --- | --- |
+| [Getting started](docs/getting-started.md) | Install, first asset, commands, new projects |
+| [Working with Claude](docs/working-with-claude.md) | Creating, editing, refining, and brainstorming with an agent |
+| [How it works](docs/how-it-works.md) | Architecture, build pipeline, shape stages, lint, export (with diagrams) |
+| [MCP server](docs/mcp.md) | Setup and tool reference |
+| [Design](docs/design.md) | The design of record: decisions, DSL reference, milestones |
+
+## Project layout
 
 ```text
-cubist/
-  core/    grid, palette, style bible, parts, models, @asset
-  dsl/     SDF primitives, CSG, transforms, voxel morphology, paint, selections, noise
-  build/   subprocess runner with timeout
-  io/      .vox reader/writer, greedy meshing, GLB writer, vengi bridge
-  export.py  lint-gated export
-  lint/    lint checks and report
-  render/  rasterizer, contact sheet, ASCII slices, bitmap font
-  cli.py
-  mcp_server.py, examples.py, project.py, palette_import.py
-projects/demo/   style.toml, ten asset scripts, examples/ (the seed library)
-tests/           golden/ holds reviewed contact sheets
+cubist/            the package: core, dsl, build, render, lint, io, export, mcp_server, cli
+projects/demo/     a sample game: style.toml, briefs, asset scripts, examples/ (the library)
+projects/eval/     20 briefs used to evaluate agents end to end
+.claude/skills/    Claude Code skills: voxel-create, voxel-refine, voxel-ideas, voxel-project
+docs/              guides, the design doc, and images (scripts/make_images.py regenerates them)
+tests/             the test suite; golden/ holds reviewed contact sheets
 ```
+
+## Status
+
+Milestones 1–5 of the [design](docs/design.md) are done; milestone 6 (evaluation) is running.
+Next up: animation, voxel effects, and engine integration.
+
+Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
+`uv run ruff check . && uv run ruff format .`.
