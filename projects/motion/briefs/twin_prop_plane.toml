@@ -1,0 +1,9 @@
+name = "twin_prop_plane"
+category = "vehicle"
+size = [24, 9, 20]
+tags = ["vehicle", "metal"]
+description = "A small twin-engine propeller plane; both propellers spin, in opposite directions."
+must_haves = ["fuselage, wings, tail, and two engine nacelles", "two propellers that spin in opposite directions", "a looping 'spin' clip that closes cleanly", "propellers pivoted on their hubs"]
+motion = ["both propellers spin"]
+moment = "airplane propellers spinning"
+references = []

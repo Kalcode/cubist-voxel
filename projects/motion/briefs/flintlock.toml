@@ -1,0 +1,9 @@
+name = "flintlock"
+category = "prop"
+size = [3, 9, 16]
+tags = ["prop", "weapon", "wood", "metal"]
+description = "A flintlock pistol. When it fires, the hammer snaps forward, the muzzle flashes and the barrel puffs smoke."
+must_haves = ["wooden stock and grip, metal barrel, a hammer", "the hammer on a hinge snapping forward", "a muzzle flash shown only for a moment", "a muzzle kick", "a smoke puff from the muzzle (a particle asset named flintlock_smoke)", "an oriented muzzle socket", "a 'fire' clip with a fire event"]
+motion = ["fires: hammer, flash, kick, smoke"]
+moment = "gun shooting"
+references = []

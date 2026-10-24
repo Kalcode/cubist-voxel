@@ -1,0 +1,9 @@
+name = "powder_keg"
+category = "prop"
+size = [10, 12, 10]
+tags = ["prop", "wood", "metal", "explosive"]
+description = "A small gunpowder keg with iron hoops and a fuse that blows apart into debris and a cloud of smoke."
+must_haves = ["keg with staves, iron hoops and a fuse", "fractured into chunks that are the keg's parts", "an 'explode' clip that throws the chunks out and lets them land", "a smoke burst from a particle asset you make (name it powder_keg_smoke)"]
+motion = ["explodes into debris with smoke"]
+moment = "barrel exploding"
+references = []

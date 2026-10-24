@@ -1,0 +1,9 @@
+name = "jewelry_box"
+category = "prop"
+size = [10, 8, 8]
+tags = ["prop", "wood", "gold", "container"]
+description = "A small ornate jewelry box with gold trim whose lid pops open with a little bounce and snaps shut."
+must_haves = ["box body with gold corner trim", "a lid hinged along the back edge", "an 'open' clip that overshoots and settles", "a quicker 'close' clip", "something glinting inside"]
+motion = ["lid opens with a bounce", "lid snaps shut"]
+moment = "chest opening"
+references = []

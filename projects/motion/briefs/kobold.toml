@@ -1,0 +1,9 @@
+name = "kobold"
+category = "character"
+size = [12, 18, 10]
+tags = ["character", "creature"]
+description = "A small kobold with a lizard snout and a long tail, in a leather vest. It walks and idles."
+must_haves = ["reptile head with snout and horns", "leather vest", "a long tail", "a looping 'walk' cycle that keeps the feet on the floor, with the tail swaying", "a looping 'idle'", "footstep events and a travel speed on the walk"]
+motion = ["walk cycle", "idle"]
+moment = "goblin walking"
+references = []

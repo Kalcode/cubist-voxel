@@ -1,0 +1,9 @@
+name = "shop_window"
+category = "building"
+size = [18, 14, 4]
+tags = ["building", "wood", "glass", "window"]
+description = "A shop window with two glass panes in a wooden frame; the left pane slides sideways behind the right one."
+must_haves = ["wooden frame with a sill", "two framed glass panes", "the moving pane slides horizontally without passing through the other", "'open' and 'close' clips"]
+motion = ["pane slides open sideways", "pane slides shut"]
+moment = "window sliding open"
+references = []

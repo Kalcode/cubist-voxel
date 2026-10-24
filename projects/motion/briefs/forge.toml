@@ -1,0 +1,9 @@
+name = "forge"
+category = "building"
+size = [16, 18, 14]
+tags = ["building", "stone", "fire", "metal"]
+description = "A blacksmith's stone forge with a burning fire, glowing coals and a chimney that smokes."
+must_haves = ["stone hearth and chimney", "fire that flickers (a flipbook)", "glowing coals and fire", "a flickering light", "smoke rising from the chimney (an always-on emitter with a particle asset named forge_smoke)"]
+motion = ["fire flickers", "chimney smokes"]
+moment = "fire with smoke"
+references = []

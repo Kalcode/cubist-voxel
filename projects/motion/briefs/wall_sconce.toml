@@ -1,0 +1,9 @@
+name = "wall_sconce"
+category = "prop"
+size = [8, 16, 8]
+tags = ["prop", "metal", "light", "fire"]
+description = "An iron wall sconce holding a burning torch: the flame flickers and lights the wall."
+must_haves = ["iron wall plate and bracket", "a wooden torch held in the bracket", "a flame that flickers on its own (a flipbook of at least four frames)", "glowing fire colors", "a flickering point light at the flame"]
+motion = ["flame flickers continuously"]
+moment = "torch flickering"
+references = []

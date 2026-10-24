@@ -1,0 +1,9 @@
+name = "cellar_hatch"
+category = "prop"
+size = [14, 4, 14]
+tags = ["prop", "wood", "stone", "door"]
+description = "A wooden trapdoor set in a stone floor frame. It swings up on its hinges and falls back shut."
+must_haves = ["stone frame flush with the floor", "plank hatch with iron straps and a ring pull", "hinged along one edge", "an 'open' clip swinging it up past vertical and resting", "a 'close' clip"]
+motion = ["hatch swings open", "hatch falls shut"]
+moment = "door opening"
+references = []

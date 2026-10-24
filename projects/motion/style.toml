@@ -1,0 +1,52 @@
+[project]
+name = "motion-eval"
+voxel_size_m = 0.0625        # 1/16 m per voxel
+
+[palette]
+# Ramps run dark to light: p.<ramp>.dark / .mid / .light, or p.<ramp>[i].
+wood    = ["#3b2414", "#5e3a1f", "#8a5a32", "#b07d4a"]
+stone   = ["#3f3f47", "#5e5e68", "#83838e", "#adadb6"]
+metal   = ["#2a2d34", "#4b505a", "#7d8491", "#c2c8d0"]
+gold    = ["#7a5a12", "#b8891c", "#e6b93a", "#fbe58a"]
+leaf    = ["#1f3d1a", "#2f5d27", "#4a8a3a", "#7cbf5a"]
+grass   = ["#3d5c1e", "#5a8a2b", "#86b84a"]
+skin    = ["#8a5a3c", "#b9805a", "#e0ad85", "#f5d4b5"]
+orc     = ["#3d5214", "#4f6b1a", "#6b8e23", "#8fb339"]
+red     = ["#5c1414", "#8e2020", "#c43a2a", "#e8644a"]
+blue    = ["#1a2a5c", "#2a4590", "#4069c4", "#7a9be0"]
+purple  = ["#2e1a4a", "#4a2a78", "#6e45a8", "#9d7ad0"]
+leather = ["#3a2416", "#5c3a22", "#7f5532"]
+fire    = ["#7a1c00", "#d9480f", "#f59f00", "#ffe066"]
+water   = ["#1c3f5c", "#2f6a8f", "#5aa0c4"]
+bone    = ["#8f8670", "#c4bca4", "#ebe5d4"]
+glow    = ["#c48a1c", "#ffd23f", "#fff3b0"]
+slime   = ["#1e5c3a", "#2f8a55", "#55c47e", "#a6f0c0"]
+# Named shades with no order (ramp ops leave these alone).
+cloth   = { white = "#ece6d6", straw = "#d9b85a" }
+eye     = { white = "#f4f1e8", dark = "#1a1a22" }
+
+[scale]
+humanoid_height = 24
+door_height = 18
+table_height = 9
+
+[budgets]
+max_colors = 24
+max_voxels = 60000
+max_triangles = 8000
+max_parts = 16
+
+[rules]
+no_pure_black = true
+dither = "allowed"
+symmetry_tolerance = 0
+notes = "Chunky silhouettes, oversized heads and hands, readable at 64 px tall. Light comes from top-left. Use 3-4 shades of a ramp per material."
+
+[glow]
+# Colors that give off light: nearly unshaded in previews, emissive in the .glb.
+fire = 1.5
+glow = 1.0
+
+[cycles]
+# The water ramp steps one shade along each tick, so water seems to flow.
+water = { ramp = "water", fps = 5 }

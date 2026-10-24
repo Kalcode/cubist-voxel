@@ -1,0 +1,9 @@
+name = "fountain"
+category = "building"
+size = [16, 10, 16]
+tags = ["building", "stone", "water"]
+description = "A round stone fountain: water flows in the basin and splashes from a central spout."
+must_haves = ["round stone basin with a rim", "water in the basin that seems to flow (color cycling)", "a central spout", "a splash at the spout that changes shape over time (a flipbook)"]
+motion = ["water flows", "spout splashes"]
+moment = "water moving"
+references = []

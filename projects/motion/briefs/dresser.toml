@@ -1,0 +1,9 @@
+name = "dresser"
+category = "prop"
+size = [14, 14, 9]
+tags = ["prop", "wood", "furniture"]
+description = "A wooden dresser with three drawers and knobs; the middle drawer slides out and back."
+must_haves = ["cabinet with three drawer fronts and knobs", "the middle drawer is a real tray that slides out", "the drawer doesn't pass through the cabinet", "'open' and 'close' clips"]
+motion = ["middle drawer slides out", "drawer slides back in"]
+moment = "desk drawer opening"
+references = []
