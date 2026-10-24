@@ -24,7 +24,7 @@ from cubist.project import new_asset as scaffold
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet, hidden_note
 from cubist.render.diff import change_grid, diff_sheet
-from cubist.render.filmstrip import render_clip
+from cubist.render.filmstrip import motion_diff, render_clip
 
 INSTRUCTIONS = """Cubist builds game-ready voxel assets from Python scripts. Never place voxels one
 at a time: write a script with the DSL (primitives, CSG, transforms, paint ops) and build it.
@@ -238,6 +238,8 @@ def create_server(project: str | Path) -> MCPServer:
                 f"{', '.join(ex['tags'])})\n# why it is good: {ex['note']}\n\n{script}"
             )
             out.append(Image(path=ex["contact_sheet"]))
+            if ex.get("filmstrip"):
+                out.append(Image(path=ex["filmstrip"]))
         return out
 
     @server.tool()
@@ -266,7 +268,13 @@ def create_server(project: str | Path) -> MCPServer:
             f"{counts['added']} added, {counts['removed']} removed, "
             f"{counts['recolored']} recolored, {counts['same']} unchanged"
         )
-        return [summary, Image(path=path)]
+        out = [summary, Image(path=path)]
+        folder = after.vox.parent
+        strips = motion_diff(folder / "motion.prev.png", folder / "motion.png")
+        if strips is not None:
+            strips.save(folder / "motion-diff.png")
+            out.append(Image(path=folder / "motion-diff.png"))
+        return out
 
     @server.tool()
     @_tool_errors

@@ -46,6 +46,10 @@ def promote(
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(script, dest / f"{name}.py")
     shutil.copyfile(out / "contact.png", dest / "contact.png")
+    if (out / "motion.png").exists():
+        shutil.copyfile(out / "motion.png", dest / "motion.png")
+    else:
+        (dest / "motion.png").unlink(missing_ok=True)
     # The library is shared: keep the summary, but no paths from this machine.
     portable = {k: v for k, v in summary.items() if k not in ("outputs",)}
     portable["script"] = f"{name}.py"
@@ -77,6 +81,9 @@ def list_examples(project: str | Path) -> list[dict]:
                 **meta,
                 "script": str(folder / f"{meta['name']}.py"),
                 "contact_sheet": str(folder / "contact.png"),
+                "filmstrip": str(folder / "motion.png")
+                if (folder / "motion.png").exists()
+                else None,
                 "voxels": json.loads((folder / "build.json").read_text()).get("voxels")
                 if (folder / "build.json").exists()
                 else None,

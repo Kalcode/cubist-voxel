@@ -25,7 +25,7 @@ from cubist.project import ProjectError, find_project, new_asset
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet, hidden_note
 from cubist.render.diff import diff_sheet
-from cubist.render.filmstrip import render_clip
+from cubist.render.filmstrip import motion_diff, render_clip
 
 
 def _hex(rgba) -> str:
@@ -204,7 +204,14 @@ def cmd_diff(args: argparse.Namespace) -> int:
     from cubist.render.diff import change_grid
 
     _, counts = change_grid(before.grid, after.grid)
-    _print({"diff_sheet": str(out), **counts})
+    result = {"diff_sheet": str(out), **counts}
+    if not args.other:
+        folder = after.vox.parent
+        strips = motion_diff(folder / "motion.prev.png", folder / "motion.png")
+        if strips is not None:
+            strips.save(folder / "motion-diff.png")
+            result["motion_diff"] = str(folder / "motion-diff.png")
+    _print(result)
     return 0
 
 

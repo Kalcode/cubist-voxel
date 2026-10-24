@@ -168,3 +168,37 @@ def test_animated_build_under_15s(project):
     start = time.perf_counter()
     build_script(script, timeout=60)
     assert time.perf_counter() - start < 15
+
+
+def test_cli_diff_also_compares_filmstrips(project, capsys):
+    script = write(project, ONE)
+    build_script(script)
+    script.write_text(script.read_text().replace("[0, 110, 100]", "[0, 80, 70]"))
+    [r] = build_script(script)
+    capsys.readouterr()
+    assert main(["diff", str(r.vox_path.parent)]) == 0
+    info = json.loads(capsys.readouterr().out)
+    strip = Image.open(info["motion_diff"])
+    one = Image.open(r.vox_path.parent / "motion.png")
+    assert strip.height > 2 * one.height - 10
+
+
+def test_mcp_diff_returns_the_filmstrip_diff(project):
+    script = write(project, ONE)
+    build_script(script)
+    script.write_text(script.read_text().replace("[0, 110, 100]", "[0, 80, 70]"))
+    build_script(script)
+    result = call(project, "diff", asset="chest")
+    assert [c.type for c in result.content].count("image") == 2
+
+
+def test_promoted_examples_keep_their_filmstrip(project):
+    from cubist.examples import promote, search_examples
+
+    build_script(write(project, ONE))
+    dest = promote(project, "chest", note="opens nicely")
+    assert (dest / "motion.png").exists()
+    [ex] = search_examples(project)
+    assert ex["filmstrip"] == str(dest / "motion.png")
+    result = call(project, "search_examples")
+    assert [c.type for c in result.content].count("image") == 2

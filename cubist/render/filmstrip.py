@@ -295,3 +295,26 @@ def render_clip(
     if frames < 2:
         raise ValueError(f"frames must be at least 2, got {frames}")
     return "filmstrip", filmstrip(asset, table, [c], frames=frames, view=view)
+
+
+def motion_diff(before: str | Path, after: str | Path) -> Image.Image | None:
+    """The previous build's filmstrip above this one's, labeled; None unless both exist."""
+    before, after = Path(before), Path(after)
+    if not (before.exists() and after.exists()):
+        return None
+    blocks, width = [], 0
+    for label, path in (("BEFORE (LAST BUILD)", before), ("AFTER (THIS BUILD)", after)):
+        img = np.asarray(Image.open(path).convert("RGB"))
+        th = text_height(2) + 8
+        block = np.full((th + img.shape[0], max(img.shape[1], text_width(label, 2)), 3), SHEET_BG,
+                        dtype=np.uint8)  # fmt: skip
+        draw_text(block, 16, 0, label, INK, scale=2)
+        block[th:, : img.shape[1]] = img
+        blocks.append(block)
+        width = max(width, block.shape[1])
+    padded = []
+    for b in blocks:
+        full = np.full((b.shape[0], width, 3), SHEET_BG, dtype=np.uint8)
+        full[:, : b.shape[1]] = b
+        padded.append(full)
+    return stack(padded, width + 2 * 16)
