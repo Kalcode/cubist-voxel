@@ -93,6 +93,29 @@ def test_glow_and_cycles_survive_summary_and_vox(tmp_path):
     assert again.glow == s.glow and again.cycles == s.cycles
 
 
+def test_built_vox_carries_every_glowing_palette_color(tmp_path):
+    # Every glowing palette entry, used or not, so painting with it in MagicaVoxel glows too.
+    s = style(tmp_path)
+
+    def fn(p):
+        return Model([Part("log", box((2, 1, 2), color=p.wood.dark))])
+
+    a = asset(name="log", size=(2, 1, 2))(fn).build(s.palette, glow=s.glow)
+    assert decode_vox(encode_vox(a.to_vox_scene())).glow == pytest.approx(s.glow)
+
+
+def test_bare_vox_takes_its_glow_from_its_materials(tmp_path):
+    # A .vox with no build.json (say, painted in MagicaVoxel) still glows in renders and the GLB.
+    s = style(tmp_path)
+
+    def fn(p):
+        return Model([Part("orb", box((2, 2, 2), color=p.eye.yellow))])
+
+    a = asset(name="orb", size=(2, 2, 2))(fn).build(s.palette, glow=s.glow)
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), {}, None)
+    assert again.glow == pytest.approx(s.glow)
+
+
 def test_style_to_dict_lists_glow_and_cycles(tmp_path):
     d = style(tmp_path).to_dict()
     assert d["glow"]["eye.yellow"] == 2.5 and d["cycles"][0]["ramp"] == "water"

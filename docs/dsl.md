@@ -212,7 +212,8 @@ change most of their voxels (`frame_pop`): small changes per frame read as motio
 Glow and color cycles are set per project in `style.toml` (`[glow]`, `[cycles]`; see
 `cubist style`), so every asset using those colors gets them. Glowing colors render nearly
 unshaded in previews and export as emissive (in the default palette-texture export;
-`--vertex-colors` has no emissive). A cycling ramp's voxels step one shade along it each tick
+`--vertex-colors` has no emissive) and as emissive materials in the `.vox`, which MagicaVoxel
+shows and engines can read. A cycling ramp's voxels step one shade along it each tick
 (water, lava): a voxel painted shade k shows shade k+1, k+2, ... wrapping around, so paint
 bands dark-to-light in the direction the water should flow. Every voxel of that ramp cycles,
 in every part, so paint spray, foam and flashes from another ramp.

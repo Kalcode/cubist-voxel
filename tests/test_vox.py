@@ -197,3 +197,79 @@ def test_parent_parts_are_groups_in_the_scene_graph():
     ]
     found = [cid for cid, _ in chunks(encode_vox(VoxScene(parts, P.rgba_table())))]
     assert found.count(b"nGRP") == 2  # root group plus torso's group
+
+
+def _matl(material_id: int, props: dict[str, str]) -> bytes:
+    def s(text: str) -> bytes:
+        return struct.pack("<i", len(text)) + text.encode()
+
+    body = b"".join(s(k) + s(v) for k, v in props.items())
+    return _chunk(b"MATL", struct.pack("<ii", material_id, len(props)) + body)
+
+
+def materials(data: bytes) -> dict[int, dict[str, str]]:
+    """MATL chunks as {material id: properties}, parsed independently of the reader."""
+    out = {}
+    for cid, content in chunks(data):
+        if cid != b"MATL":
+            continue
+        material_id, n = struct.unpack_from("<ii", content)
+        pos, props = 8, {}
+        for _ in range(n):
+            pair = []
+            for _ in range(2):
+                (size,) = struct.unpack_from("<i", content, pos)
+                pair.append(content[pos + 4 : pos + 4 + size].decode())
+                pos += 4 + size
+            props[pair[0]] = pair[1]
+        out[material_id] = props
+    return out
+
+
+def test_glow_is_written_as_emissive_materials_on_its_color_indices():
+    # MagicaVoxel's HDR emission is _emit * 10 ^ _flux; _flux is the smallest whole power.
+    scene = VoxScene([VoxPart("a", grid({(0, 0, 0): 1}))], P.rgba_table(), glow={2: 0.6, 4: 1.5})
+    assert materials(encode_vox(scene)) == {
+        2: {"_type": "_emit", "_emit": "0.6", "_flux": "0"},
+        4: {"_type": "_emit", "_emit": "0.15", "_flux": "1"},
+    }
+
+
+def test_no_glow_writes_no_materials():
+    scene = VoxScene([VoxPart("a", grid({(0, 0, 0): 1}))], P.rgba_table())
+    assert materials(encode_vox(scene)) == {}
+
+
+def test_glow_round_trips_through_materials():
+    glow = {1: 0.25, 2: 1.0, 3: 1.5, 5: 12.0}
+    scene = VoxScene([VoxPart("a", grid({(0, 0, 0): 1}))], P.rgba_table(), glow=glow)
+    assert decode_vox(encode_vox(scene)).glow == pytest.approx(glow)
+
+
+def test_reads_glow_from_magicavoxel_materials():
+    # MagicaVoxel writes a MATL for every palette entry, most of them diffuse. Material ids are
+    # color indices, with 256 standing for index 0 (empty). Older files give the amount as _weight.
+    size = _chunk(b"SIZE", struct.pack("<iii", 1, 1, 1))
+    xyzi = _chunk(b"XYZI", struct.pack("<i", 1) + bytes([0, 0, 0, 7]))
+    mats = [
+        _matl(3, {"_type": "_diffuse", "_weight": "1", "_rough": "0.1"}),
+        _matl(7, {"_type": "_emit", "_emit": "0.5", "_flux": "2", "_ldr": "0"}),
+        _matl(9, {"_type": "_emit", "_weight": "0.4"}),
+        _matl(11, {"_type": "_emit", "_emit": "0"}),
+        _matl(256, {"_type": "_emit", "_emit": "1"}),
+    ]
+    body = size + xyzi + b"".join(mats)
+    data = b"VOX " + struct.pack("<i", 200) + b"MAIN" + struct.pack("<ii", 0, len(body)) + body
+    assert decode_vox(data).glow == pytest.approx({7: 50.0, 9: 0.4})
+
+
+def test_unreadable_material_values_are_skipped_not_fatal():
+    size = _chunk(b"SIZE", struct.pack("<iii", 1, 1, 1))
+    xyzi = _chunk(b"XYZI", struct.pack("<i", 1) + bytes([0, 0, 0, 4]))
+    bad = {"_type": "_emit", "_emit": "bright"}
+    huge = {"_type": "_emit", "_emit": "1", "_flux": "1e999"}
+    mats = _matl(4, bad) + _matl(5, huge)
+    body = size + xyzi + mats
+    data = b"VOX " + struct.pack("<i", 200) + b"MAIN" + struct.pack("<ii", 0, len(body)) + body
+    scene = decode_vox(data)
+    assert scene.glow == {} and scene.parts[0].grid.count() == 1

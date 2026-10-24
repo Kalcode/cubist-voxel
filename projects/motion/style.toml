@@ -43,7 +43,7 @@ symmetry_tolerance = 0
 notes = "Chunky silhouettes, oversized heads and hands, readable at 64 px tall. Light comes from top-left. Use 3-4 shades of a ramp per material."
 
 [glow]
-# Colors that give off light: nearly unshaded in previews, emissive in the .glb.
+# Colors that give off light: nearly unshaded in previews, emissive in the .glb and .vox.
 fire = 1.5
 glow = 1.0
 

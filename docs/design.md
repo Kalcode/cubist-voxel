@@ -388,6 +388,13 @@ given off-palette colors is caught too) and refuses to export when there are err
 - The part hierarchy is kept: a part with children becomes a named group holding its own shape
   and its child parts; the reader rebuilds parents from that nesting (third-party groups that
   aren't parts are ignored). Pivots and sockets live in `build.json` and the GLB, not the `.vox`.
+- Glow is in the `.vox` as `MATL` emissive materials (`_type = _emit`), one per glowing palette
+  index, used or not, so a color painted on in MagicaVoxel glows too. The material id is the
+  color index. Strength follows MagicaVoxel's HDR emission, `_emit * 10 ^ _flux`: the writer
+  picks the smallest whole `_flux` that keeps `_emit` at most 1 (1.5 is `_emit 0.15`, `_flux 1`).
+  The reader takes glow from `_emit` materials (or `_weight` in older files) and ignores the
+  rest; a `.vox` with no `build.json` gets its glow this way. Engines can read glow from the
+  `.vox` alone, for Cubist's files and hand-painted ones alike.
 - Parts over 256 voxels on any axis are rejected by the writer (they are a lint error anyway).
   Splitting them into several models is deferred until an asset needs it.
 - The reader rejects rotated scene-graph nodes for now.

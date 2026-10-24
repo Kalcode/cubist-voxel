@@ -25,7 +25,7 @@ cloth  = { brown = "#6b4a2a" }
 eye    = { yellow = "#ffd23f" }
 
 [glow]
-# Colors that give off light: unshaded in previews, emissive in the .glb.
+# Colors that give off light: unshaded in previews, emissive in the .glb and .vox.
 fire = 1.5
 potion = 0.6
 

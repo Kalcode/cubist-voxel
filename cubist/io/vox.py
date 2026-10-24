@@ -2,7 +2,9 @@
 
 Follows the public format spec (github.com/ephtracy/voxel-model). Parts are written as
 separate models placed by the scene graph (``nTRN`` / ``nGRP`` / ``nSHP``), so they keep
-their names and world positions; the palette goes in the ``RGBA`` chunk.
+their names and world positions; the palette goes in the ``RGBA`` chunk. Glowing colors are
+``MATL`` emissive materials on their color indices, at MagicaVoxel's HDR emission
+``_emit * 10 ^ _flux`` (``_flux`` is the smallest whole power, ``_emit`` at most 1).
 
 Cubist is Y-up with +Z toward the front; MagicaVoxel is Z-up with the front at -Y.
 A DSL voxel cell (x, y, z) maps to the MagicaVoxel cell (x, -1 - z, y). MagicaVoxel
@@ -11,9 +13,10 @@ places a model by its center, ``floor(size / 2)`` from the model's min corner.
 
 from __future__ import annotations
 
+import math
 import os
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -40,6 +43,7 @@ class VoxPart:
 class VoxScene:
     parts: list[VoxPart]
     palette: np.ndarray  # (256, 4) uint8, indexed by color index; row 0 unused
+    glow: dict[int, float] = field(default_factory=dict)  # color index -> emission strength
 
 
 def default_palette() -> np.ndarray:
@@ -69,6 +73,26 @@ def _string(s: str) -> bytes:
 
 def _dict(d: dict[str, str]) -> bytes:
     return struct.pack("<i", len(d)) + b"".join(_string(k) + _string(v) for k, v in d.items())
+
+
+def _emit_material(index: int, strength: float) -> bytes:
+    flux = 0
+    while strength > 10**flux:
+        flux += 1
+    props = {"_type": "_emit", "_emit": f"{strength / 10**flux:.6g}", "_flux": str(flux)}
+    return _chunk(b"MATL", struct.pack("<i", index) + _dict(props))
+
+
+def _material_glow(props: dict[str, str]) -> float:
+    """Emission strength of a MATL material; 0 unless it is emissive."""
+    if props.get("_type") != "_emit":
+        return 0.0
+    try:
+        amount = float(props.get("_emit", props.get("_weight", "0")))
+        strength = amount * 10 ** float(props.get("_flux", "0"))
+    except (ValueError, OverflowError):
+        return 0.0  # an unreadable material doesn't cost the file its voxels
+    return strength if math.isfinite(strength) else 0.0
 
 
 def _to_mv(grid: VoxelGrid) -> tuple[np.ndarray, tuple[int, int, int]]:
@@ -177,7 +201,8 @@ def encode_vox(scene: VoxScene) -> bytes:
     layer = _chunk(b"LAYR", struct.pack("<i", 0) + _dict({}) + struct.pack("<i", -1))
     palette = np.asarray(scene.palette, dtype=np.uint8)
     rgba = _chunk(b"RGBA", palette[1:256].tobytes() + bytes(4))
-    children = b"".join(models) + root + _grp(1, top) + b"".join(nodes) + layer + rgba
+    matl = b"".join(_emit_material(i, s) for i, s in sorted(scene.glow.items()) if s > 0)
+    children = b"".join(models) + root + _grp(1, top) + b"".join(nodes) + layer + rgba + matl
     return b"VOX " + struct.pack("<i", VERSION) + _chunk(b"MAIN", b"", children)
 
 
@@ -240,6 +265,7 @@ def _decode(data: bytes) -> VoxScene:
     size = None
     nodes: dict[int, tuple[bytes, dict]] = {}
     palette = None
+    glow: dict[int, float] = {}
     for cid, start, n in _iter_chunks(data, 20 + main_content, end):
         r = _Reader(data, start)
         if cid == b"SIZE":
@@ -262,6 +288,11 @@ def _decode(data: bytes) -> VoxScene:
             entries = np.frombuffer(data, dtype=np.uint8, count=1024, offset=start).reshape(256, 4)
             palette = np.zeros((256, 4), dtype=np.uint8)
             palette[1:] = entries[:255]
+        elif cid == b"MATL":
+            index = r.int32() & 0xFF  # material 256 stands for index 0, which is empty
+            strength = _material_glow(r.dict())
+            if index and strength > 0:
+                glow[index] = strength
         elif cid in (b"nTRN", b"nGRP", b"nSHP"):
             node_id = r.int32()
             attrs = r.dict()
@@ -283,7 +314,7 @@ def _decode(data: bytes) -> VoxScene:
 
     if not nodes:
         parts = [VoxPart(f"model{i}", _from_mv(m, None)) for i, m in enumerate(models)]
-        return VoxScene(parts, palette)
+        return VoxScene(parts, palette, glow)
 
     parts: list[VoxPart] = []
 
@@ -317,7 +348,7 @@ def _decode(data: bytes) -> VoxScene:
     for p in parts:
         if p.parent not in known:
             p.parent = None
-    return VoxScene(parts, palette)
+    return VoxScene(parts, palette, glow)
 
 
 def _from_mv(mv: np.ndarray, t: np.ndarray | None) -> VoxelGrid:

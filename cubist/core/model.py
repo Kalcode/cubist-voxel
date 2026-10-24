@@ -262,7 +262,7 @@ class BuiltAsset:
             parts.append(VoxPart(p.name, p.grid, p.parent, hidden=p.hidden))
             for k, frame in enumerate((p.frames or [])[1:], start=1):
                 parts.append(VoxPart(f"{p.name}@{k}", frame, p.name, hidden=True))
-        return VoxScene(parts, self.palette.rgba_table())
+        return VoxScene(parts, self.palette.rgba_table(), dict(self.glow))
 
     def summary(self) -> dict:
         def part_info(p: BuiltPart) -> dict:
@@ -309,7 +309,8 @@ class BuiltAsset:
         """Rebuild an asset from its .vox file and build.json (empty dict if none) for lint
         and posed renders (which need no palette names; pass None there).
 
-        Color indices stay as they are in the file, which may differ from ``palette``."""
+        Color indices stay as they are in the file, which may differ from ``palette``. With no
+        glow in build.json (a file painted in MagicaVoxel, say), glow comes from its materials."""
         info = {p["name"]: p for p in summary.get("parts", [])}
         by_name = {p.name: p for p in scene.parts}
         parts = []
@@ -347,7 +348,7 @@ class BuiltAsset:
             seed=int(summary.get("seed", 0)),
             ops_used=set(summary.get("ops_used", ())),
             clips=_surviving_clips(summary.get("clips", ()), parts),
-            glow={int(k): float(v) for k, v in summary.get("glow", {}).items()},
+            glow={int(k): float(v) for k, v in summary.get("glow", {}).items()} or dict(scene.glow),
             cycles=[Cycle.from_dict(c) for c in summary.get("cycles", ())],
             lights={k: Light.from_summary(v) for k, v in summary.get("lights", {}).items()},
             emitters={k: Emitter.from_summary(v) for k, v in summary.get("emitters", {}).items()},

@@ -96,7 +96,9 @@ An engine can drive joints directly, such as a door the player pushes, using the
 
 - **`glow`**: the glowing colors this asset uses, with strengths. The `.glb` material has an
   emissive palette texture (glowing cells colored, others black), `emissiveFactor` 1 and, when a
-  strength is above 1, `KHR_materials_emissive_strength`.
+  strength is above 1, `KHR_materials_emissive_strength`. The `.vox` has every glowing palette
+  color as a `MATL` emissive material on its color index, strength `_emit * 10 ^ _flux`
+  (MagicaVoxel's HDR emission), so an engine can take glow from the `.vox` alone.
 - **`cycles`**: each tick (`1/fps` s) every voxel of a listed color shows the next color in the
   list, wrapping around. Not in the `.glb`: with a 256×1 palette texture an engine can rotate
   those texels.
