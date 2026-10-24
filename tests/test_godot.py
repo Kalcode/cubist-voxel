@@ -50,6 +50,9 @@ func _dump(node, parent):
         info["texture"] = mat != null and mat.albedo_texture != null
         info["filter"] = mat.texture_filter if mat != null else -1
         info["triangles"] = node.mesh.get_faces().size() / 3
+        info["emission"] = mat != null and mat.emission_enabled
+    if node is AnimationPlayer:
+        info["animations"] = node.get_animation_list()
     print("NODE ", JSON.stringify(info))
     for child in node.get_children():
         _dump(child, str(node.name))
@@ -127,3 +130,37 @@ def test_goblin_imports_with_every_part_under_the_torso(tmp_path):
     head = tree["head"]
     top = tree["torso"]["position"][1] + head["position"][1] + head["aabb_size"][1]
     assert abs(top - 22 / 16) < 1e-4
+
+
+@pytest.mark.parametrize(
+    "name,clip,light",
+    [
+        ("torch", "flame_frames", "flame"),
+        ("blaster", "fire", None),
+        ("goblin", "walk", None),
+        ("campfire", "flames_frames", "fire"),
+    ],
+)
+def test_moving_demo_assets_import_with_clips_lights_and_glow(name, clip, light, tmp_path):
+    """Clips arrive as animations, lights as OmniLight3D, glowing colors as emission."""
+    import runpy
+
+    from cubist.build.runner import load_project_style
+    from cubist.core.model import AssetDef
+    from cubist.io.gltf import encode_glb
+
+    style = load_project_style(DEMO / "style.toml")
+    [a] = [v for v in runpy.run_path(str(DEMO / "assets" / f"{name}.py")).values()
+           if isinstance(v, AssetDef)]  # fmt: skip
+    built = a.build(style.palette, glow=style.glow, cycles=style.cycles)
+    glb = tmp_path / f"{name}.glb"
+    glb.write_bytes(encode_glb(built, style.palette.rgba_table(), voxel_size_m=0.0625))
+    tree = godot_tree(glb, tmp_path)
+    players = [n for n in tree.values() if n["type"] == "AnimationPlayer"]
+    assert players and clip in players[0]["animations"]
+    if light:
+        assert any(n["type"] == "OmniLight3D" for n in tree.values())
+    meshes = [n for n in tree.values() if n["type"] == "MeshInstance3D"]
+    glows = any(c in built.glow for p in built.parts for g in (p.frames or [p.grid])
+                for c in g.colors_used())  # fmt: skip
+    assert any(m["emission"] for m in meshes) == glows
