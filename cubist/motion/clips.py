@@ -64,6 +64,7 @@ class Clip:
     loop: bool = False
     ease: str = "smooth"
     events: tuple[tuple[float, str], ...] = ()
+    travel: tuple[float, float, float] | None = None  # voxels per second, for in-place walks
 
     def track_ease(self, track: Track) -> str:
         if track.channel == "visible":
@@ -78,6 +79,7 @@ class Clip:
             "ease": self.ease,
             "tracks": [t.to_dict() for t in self.tracks],
             "events": [[t, name] for t, name in self.events],
+            "travel": list(self.travel) if self.travel else None,
         }
 
     @classmethod
@@ -89,6 +91,7 @@ class Clip:
             bool(d.get("loop", False)),
             d.get("ease", "smooth"),
             tuple((float(t), str(name)) for t, name in d.get("events", ())),
+            tuple(float(v) for v in d["travel"]) if d.get("travel") else None,  # type: ignore[arg-type]
         )
 
 
@@ -215,6 +218,7 @@ def clip(
     loop: bool = False,
     ease: str = "smooth",
     events: Iterable[tuple[float, str]] = (),
+    travel=None,
 ) -> Clip:
     """A named clip ``length`` seconds long.
 
@@ -222,6 +226,8 @@ def clip(
     ``length`` (one value holds at t = 0), or ``(time, value)`` pairs. Or it is a list of
     tracks: ``turn(...)``, ``move(...)``, ``visible(...)``, generators like ``swing(...)``
     (nested lists are fine). ``ease`` is ``smooth`` (default), ``linear`` or ``step``.
+    ``travel`` is how fast an in-place clip (a walk) moves the asset through the world, in
+    voxels per second, for the engine to match so feet don't slide.
     """
     if not isinstance(name, str) or not _NAME.match(name):
         raise ModelError(
@@ -281,4 +287,12 @@ def clip(
         if not -_EPS <= t <= length + _EPS:
             raise ModelError(f"clip {name!r} event {label!r} at {t:g} s is outside the clip")
         evs.append((t, str(label)))
-    return Clip(name, length, tuple(built), bool(loop), ease, tuple(sorted(evs)))
+    move_by = None
+    if travel is not None:
+        try:
+            move_by = tuple(_float(v, f"clip {name!r} travel") for v in travel)
+        except TypeError:
+            move_by = ()
+        if len(move_by) != 3:
+            raise ModelError(f"clip {name!r} travel must be (x, y, z) voxels per second")
+    return Clip(name, length, tuple(built), bool(loop), ease, tuple(sorted(evs)), move_by)

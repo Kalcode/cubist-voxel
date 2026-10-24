@@ -82,6 +82,7 @@
         "loop": {"type": "boolean"},
         "ease": {"enum": ["smooth", "linear", "step"]},
         "tracks": {"type": "array", "items": {"$ref": "#/$defs/track"}},
+        "travel": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
         "events": {
           "type": "array",
           "items": {

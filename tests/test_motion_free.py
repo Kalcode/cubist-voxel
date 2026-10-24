@@ -114,3 +114,49 @@ def test_manifest_schema_accepts_free_channels():
     clips = [clip("c", 1, [turn("arm", "z", [0, 60]), move("torso", "y", [0, 1])])]
     m = build_manifest(build(lambda p: arm(p, clips)), voxel_size_m=1)
     jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
+
+
+# --- travel and the floor check ----------------------------------------------
+
+from cubist import bob, swing  # noqa: E402
+from cubist.motion.clips import Clip  # noqa: E402
+
+
+def test_travel_round_trips_and_reaches_manifest_and_glb():
+    c = clip("walk", 0.8, [turn("arm", "x", [0, 20, 0])], loop=True, travel=(0, 0, 6))
+    assert c.travel == (0.0, 0.0, 6.0) and Clip.from_dict(c.to_dict()) == c
+    a = build(lambda p: arm(p, [c]), size=(8, 8, 6))
+    m = build_manifest(a, voxel_size_m=1)
+    jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
+    assert m["clips"][0]["travel"] == [0.0, 0.0, 6.0]
+    g = GLTF2.load_from_bytes(encode_glb(a, P.rgba_table(), voxel_size_m=0.5))
+    assert g.animations[0].extras["travel"] == [0.0, 0.0, 3.0]  # metres per second
+
+
+def test_clip_without_travel_has_none():
+    assert clip("x", 1, [turn("a", "x", [0, 1])]).travel is None
+
+
+def walker(p, drop):
+    torso = Part("torso", box((4, 4, 2), color=p.wood.mid).at(2, 5, 2), pivot=(4, 5, 3))
+    leg = Part(
+        "leg", box((2, 5, 2), color=p.wood.dark).at(3, 0, 2), parent="torso", pivot=(4, 5, 3)
+    )
+    walk = clip("walk", 0.8, [swing("leg", "x", 25), bob("torso", -drop)], loop=True)
+    return Model([torso, leg], clips=[walk])
+
+
+def test_leg_pushed_through_the_floor_warns():
+    a = build(lambda p: walker(p, 1.5), size=(8, 9, 6), grounded=True)
+    [f] = [x for x in check_motion(a) if x.check == "motion_floor"]
+    assert f.severity == "warning" and "'walk'" in f.message and "floor" in f.message
+
+
+def test_planted_walk_does_not_warn():
+    a = build(lambda p: walker(p, 0.0), size=(8, 9, 6), grounded=True)
+    assert not [x for x in check_motion(a) if x.check == "motion_floor"]
+
+
+def test_floor_check_only_for_grounded_assets():
+    a = build(lambda p: walker(p, 1.5), size=(8, 9, 6))
+    assert not [x for x in check_motion(a) if x.check == "motion_floor"]

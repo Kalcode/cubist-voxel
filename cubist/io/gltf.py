@@ -256,7 +256,11 @@ def _animation(
         "name": clip.name,
         "channels": channels,
         "samplers": samplers,
-        "extras": {"loop": clip.loop, "length": clip.length},
+        "extras": {
+            "loop": clip.loop,
+            "length": clip.length,
+            **({"travel": [v * s for v in clip.travel]} if clip.travel else {}),
+        },
     }
 
 

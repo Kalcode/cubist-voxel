@@ -33,6 +33,7 @@ def check_motion(asset: BuiltAsset) -> list[Finding]:
         *check_limits(asset),
         *check_loops(asset),
         *check_collisions(asset),
+        *check_floor(asset),
         *motion_bounds(asset),
     ]
 
@@ -216,6 +217,43 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
                         {"clip": c.name, "parts": [a, b], "time": t, "voxels": n_hits},
                     )
                 )
+    return out
+
+
+FLOOR_TOLERANCE = 0.25  # voxels a grounded asset may dip below y = 0 mid-clip
+
+
+def check_floor(asset: BuiltAsset) -> list[Finding]:
+    """A grounded asset whose clips push a part below the floor (feet through the ground)."""
+    if not asset.grounded:
+        return []
+    out = []
+    centers = {p.name: p.grid.voxels()[0].astype(np.float64) + 0.5 for p in asset.parts}
+    for c in asset.clips:
+        worst = (FLOOR_TOLERANCE, None, 0.0)
+        for t in dense_times(asset, c, COLLISION_SAMPLES_PER_S, MAX_TURN_PER_SAMPLE):
+            m = world_matrices(asset, c, float(t))
+            hide = hidden_at(asset, c, float(t))
+            for name, pts in centers.items():
+                if name in hide or not len(pts):
+                    continue
+                r = m[name][:3, :3]
+                # lowest corner of each turned unit cube
+                low = pts @ r[1] + m[name][1, 3] - 0.5 * np.abs(r[1]).sum()
+                depth = -float(low.min())
+                if depth > worst[0]:
+                    worst = (depth, name, float(t))
+        depth, part, t = worst
+        if part is not None:
+            out.append(
+                Finding(
+                    "motion_floor",
+                    "warning",
+                    f"clip {c.name!r} pushes {part!r} {depth:.1f} voxels through the floor at "
+                    f"t={t:.2f} s; lift it (bob the body less, swing less, or move the pivot)",
+                    {"clip": c.name, "part": part, "depth": depth, "time": t},
+                )
+            )
     return out
 
 
