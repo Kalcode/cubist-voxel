@@ -131,8 +131,44 @@ class _Inside(Selection):
             d, _ = self.shape._eval(cells + 0.5)
             inside = d <= EPS
         else:
-            inside = self.shape.voxelize().lookup(cells) > 0
+            inside = self.shape.occupancy().lookup(cells) > 0
         return inside.reshape(grid.shape)
+
+
+class _Stripes(Selection):
+    def __init__(self, axis: str, period: int, width: int, offset: int):
+        if axis not in ("x", "y", "z"):
+            raise ShapeError(f"stripes axis must be x, y or z, got {axis!r}")
+        if period < 1 or not 0 < width <= period:
+            raise ShapeError("stripes need period >= 1 and 0 < width <= period")
+        self.axis, self.period, self.width, self.offset = "xyz".index(axis), period, width, offset
+
+    def mask(self, grid):
+        c = _coords(grid)[..., self.axis]
+        return (c - self.offset) % self.period < self.width
+
+
+class _Checker(Selection):
+    def __init__(self, size: int, axes: str):
+        if size < 1 or not axes or any(a not in "xyz" for a in axes):
+            raise ShapeError("checker needs size >= 1 and axes from 'xyz'")
+        self.size, self.axes = size, ["xyz".index(a) for a in axes]
+
+    def mask(self, grid):
+        c = _coords(grid)
+        total = sum(np.floor_divide(c[..., a], self.size) for a in self.axes)
+        return total % 2 == 0
+
+
+def stripes(axis: str, period: int, width: int = 1, offset: int = 0) -> Selection:
+    """Voxels in repeating bands across ``axis``: ``width`` on, then ``period - width`` off,
+    starting at ``offset`` (awnings, planks, banners)."""
+    return _Stripes(axis, period, width, offset)
+
+
+def checker(size: int = 1, axes: str = "xyz") -> Selection:
+    """A checkerboard of ``size``-voxel cells over ``axes``; the cell at the origin is on."""
+    return _Checker(size, axes)
 
 
 def band(axis: str, at: float, height: float = 1) -> Selection:

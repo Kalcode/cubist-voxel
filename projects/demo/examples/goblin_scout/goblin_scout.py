@@ -20,8 +20,9 @@ def goblin(p):
         parts=[
             Part("torso", torso, pivot=(8, 9, 6), symmetric="x"),
             Part("head", head, parent="torso", pivot=(8, 16, 6), symmetric="x"),
-            Part("leg_l", leg, parent="torso", pivot=(6, 9, 6)).mirrored("leg_r", about_x=8),
-            Part("arm_l", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_r", about_x=8),
+            # Named from the goblin's own point of view: it faces +Z, so its right is at low x.
+            Part("leg_r", leg, parent="torso", pivot=(6, 9, 6)).mirrored("leg_l", about_x=8),
+            Part("arm_r", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_l", about_x=8),
         ],
-        sockets={"hand_r": (12, 8, 6)},
+        sockets={"hand_r": (4, 8, 6)},
     )

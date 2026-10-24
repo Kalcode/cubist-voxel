@@ -14,6 +14,7 @@
   "symmetric": null,
   "allow_floating": false,
   "voxels": 252,
+  "part_voxels": 252,
   "parts": [
     {
       "name": "potion",
@@ -59,6 +60,6 @@
     "errors": 0,
     "warnings": 0,
     "infos": 2,
-    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 24 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (0,3,0)-(8,10,8)\nINFO hidden: 96 solid voxels can't be seen from outside; export hollows them"
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 24 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 12 at (1,9,1)-(7,10,7); 2 at (0,3,3)-(1,4,5); 2 at (3,3,0)-(5,4,1) (+6 smaller)\nINFO hidden: 96 solid voxels can't be seen from outside; export hollows them"
   }
 }

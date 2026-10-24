@@ -31,10 +31,11 @@ def barrel(p):
 
 ## What you get
 
-- **A shape DSL built for agents.** Primitives (box, sphere, cylinder, cone, capsule, torus,
-  wedge, lathe, extrude, heightmap), CSG with smooth blends, transforms, mirroring, voxel
-  morphology (round, chamfer, hollow), paint ops (gradients, dithering, crevice shading, edge
-  highlights), and selections. Colors come from named palette ramps, never indices.
+- **A shape DSL built for agents.** Primitives (box, sphere, cylinder, cone, pyramid, capsule,
+  torus, wedge, lathe, extrude, panel, line, heightmap), CSG with smooth blends and carving,
+  transforms, mirroring, voxel morphology (round, chamfer, hollow), paint ops (gradients,
+  dithering, masonry, decals, crevice shading, edge highlights), and selections. Colors come
+  from named palette ramps, never indices. See the [DSL reference](docs/dsl.md).
 - **Eyes for the agent.** Every build renders front, side, back, top, and iso views with
   voxel-coordinate rulers and a palette legend, so feedback can be exact. ASCII slices and
   before/after diffs cover the details.
@@ -100,15 +101,35 @@ More in [docs/working-with-claude.md](docs/working-with-claude.md). Other MCP cl
 same tools: `claude mcp add cubist -- uv run --directory "$PWD" cubist mcp --project
 projects/demo` ([docs/mcp.md](docs/mcp.md)).
 
+## Does it work?
+
+We gave four fresh Claude agents nothing but `CLAUDE.md`, the docs, and twenty briefs (props,
+buildings, characters, creatures) in a style bible they had never seen. They built all twenty:
+
+| | |
+| --- | --- |
+| Briefs built | 20 / 20 |
+| Final builds lint-clean (no errors, no warnings) | 20 / 20 |
+| Finished within the 5-iteration budget | 20 / 20 (mean 3.95) |
+| Agent self-score | 3.7 / 5 on average |
+
+![Twenty assets built by agents from briefs](docs/images/eval-gallery.png)
+
+Their reports (bugs, confusing errors, doc gaps, wished-for features) drove the next round of
+fixes and the `carve`, `decal`, `masonry`, `panel`, and `pyramid` additions. The full record is in
+[projects/eval/eval/agent-notes.md](projects/eval/eval/agent-notes.md); human scores are still to
+come.
+
 ## Docs
 
 | | |
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Install, first asset, commands, new projects |
 | [Working with Claude](docs/working-with-claude.md) | Creating, editing, refining, and brainstorming with an agent |
+| [DSL reference](docs/dsl.md) | Every primitive, op, selection, and paint call, with conventions |
 | [How it works](docs/how-it-works.md) | Architecture, build pipeline, shape stages, lint, export (with diagrams) |
 | [MCP server](docs/mcp.md) | Setup and tool reference |
-| [Design](docs/design.md) | The design of record: decisions, DSL reference, milestones |
+| [Design](docs/design.md) | The design of record: decisions and milestones |
 
 ## Project layout
 
@@ -123,8 +144,8 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 
 ## Status
 
-Milestones 1–5 of the [design](docs/design.md) are done; milestone 6 (evaluation) is running.
-Next up: animation, voxel effects, and engine integration.
+Milestones 1–6 of the [design](docs/design.md) are done, with human scores for the evaluation
+still to come. Next up: animation, voxel effects, and engine integration.
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
 `uv run ruff check . && uv run ruff format .`.

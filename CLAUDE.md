@@ -29,7 +29,8 @@ When the user approves an asset: `cubist examples promote <name> --note "why it 
 DSL gotchas: a voxel is filled when its center is inside a shape; shapes symmetric about a whole
 number need an even width; pointed shapes (cones, tips) need their center on a voxel center
 (x.5) so the tip has a column; ramp ops (`darken_crevices`, `highlight_edges`, `dither`) only
-step along list ramps. The full DSL reference is in `docs/design.md`.
+step along list ramps; characters face +Z, so their right side is at low x. The full DSL
+reference, with every signature, is `docs/dsl.md`.
 
 ## Developing Cubist
 

@@ -39,6 +39,9 @@ class Union(Shape):
     def __init__(self, shapes: Sequence[Shape]):
         self.shapes = list(shapes)
 
+    def _color_sources(self):
+        return self.shapes
+
     @property
     def is_sdf(self):
         return all(s.is_sdf for s in self.shapes)
@@ -69,6 +72,9 @@ class SmoothUnion(Shape):
             raise ShapeError(f"smooth_union k must be > 0, got {k}")
         self.a, self.b, self.k = a, b, float(k)
 
+    def _color_sources(self):
+        return [self.a, self.b]
+
     def _eval(self, p):
         da, ca = self.a._eval(p)
         db, cb = self.b._eval(p)
@@ -82,6 +88,9 @@ class SmoothUnion(Shape):
 class Subtract(Shape):
     def __init__(self, a: Shape, b: Shape):
         self.a, self.b = a, b
+
+    def _color_sources(self):
+        return [self.a]
 
     @property
     def is_sdf(self):
@@ -98,7 +107,7 @@ class Subtract(Shape):
     def voxelize(self):
         if self.is_sdf:
             return super().voxelize()
-        ga, gb = self.a.voxelize(), self.b.voxelize()
+        ga, gb = self.a.voxelize(), self.b.occupancy()
         keep = gb.lookup(_cells(ga)).reshape(ga.shape) == 0
         return VoxelGrid(np.where(keep, ga.data, 0).astype(np.uint8), ga.origin).cropped()
 
@@ -106,6 +115,9 @@ class Subtract(Shape):
 class Intersect(Shape):
     def __init__(self, a: Shape, b: Shape):
         self.a, self.b = a, b
+
+    def _color_sources(self):
+        return [self.a]
 
     @property
     def is_sdf(self):
@@ -123,7 +135,7 @@ class Intersect(Shape):
     def voxelize(self):
         if self.is_sdf:
             return super().voxelize()
-        ga, gb = self.a.voxelize(), self.b.voxelize()
+        ga, gb = self.a.voxelize(), self.b.occupancy()
         keep = gb.lookup(_cells(ga)).reshape(ga.shape) > 0
         return VoxelGrid(np.where(keep, ga.data, 0).astype(np.uint8), ga.origin).cropped()
 
@@ -146,6 +158,9 @@ class Mirror(Shape):
     @property
     def is_sdf(self):
         return self.shape.is_sdf
+
+    def _color_sources(self):
+        return [self.shape]
 
     def _reflect_points(self, p):
         q = p.copy()
@@ -209,6 +224,9 @@ class Transform(Shape):
     @property
     def is_sdf(self):
         return self.shape.is_sdf
+
+    def _color_sources(self):
+        return [self.shape]
 
     def _eval(self, p):
         local = p @ self.inverse[:3, :3].T + self.inverse[:3, 3]
@@ -312,6 +330,9 @@ class Taper(Shape):
         self.lo, self.hi = shape.bounds()
         self.center = (self.lo + self.hi) / 2.0
 
+    def _color_sources(self):
+        return [self.shape]
+
     def _factor(self, h: np.ndarray) -> np.ndarray:
         span = max(self.hi[self.axis] - self.lo[self.axis], 1e-9)
         t = np.clip((h - self.lo[self.axis]) / span, 0.0, 1.0)
@@ -345,6 +366,9 @@ class Displace(Shape):
             raise ShapeError(f"displace scale must be > 0, got {scale}")
         self.shape, self.amp, self.scale = shape, float(amp), float(scale)
         self.seed, self.kind, self.octaves = int(seed), kind, max(1, int(octaves))
+
+    def _color_sources(self):
+        return [self.shape]
 
     def _eval(self, p):
         d, c = self.shape._eval(p)

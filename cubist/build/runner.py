@@ -204,18 +204,29 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
     }
 
 
-def _log_history(asset_dir: Path, script: Path, built: BuiltAsset, report) -> None:
-    """One line per build in history.jsonl; distinct script hashes count as iterations."""
+def _append_history(asset_dir: Path, script: Path, **fields) -> None:
+    """One line per build attempt in history.jsonl; distinct script hashes count as
+    iterations, failed attempts included."""
+    asset_dir.mkdir(parents=True, exist_ok=True)
     entry = {
         "time": datetime.now(UTC).isoformat(timespec="seconds"),
         "script_sha256": hashlib.sha256(script.read_bytes()).hexdigest(),
-        "voxels": built.voxel_count(),
-        "errors": report.count("error"),
-        "warnings": report.count("warning"),
-        "seed": built.seed,
+        **fields,
     }
     with open(asset_dir / "history.jsonl", "a") as f:
         f.write(json.dumps(entry) + "\n")
+
+
+def _log_history(asset_dir: Path, script: Path, built: BuiltAsset, report) -> None:
+    _append_history(
+        asset_dir,
+        script,
+        ok=True,
+        voxels=built.merged_grid().count(),
+        errors=report.count("error"),
+        warnings=report.count("warning"),
+        seed=built.seed,
+    )
 
 
 def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> list[dict]:
@@ -223,7 +234,9 @@ def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> l
     try:
         namespace = runpy.run_path(str(script), run_name="__cubist_asset__")
     except Exception as e:
-        raise BuildError(f"{script.name} failed to load:\n{_script_traceback(e, script)}") from e
+        message = f"{script.name} failed to load:\n{_script_traceback(e, script)}"
+        _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
+        raise BuildError(message) from e
     assets = list({id(v): v for v in namespace.values() if isinstance(v, AssetDef)}.values())
     if not assets:
         raise BuildError(f"{script.name} defines no @asset functions")
@@ -232,9 +245,9 @@ def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> l
         try:
             built = a.build(style.palette, seed=seed)
         except Exception as e:
-            raise BuildError(
-                f"{script.name}: asset {a.name!r} failed:\n{_script_traceback(e, script)}"
-            ) from e
+            message = f"{script.name}: asset {a.name!r} failed:\n{_script_traceback(e, script)}"
+            _append_history(out / a.name, script, ok=False, error=message, seed=seed)
+            raise BuildError(message) from e
         results.append(write_outputs(built, style, out / a.name, script))
     return results
 

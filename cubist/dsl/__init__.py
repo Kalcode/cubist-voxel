@@ -1,6 +1,7 @@
 """What asset scripts import: primitives, CSG, transforms, shape ops, paint, selections."""
 
 from cubist.dsl.context import building
+from cubist.dsl.paint import carve, decal
 from cubist.dsl.primitives import (
     box,
     capsule,
@@ -11,11 +12,14 @@ from cubist.dsl.primitives import (
     heightmap,
     lathe,
     line,
+    panel,
+    polyline,
+    pyramid,
     sphere,
     torus,
     wedge,
 )
-from cubist.dsl.select import band, colored, faces, inside, region, surface
+from cubist.dsl.select import band, checker, colored, faces, inside, region, stripes, surface
 from cubist.dsl.shape import Shape, ShapeError
 
 __all__ = [
@@ -25,9 +29,12 @@ __all__ = [
     "box",
     "building",
     "capsule",
+    "carve",
+    "checker",
     "colored",
     "cone",
     "cylinder",
+    "decal",
     "ellipsoid",
     "extrude",
     "faces",
@@ -35,8 +42,12 @@ __all__ = [
     "inside",
     "lathe",
     "line",
+    "panel",
+    "polyline",
+    "pyramid",
     "region",
     "sphere",
+    "stripes",
     "surface",
     "torus",
     "wedge",

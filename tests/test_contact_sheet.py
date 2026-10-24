@@ -78,3 +78,24 @@ def test_64_cubed_model_renders_in_under_a_second():
     start = time.perf_counter()
     contact_sheet(grid, P, name="sphere", size=(64, 64, 64))
     assert time.perf_counter() - start < 1.0
+
+
+def test_sheet_is_wide_enough_for_its_header():
+    tall = VoxelGrid.from_voxels(
+        np.array([(0, y, 0) for y in range(40)]), np.ones(40, dtype=np.uint8)
+    )
+    img = np.asarray(
+        contact_sheet(tall, P, name="a_rather_long_asset_name", size=(1, 40, 1), views=("iso",))
+    )
+    assert img.shape[1] >= text_width("SIZE 1X40X1   40 VOXELS   BOUNDS (0,0,0)-(1,40,1)") + 32
+
+
+def test_iso_panel_has_a_margin():
+    img = np.asarray(contact_sheet(block(), P, name="b", views=("iso",)))
+    panel_bg = np.all(img == (233, 230, 223), axis=-1)
+    rows = np.nonzero(panel_bg.any(axis=1))[0]
+    cols = np.nonzero(panel_bg.any(axis=0))[0]
+    region = img[rows.min() : rows.max() + 1, cols.min() : cols.max() + 1]
+    # the outermost rows and columns of the panel are background, not model
+    for edge in (region[0], region[-1], region[:, 0], region[:, -1]):
+        assert np.all(np.all(edge == (233, 230, 223), axis=-1))

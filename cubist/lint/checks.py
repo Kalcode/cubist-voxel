@@ -214,9 +214,10 @@ def check_symmetry(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> l
     if asset.symmetric:
         targets.append(("asset", merged, asset.symmetric))
     targets += [(f"part {p.name!r}", p.grid, p.symmetric) for p in asset.parts if p.symmetric]
-    for label, grid, axis_name in targets:
+    for label, grid, spec in targets:
+        axis_name, at = (spec, None) if isinstance(spec, str) else (spec[0], float(spec[1]))
         axis = "xyz".index(axis_name)
-        at = plane(axis)
+        at = plane(axis) if at is None else at
         mismatched = _mirror_mismatch(grid, axis, at)
         if mismatched > tolerance:
             out.append(
@@ -271,7 +272,8 @@ def check_budgets(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> li
 
 
 def check_thin(merged: VoxelGrid) -> list[Finding]:
-    """Voxels with outside air on both sides along some axis: walls you can see past."""
+    """Voxels with outside air on both sides along some axis: walls you can see past.
+    Reported as the largest clusters, so each one is somewhere to look."""
     if merged.count() == 0:
         return []
     filled = np.pad(merged.data > 0, 1)
@@ -282,15 +284,54 @@ def check_thin(merged: VoxelGrid) -> list[Finding]:
     n = int(thin.sum())
     if n == 0:
         return []
-    cells = np.argwhere(thin) - 1 + np.array(merged.origin)
-    lo, hi = cells.min(axis=0).tolist(), (cells.max(axis=0) + 1).tolist()
+    labels, count = ndimage.label(thin, structure=np.ones((3, 3, 3)))
+    sizes = np.bincount(labels.ravel())[1:]
+    clusters = []
+    for label in np.argsort(-sizes)[:3] + 1:
+        cells = np.argwhere(labels == label) - 1 + np.array(merged.origin)
+        clusters.append(
+            {
+                "voxels": int(len(cells)),
+                "lo": cells.min(axis=0).tolist(),
+                "hi": (cells.max(axis=0) + 1).tolist(),
+            }
+        )
+    where = "; ".join(f"{c['voxels']} at {_box(c['lo'], c['hi'])}" for c in clusters)
+    more = f" (+{count - 3} smaller)" if count > 3 else ""
     return [
         Finding(
             "thin",
             "info",
             f"{n} voxels are one voxel thick with open air on both sides and may vanish at "
-            f"game distance, within {_box(lo, hi)}",
-            {"voxels": n, "lo": lo, "hi": hi},
+            f"game distance; largest: {where}{more}",
+            {"voxels": n, "clusters": clusters},
+        )
+    ]
+
+
+def check_overlap(asset: BuiltAsset) -> list[Finding]:
+    """Voxels claimed by two parts. They double up in exports and poke through when a part
+    moves, so each voxel should belong to one part."""
+    pairs = []
+    for i, a in enumerate(asset.parts):
+        coords, _ = a.grid.voxels()
+        if len(coords) == 0:
+            continue
+        for b in asset.parts[i + 1 :]:
+            shared = int(np.sum(b.grid.lookup(coords) > 0))
+            if shared:
+                pairs.append((a.name, b.name, shared))
+    if not pairs:
+        return []
+    total = sum(n for _, _, n in pairs)
+    listed = ", ".join(f"{a}/{b} {n}" for a, b, n in sorted(pairs, key=lambda p: -p[2])[:5])
+    return [
+        Finding(
+            "overlap",
+            "warning",
+            f"parts share {total} voxels ({listed}); subtract one part's shape from the other "
+            "so each voxel belongs to one part",
+            {"pairs": [{"parts": [a, b], "voxels": n} for a, b, n in pairs]},
         )
     ]
 

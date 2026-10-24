@@ -1,5 +1,5 @@
-"""Lint: palette, bounds, pivots, connectivity, symmetry, grounding, budgets, thin features,
-and hidden interior. Errors block export; warnings and infos are advice."""
+"""Lint: palette, bounds, pivots, part overlap, connectivity, symmetry, grounding, budgets,
+thin features, and hidden interior. Errors block export; warnings and infos are advice."""
 
 from __future__ import annotations
 
@@ -64,6 +64,7 @@ def lint(
         *checks.check_bounds(asset),
         *checks.check_pivots(asset),
         *extra,
+        *checks.check_overlap(asset),
         *checks.check_floating(asset, merged),
         *checks.check_symmetry(asset, merged, style),
         *checks.check_grounding(asset, merged),

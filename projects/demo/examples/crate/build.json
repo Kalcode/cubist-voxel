@@ -14,6 +14,7 @@
   "symmetric": null,
   "allow_floating": false,
   "voxels": 1664,
+  "part_voxels": 1664,
   "parts": [
     {
       "name": "crate",

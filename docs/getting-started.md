@@ -102,4 +102,4 @@ Edit the palette, scale, budgets, and rules (see the `voxel-project` skill, or a
 it up). Then `cubist new` your first brief.
 
 Next: [working with Claude](working-with-claude.md), [how it works](how-it-works.md), and
-the [DSL reference](design.md#the-dsl).
+the [DSL reference](dsl.md).

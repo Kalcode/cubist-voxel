@@ -88,7 +88,10 @@ def list_examples(project: str | Path) -> list[dict]:
 def search_examples(
     project: str | Path, tags: list[str] | None = None, category: str | None = None, limit: int = 3
 ) -> list[dict]:
-    """Closest examples: 2 points for a category match, 1 per shared tag; best first."""
+    """Closest examples: 2 points for a category match, 1 per shared tag; best first.
+    With no tags and no category, the whole library (up to ``limit``)."""
+    if not tags and not category:
+        return list_examples(project)[:limit]
     wanted = set(tags or [])
     scored = []
     for ex in list_examples(project):

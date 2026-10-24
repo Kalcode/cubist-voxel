@@ -102,3 +102,26 @@ def polygon(q: np.ndarray, verts: np.ndarray) -> np.ndarray:
         flip = (c1 & c2 & c3) | (~c1 & ~c2 & ~c3)
         s = np.where(flip, -s, s)
     return s * np.sqrt(d)
+
+
+def round_cone(p: np.ndarray, a: np.ndarray, b: np.ndarray, r1: float, r2: float) -> np.ndarray:
+    """Exact distance to the hull of a sphere r1 at a and a sphere r2 at b (Inigo Quilez)."""
+    ba = b - a
+    l2 = float(np.dot(ba, ba))
+    rr = r1 - r2
+    a2 = l2 - rr * rr
+    il2 = 1.0 / l2
+    pa = p - a
+    y = pa @ ba
+    z = y - l2
+    w = pa * l2 - y[:, None] * ba
+    x2 = np.sum(w * w, axis=1)
+    y2 = y * y * l2
+    z2 = z * z * l2
+    k = np.sign(rr) * rr * rr * x2
+    d_cap2 = np.sqrt(x2 + z2) * il2 - r2
+    d_cap1 = np.sqrt(x2 + y2) * il2 - r1
+    d_side = (np.sqrt(np.maximum(x2 * a2 * il2, 0.0)) + y * rr) * il2 - r1
+    return np.where(
+        np.sign(z) * a2 * z2 > k, d_cap2, np.where(np.sign(y) * a2 * y2 < k, d_cap1, d_side)
+    )

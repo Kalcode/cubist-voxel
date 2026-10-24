@@ -16,6 +16,21 @@ class ModelError(ValueError):
     """A model's structure is invalid."""
 
 
+def check_symmetric(value, what: str) -> None:
+    """``symmetric`` is an axis ('x', 'y', 'z') or (axis, plane) for a plane off the
+    asset's center (e.g. ("x", 15.5) for an odd-width model in an even-width asset)."""
+    if value is None or value in ("x", "y", "z"):
+        return
+    if (
+        isinstance(value, (tuple, list))
+        and len(value) == 2
+        and value[0] in ("x", "y", "z")
+        and isinstance(value[1], (int, float))
+    ):
+        return
+    raise ModelError(f"{what} must be 'x', 'y', 'z', (axis, plane) or None, got {value!r}")
+
+
 def _flatten(parts: Iterable) -> list[Part]:
     out = []
     for item in parts:
@@ -138,7 +153,8 @@ class BuiltAsset:
             "grounded": self.grounded,
             "symmetric": self.symmetric,
             "allow_floating": self.allow_floating,
-            "voxels": self.voxel_count(),
+            "voxels": self.merged_grid().count(),
+            "part_voxels": self.voxel_count(),
             "parts": [part_info(p) for p in self.parts],
             "sockets": {k: list(v) for k, v in self.sockets.items()},
             "colors": self.color_counts(),
@@ -193,8 +209,7 @@ class AssetDef:
         symmetric: str | None = None,
         allow_floating: bool = False,
     ):
-        if symmetric not in (None, "x", "y", "z"):
-            raise ModelError(f"symmetric must be 'x', 'y', 'z' or None, got {symmetric!r}")
+        check_symmetric(symmetric, "symmetric")
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
         self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
 
@@ -202,7 +217,7 @@ class AssetDef:
         with building(palette, seed) as ctx:
             result = self.fn(palette)
             if isinstance(result, Shape):
-                result = Model(parts=[Part(self.name, result, symmetric=self.symmetric)])
+                result = Model(parts=[Part(self.name, result)])
             if not isinstance(result, Model):
                 raise ModelError(
                     f"asset {self.name!r} must return a Model or a Shape, "
@@ -210,9 +225,11 @@ class AssetDef:
                 )
             parts = []
             for p in result.parts:
-                if p.symmetric not in (None, "x", "y", "z"):
-                    raise ShapeError(f"part {p.name!r}: symmetric must be 'x', 'y', 'z' or None")
-                grid = p.shape.voxelize()
+                check_symmetric(p.symmetric, f"part {p.name!r} symmetric")
+                try:
+                    grid = p.shape.voxelize()
+                except ShapeError as e:
+                    raise ShapeError(f"part {p.name!r}: {e}") from None
                 pivot = tuple(p.pivot) if p.pivot is not None else default_pivot(grid)
                 parts.append(BuiltPart(p.name, grid, pivot, p.parent, p.symmetric))
         return BuiltAsset(

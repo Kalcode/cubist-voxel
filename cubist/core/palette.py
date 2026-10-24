@@ -166,6 +166,7 @@ class Palette:
         self._by_index = [Color(name, i + 1, parse_hex(hx)) for i, (hx, name) in enumerate(slots)]
         self._entries: dict[str, Ramp | Color] = {}
         self._ramp_of: dict[int, tuple[list[int], int]] = {}
+        self._list_ramps = [name for name, spec in layout.items() if spec[0] == "list"]
         for ramp_name, spec in layout.items():
             if spec[0] == "single":
                 self._entries[ramp_name] = self._by_index[spec[1]]
@@ -190,7 +191,12 @@ class Palette:
         return order[max(0, min(len(order) - 1, pos + steps))]
 
     def ramp_names(self) -> list[str]:
+        """Every top-level palette name: list ramps, named tables, and single colors."""
         return list(self._entries)
+
+    def list_ramps(self) -> list[str]:
+        """Names of the ordered dark-to-light ramps (what ramp ops step along)."""
+        return [n for n in self._list_ramps if n in self._entries]
 
     def __getattr__(self, name: str) -> Ramp | Color:
         if name.startswith("_"):

@@ -63,7 +63,8 @@ class StyleBible:
                 {"index": c.index, "name": c.name, "hex": hex_of(c.rgba)}
                 for c in self.palette.colors()
             ],
-            "ramps": self.palette.ramp_names(),
+            "ramps": self.palette.list_ramps(),
+            "named": [n for n in self.palette.ramp_names() if n not in self.palette.list_ramps()],
             "scale": self.scale,
             "budgets": asdict(self.budgets),
             "rules": asdict(self.rules),

@@ -211,3 +211,27 @@ def test_socket_with_a_named_part_is_checked_by_position():
     report = lint(build(fn), style())
     messages = [f.message for f in report.findings if f.check == "pivots"]
     assert len(messages) == 1 and "far" in messages[0]
+
+
+def test_overlapping_parts_warn():
+    def fn(p):
+        return Model(
+            parts=[
+                Part("a", box((2, 2, 2), color=p.wood.mid)),
+                Part("b", box((2, 2, 2), color=p.leaf).at(1, 0, 0)),
+            ]
+        )
+
+    finding = next(f for f in lint(build(fn), style()).findings if f.check == "overlap")
+    assert finding.severity == "warning"
+    assert finding.details["pairs"] == [{"parts": ["a", "b"], "voxels": 4}]
+
+
+def test_thin_info_lists_clusters():
+    def fn(p):
+        return box((6, 6, 1), color=p.wood.mid) | box((1, 1, 4), color=p.wood.mid).at(9, 0, 0)
+
+    finding = next(
+        f for f in lint(build(fn, allow_floating=True), style()).findings if f.check == "thin"
+    )
+    assert [c["voxels"] for c in finding.details["clusters"]] == [36, 4]

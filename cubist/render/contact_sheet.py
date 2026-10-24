@@ -29,6 +29,7 @@ TITLES = {
     "silhouette": "SILHOUETTE (FRONT)",
 }
 TARGET_VIEW_PX = 256
+ISO_MARGIN = 10
 MAX_ROW_PX = 1100
 MARGIN, GAP = 16, 24
 SHEET_BG = (250, 249, 246)
@@ -217,7 +218,11 @@ def contact_sheet(
     panels = []
     for v in views:
         if v == "iso":
-            panels.append(_titled(TITLES[v], iso(grid, table, scale, region).rgb))
+            view = iso(grid, table, scale, region).rgb
+            framed = np.pad(view, ((ISO_MARGIN,) * 2, (ISO_MARGIN,) * 2, (0, 0)))
+            framed[:ISO_MARGIN] = framed[-ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
+            framed[:, :ISO_MARGIN] = framed[:, -ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
+            panels.append(_titled(TITLES[v], framed))
             continue
         base_view = "front" if v == "silhouette" else v
         assert base_view in VIEWS
@@ -228,12 +233,6 @@ def contact_sheet(
         ruled, offset = _ruled(render, rgb, step)
         panels.append(_titled(TITLES[v], ruled, body_x=offset))
 
-    rows = _flow(panels)
-    body_w = max(sum(p.shape[1] for p in row) + GAP * (len(row) - 1) for row in rows)
-    width = body_w + 2 * MARGIN
-
-    header = np.full((text_height(2) + text_height() + 14, body_w, 3), SHEET_BG, dtype=np.uint8)
-    draw_text(header, 0, 0, name, INK, scale=2)
     b = grid.bounds()
     info = [f"{grid.count()} VOXELS"]
     if size is not None:
@@ -241,7 +240,16 @@ def contact_sheet(
     if b is not None:
         info.append(f"BOUNDS ({','.join(map(str, b[0]))})-({','.join(map(str, b[1]))})")
     info.append(f"1 VOXEL = {scale} PX")
-    draw_text(header, 0, text_height(2) + 7, "   ".join(info), MUTED)
+    info_line = "   ".join(info)
+
+    rows = _flow(panels)
+    body_w = max(sum(p.shape[1] for p in row) + GAP * (len(row) - 1) for row in rows)
+    body_w = max(body_w, text_width(name, 2), text_width(info_line))
+    width = body_w + 2 * MARGIN
+
+    header = np.full((text_height(2) + text_height() + 14, body_w, 3), SHEET_BG, dtype=np.uint8)
+    draw_text(header, 0, 0, name, INK, scale=2)
+    draw_text(header, 0, text_height(2) + 7, info_line, MUTED)
 
     legend = _legend(grid.colors_used(), table, names, body_w)
     blocks = [header]

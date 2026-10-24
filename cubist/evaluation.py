@@ -185,6 +185,23 @@ def write_report(project: str | Path, report: dict) -> dict[str, Path]:
     }
 
 
+def _thumbnail(asset_dir: Path, fit: int) -> np.ndarray:
+    """The asset's iso view scaled to fit a ``fit``-pixel square, whole and centered."""
+    asset = load_asset(asset_dir)
+    grid = asset.grid
+    lo, hi = grid.bounds()
+    nx, ny, nz = (b - a for a, b in zip(lo, hi, strict=True))
+    scale = 2
+    for s in range(12, 1, -2):  # largest even scale whose image fits in twice the cell
+        if max((nx + nz) * s, (nx + nz) * s // 2 + ny * round(1.2247 * s)) <= 2 * fit:
+            scale = s
+            break
+    view = iso(grid, asset.scene.palette, scale).rgb
+    img = Image.fromarray(view)
+    img.thumbnail((fit, fit), Image.LANCZOS)
+    return np.asarray(img.convert("RGB"))
+
+
 def _gallery(project: Path, report: dict, cell: int = 220, columns: int = 5) -> Image.Image:
     rows = report["assets"]
     label_h = 2 * text_height() + 10
@@ -196,16 +213,9 @@ def _gallery(project: Path, report: dict, cell: int = 220, columns: int = 5) -> 
         x0 = 8 + (i % columns) * cell
         y0 = 8 + (i // columns) * (cell + label_h)
         if r["built"]:
-            asset = load_asset(project / "out" / r["name"])
-            grid = asset.grid
-            dims = [h - lo for lo, h in zip(*grid.bounds(), strict=True)]
-            span = max(dims[0] + dims[2], 1)
-            scale = max(2, min(12, (cell - 12) // span))
-            scale -= scale % 2
-            img = iso(grid, asset.scene.palette, scale).rgb[: cell - 4, : cell - 4]
-            h, w = img.shape[:2]
-            ox, oy = x0 + (cell - w) // 2, y0 + (cell - h) // 2
-            sheet[oy : oy + h, ox : ox + w] = img
+            thumb = _thumbnail(project / "out" / r["name"], cell - 8)
+            ox, oy = x0 + (cell - thumb.shape[1]) // 2, y0 + (cell - thumb.shape[0]) // 2
+            sheet[oy : oy + thumb.shape[0], ox : ox + thumb.shape[1]] = thumb
         status = "NOT BUILT" if not r["built"] else ("LINT OK" if r["lint_ok"] else "LINT ERR")
         draw_text(sheet, x0, y0 + cell + 2, r["name"], INK)
         draw_text(

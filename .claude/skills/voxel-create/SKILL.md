@@ -40,4 +40,6 @@ command through `uv run`.
   `taper`, and `displace` before them.
 - Ramp ops only step along list ramps (`wood = [...]`); named-table colors stay as they are.
 - Dithering breaks exact color symmetry; don't declare `symmetric=` on dithered parts.
-- The full DSL reference is in `docs/design.md` (section "The DSL").
+- Characters face +Z, so their own right side is at low x: name that arm `arm_r`.
+- Cutters (`a - b`, `a & b`) need no color; `carve(cutter, color=...)` colors a recess.
+- The full DSL reference, with every signature, is `docs/dsl.md`.

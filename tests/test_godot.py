@@ -121,7 +121,8 @@ def test_goblin_imports_with_every_part_under_the_torso(tmp_path):
     tree = godot_tree(glb, tmp_path)
     for part in ("head", "leg_l", "leg_r", "arm_l", "arm_r"):
         assert tree[part]["parent"] == "torso", part
-    assert tree["hand_r"]["parent"] == "arm_r"
+    assert tree["hand_r"]["parent"] == "arm_r"  # the goblin's own right, at low x
+    assert tree["arm_r"]["position"][0] < tree["arm_l"]["position"][0]
     # 24 voxels tall at 1/16 m: the head's top sits 22 voxels up.
     head = tree["head"]
     top = tree["torso"]["position"][1] + head["position"][1] + head["aabb_size"][1]

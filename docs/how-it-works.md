@@ -181,4 +181,5 @@ an arm or open a lid with no extra setup. The import is tested in headless Godot
 | `cubist/mcp_server.py` | MCP tools over the same functions |
 | `cubist/cli.py` | The `cubist` command |
 
-The design of record, with every decision and the DSL reference, is [design.md](design.md).
+The DSL reference is [dsl.md](dsl.md); the design of record, with every decision, is
+[design.md](design.md).

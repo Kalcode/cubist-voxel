@@ -49,25 +49,34 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
-    scene = read_vox(args.asset)
+    asset = load_asset(args.asset)
+    names = asset.names
+    meta = {p["name"]: p for p in asset.summary.get("parts", [])}
     parts, totals = [], {}
-    for part in scene.parts:
+    for part in asset.scene.parts:
         b = part.grid.bounds()
+        info = meta.get(part.name, {})
         parts.append(
             {
                 "name": part.name,
+                "parent": part.parent,
                 "voxels": part.grid.count(),
                 "bounds": [list(b[0]), list(b[1])] if b else None,
+                "pivot": info.get("pivot"),
             }
         )
         for index, n in part.grid.colors_used().items():
             totals[index] = totals.get(index, 0) + n
     _print(
         {
-            "path": str(args.asset),
-            "voxels": sum(p["voxels"] for p in parts),
+            "path": str(asset.vox),
+            "voxels": asset.grid.count(),
             "parts": parts,
-            "colors": {_hex(scene.palette[i]): n for i, n in sorted(totals.items())},
+            "sockets": asset.summary.get("sockets", {}),
+            # palette names when the build summary is beside the file, else hex
+            "colors": {
+                names.get(i, _hex(asset.scene.palette[i])): n for i, n in sorted(totals.items())
+            },
         }
     )
     return 0
@@ -81,7 +90,7 @@ def cmd_render(args: argparse.Namespace) -> int:
         print(slices(grid, axis, start, stop, asset.names, asset_region(grid, size)), end="")
     if args.views or not args.slices:
         views = args.views.split(",") if args.views else DEFAULT_VIEWS
-        out = args.out or asset.vox.parent / "contact.png"
+        out = args.out or asset.vox.parent / "render.png"  # contact.png belongs to the build
         sheet = contact_sheet(
             grid, asset.scene.palette, name=name, size=size, views=views, names=asset.names
         )
@@ -241,7 +250,7 @@ def parser() -> argparse.ArgumentParser:
     r.add_argument("asset", type=Path, help="a .vox file or its out/<name>/ directory")
     r.add_argument("--views", help=f"comma-separated (default: {','.join(DEFAULT_VIEWS)})")
     r.add_argument("--slices", help="layers to print, like y=10..14 or x=3")
-    r.add_argument("--out", type=Path, help="contact sheet path (default: beside the .vox)")
+    r.add_argument("--out", type=Path, help="image path (default: render.png beside the .vox)")
     r.set_defaults(fn=cmd_render)
 
     li = sub.add_parser("lint", help="lint a built asset (exit 2 when there are errors)")
@@ -275,8 +284,8 @@ def parser() -> argparse.ArgumentParser:
     e.add_argument("--style", type=Path, help="style.toml (default: nearest above the asset)")
     e.set_defaults(fn=cmd_export)
 
-    i = sub.add_parser("inspect", help="parts, bounds, and color counts of a .vox file")
-    i.add_argument("asset", type=Path)
+    i = sub.add_parser("inspect", help="parts, bounds, pivots, and color counts as JSON")
+    i.add_argument("asset", type=Path, help="a .vox file or its out/<name>/ directory")
     i.set_defaults(fn=cmd_inspect)
 
     n = sub.add_parser("new", help="scaffold a brief and a script stub for a new asset")

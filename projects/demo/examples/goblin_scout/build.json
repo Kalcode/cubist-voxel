@@ -13,6 +13,7 @@
   "symmetric": null,
   "allow_floating": false,
   "voxels": 516,
+  "part_voxels": 516,
   "parts": [
     {
       "name": "torso",
@@ -61,7 +62,7 @@
       "symmetric": "x"
     },
     {
-      "name": "leg_l",
+      "name": "leg_r",
       "voxels": 36,
       "bounds": [
         [
@@ -84,7 +85,7 @@
       "symmetric": null
     },
     {
-      "name": "leg_r",
+      "name": "leg_l",
       "voxels": 36,
       "bounds": [
         [
@@ -107,7 +108,7 @@
       "symmetric": null
     },
     {
-      "name": "arm_l",
+      "name": "arm_r",
       "voxels": 32,
       "bounds": [
         [
@@ -130,7 +131,7 @@
       "symmetric": null
     },
     {
-      "name": "arm_r",
+      "name": "arm_l",
       "voxels": 32,
       "bounds": [
         [
@@ -155,14 +156,14 @@
   ],
   "sockets": {
     "hand_r": [
-      12,
+      4,
       8,
       6
     ]
   },
   "colors": {
-    "skin.dark": 4,
-    "skin.1": 92,
+    "skin.dark": 2,
+    "skin.1": 94,
     "skin.mid": 280,
     "tunic.mid": 76,
     "tunic.light": 36,
@@ -188,6 +189,6 @@
     "errors": 0,
     "warnings": 0,
     "infos": 2,
-    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 2 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (7,16,9)-(9,17,10)\nINFO hidden: 160 solid voxels can't be seen from outside; export hollows them"
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 2 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 2 at (7,16,9)-(9,17,10)\nINFO hidden: 160 solid voxels can't be seen from outside; export hollows them"
   }
 }

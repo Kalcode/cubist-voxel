@@ -163,3 +163,15 @@ def test_shift_ignores_the_unordered_source_ramp():
     p = Palette({"warm": [1, 2]}, source=["#000001", "#000002", "#000003"])
     assert p.shift(p.source[0].index, 1) == p.source[0].index
     assert p.shift(p.warm.dark.index, 1) == p.warm.light.index
+
+
+def test_to_dict_separates_ramps_from_named_colors(tmp_path):
+    d = load_style(
+        write(
+            tmp_path,
+            '[palette]\nwood = ["#100000", "#200000"]\n'
+            'cloth = { white = "#ffffff" }\neye = "#ffff00"\n',
+        )
+    ).to_dict()
+    assert d["ramps"] == ["wood"]
+    assert d["named"] == ["cloth", "eye"]

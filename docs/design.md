@@ -98,97 +98,47 @@ center), an odd width.
 ## The DSL
 
 Asset scripts are plain Python using a small, chainable API; Python is chosen because it is the
-language agents write most reliably.
+language agents write most reliably. **The complete reference, with every signature and
+convention, is [dsl.md](dsl.md).** This section records the design decisions behind it.
 
-### Primitives
-
-Each starts at its local origin and is placed with `.at(x, y, z)`.
-
-| Primitive | Local origin and parameters |
-| --- | --- |
-| `box(size)` | min corner at the origin |
-| `sphere(r)`, `ellipsoid(radii)` | centered |
-| `cylinder(r, h, axis)`, `cone(r, h, axis, r_top=0)` | base centered on the origin, extending `h` along `axis` |
-| `capsule(p0, p1, r)` | absolute endpoints, round ends |
-| `line(p0, p1, r=0.5)` | absolute endpoints; max-norm distance, so the default samples to a connected one-voxel line (ropes, wires) |
-| `torus(R, r, axis)` | centered, ring around `axis` |
-| `wedge(size, rise="+x")` | like `box`, height 0 at the low end of `rise` (`±x`, `±z`) rising to full height |
-| `lathe(profile, axis)` | `(height, radius)` points, heights increasing, revolved around `axis` (barrels, bottles, columns) |
-| `extrude(polygon, depth, axis="z")` | 2D polygon in the other two axes (`z`: x,y; `y`: x,z; `x`: z,y) pushed `depth` from the origin |
-| `heightmap(heights)` | columns from y = 0 up to `heights[x][z]` |
-
-### Two stages: distance fields, then voxels
-
-Shapes start as signed distance fields. Anything that works on voxels (painting, hollowing,
-morphology, heightmaps) turns a shape into a grid-stage shape. CSG, transforms, and `mirror`
-work in both stages with the same color rules; `smooth_union`, `taper`, and `displace` need a
-distance field and refuse grid-stage input with a message to apply them before painting.
-
-### Operations
-
-- CSG: `union` (`|`), `subtract` (`-`), `intersect` (`&`), `smooth_union(k)`. Union gives
-  overlaps the later shape's color; subtract and intersect keep the left shape's colors.
-- Transforms: `at`/`translate`, `rotate` (any angle; default pivot is the bounds center),
-  `scale`, `reflect(axis, about)` (reflection only), `mirror(axis, about)` (keeps the shape and
-  adds its reflection, exactly symmetric in form and color), `array(n, step)`,
-  `radial(n, axis, about)`. Grid-stage shapes are resampled exactly for whole-voxel moves and
-  90° turns, by nearest voxel otherwise; mirroring them needs a plane on the voxel grid.
-- Field modifiers: `taper(top, axis)`, `displace(amp, scale, seed, noise="perlin"|"value",
-  octaves)`.
-- Voxel morphology (exact Euclidean distances between voxel centers): `round(r)` (morphological
-  opening: never grows the shape; `round(1)` takes one voxel off every edge), `chamfer(c)`
-  (removes `c` layers of convex-edge voxels), `hollow(t)` (a shell `t` thick measured in all 26
-  directions, so curved shells stay watertight), `erode(r)`, `dilate(r, color=None)` (new voxels
-  take the nearest voxel's color).
-- Paint: `paint(color, where)`, `paint_faces(direction, color, depth=1)`,
-  `gradient(axis, ramp, reverse=False)`, `dither(ramp, seed, amount=0.5)`,
-  `darken_crevices(steps=1)`, `highlight_edges(steps=1)`. Ramp-stepping ops move along list
-  ramps; table and single colors have no order and stay unchanged. A crevice is a surface voxel
-  with solid material beside its open face one and two layers out (a floor meeting a wall), so
-  bevel steps don't darken; an edge is a voxel exposed on two different axes.
-- Selections for `where=`: `band(axis, at, height)`, `region(lo, hi)`, `colored(*colors)`,
-  `faces(direction)`, `surface()`, `inside(shape)`, or any shape directly; combine with `&`,
-  `|`, `-`, `~`. Selecting by part is done by painting that part's shape.
+- **Primitives start at their local origin** and are placed with `.at()`: boxes at their min
+  corner, spheres centered, cylinders and cones at the center of their base.
+- **Two stages.** Shapes are signed distance fields until a voxel-level op (paint, hollow,
+  round, ...). CSG, transforms, and mirror work in both stages with the same color rules: union
+  gives overlaps the later shape's color; subtract and intersect keep the left shape's colors,
+  so cutters need no color (in either stage; cutters are sampled for occupancy only).
+  `smooth_union`, `taper`, and `displace` need a distance field and say so.
+- **`mirror` is exact**: colors come from a canonical point per mirrored pair, so both halves
+  match. `reflect` is the plain reflection.
+- **`round` is a morphological opening** (erode then dilate, never growing) so `round(1)` means
+  the same thing on every shape; `hollow` measures depth in all 26 directions so curved shells
+  stay watertight; erode and dilate use exact Euclidean distances.
+- **Lines are voxel walks**, not distance fields: face-connected by default (a 2-wide staircase
+  on diagonals, so they never count as floating), or one voxel per step with `connect=26`.
+  `panel` plates default to the thinnest watertight thickness at their tilt.
+- **Ramp ops step along list ramps only.** A crevice needs solid material one and two layers
+  out (so bevel steps don't darken) and skips one-voxel walls (so nothing shows through); an
+  edge is open on one side along two different axes (so thin plates don't light up entirely).
+- **Left and right are the character's own**: characters face +Z, so their right is at low x.
+- **Errors point at the script**: every shape records the script line that created it, so a
+  lazily evaluated failure (a primitive with no color, a shape too large to sample) names the
+  primitive, its line, and the part it belongs to.
 
 ### Seeds
 
-Seeded ops (`displace`, `dither`) mix their own seed with the build seed (`cubist build
---seed N`, default 0) through a pinned integer hash, so one flag reshuffles every seeded op and
-the same script and seed always give the same voxels on any platform.
-
-### Parts, pivots, sockets
-
-A `Model` holds named `Part`s. Each part has a shape, a pivot (default: the bottom center of its
-voxels), an optional parent, an optional `symmetric` axis, and is exported as its own `.vox`
-model and glTF node. Sockets are named attachment points (`hand_r`, `muzzle`, `door_hinge`).
-`Part.mirrored("arm_r", about_x=…)` returns the part and a reflected twin; `Model` flattens such
-pairs. An `@asset` function may return a bare `Shape`, which becomes a single part named after
-the asset. `@asset` also takes `grounded`, `symmetric`, and `allow_floating` for lint.
+Seeded ops (`displace`, `dither`, `masonry`) mix their own seed with the build seed (`cubist
+build --seed N`, default 0) through a pinned integer hash, so one flag reshuffles every seeded op
+and the same script and seed always give the same voxels on any platform.
 
 ### Palette
 
 Scripts reference colors by name, never by index. A palette entry in `style.toml` is a list
-(a ramp, dark to light: shades `dark` = first, `mid` = middle, `light` = last, any position as
-`p.wood[i]`), a table of named shades (`cloth = { brown = "#6b4a2a" }` → `p.cloth.brown`), or a
-single color (`p.cork`). With `source = "palette.png"` (also `.gif`, `.gpl`, `.hex`), entries
-may give source positions instead of hex (`warm = [1, 2, 3]`) and every source color is
-`p.source[i]`. An unknown name is a build error that suggests close matches.
+(a ramp, dark to light), a table of named shades, or a single color. With `source =
+"palette.png"` (also `.gif`, `.gpl`, `.hex`), entries may give source positions instead of hex
+(`warm = [1, 2, 3]`) and every source color is `p.source[i]`. An unknown name is a build error
+that suggests close matches.
 
-### Examples
-
-```python
-from cubist import *
-
-
-@asset(name="barrel", size=(12, 16, 12), tags=["prop", "wood"], grounded=True)
-def barrel(p):
-    body = lathe(profile=[(0, 5), (3, 6), (13, 6), (16, 5)], color=p.wood.mid).at(6, 0, 6)
-    body = body.hollow(1).union(cylinder(r=5, h=1, color=p.wood.dark).at(6, 15, 6))
-    for y in (2, 13):
-        body = body.paint(p.metal.dark, where=band(axis="y", at=y, height=1))
-    body = body.dither(p.wood.ramp, seed=1).darken_crevices()
-    return Model(parts=[Part("body", body, pivot=(6, 0, 6))])
-```
+### Example
 
 ```python
 @asset(name="goblin_scout", size=(16, 24, 12), tags=["character"], grounded=True)
@@ -202,13 +152,14 @@ def goblin(p):
         parts=[
             Part("torso", torso, pivot=(8, 9, 6), symmetric="x"),
             Part("head", head, parent="torso", pivot=(8, 16, 6), symmetric="x"),
-            Part("arm_l", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_r", about_x=8),
+            # the goblin's own right arm, at low x; mirrored to make the left
+            Part("arm_r", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_l", about_x=8),
         ],
-        sockets={"hand_r": (12, 8, 6)},
+        sockets={"hand_r": (4, 8, 6)},
     )
 ```
 
-Both run as written; the full versions are in `projects/demo/assets/`.
+The full versions of every example are in `projects/demo/assets/`.
 
 **Rules for scripts:** no file or network access, no randomness except through the provided
 `seed`, and a build timeout (default 30 s). Status: the timeout is enforced and
@@ -293,12 +244,13 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Palette | Colors not in the project palette | Error |
 | Bounds | Voxels outside the declared asset size, or a part over 256³ | Error |
 | Pivots and sockets | Pivots or sockets outside the part's bounds | Error |
+| Overlap | Voxels claimed by two parts (they double up in exports and poke through when a part moves) | Warning |
 | Determinism | Two builds with the same seed hash differently (CI only) | Error |
 | Floating voxels | Components not attached to the main body (6-connectivity); allow with a flag | Warning |
 | Symmetry | A part declared symmetric differs from its mirror by more than N voxels | Warning |
 | Grounding | Asset marked `grounded` has nothing at y = 0 | Warning |
 | Budgets | Voxel, color, part, or post-meshing triangle count over the style bible's limits | Warning |
-| Thin features | 1-voxel walls or spans that disappear at game distance | Info |
+| Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
 
 ## Style bible and example library
@@ -511,8 +463,16 @@ CLAUDE.md
 5. **Agent integration** — done. CLI polish, MCP server, `CLAUDE.md` workflow, example library
    with 10 seed examples (checked by Claude against the critique checklist; awaiting a person's
    review).
-6. **Evaluation.** 20 briefs across props, buildings, and characters. Track lint pass rate,
-   iterations to acceptance, and a 1–5 human quality score per asset.
+6. **Evaluation** — run; human scores pending. 20 briefs across props, buildings, and
+   characters. Track lint pass rate, iterations to acceptance, and a 1–5 human quality score per
+   asset. Four fresh agents, given only `CLAUDE.md` and the docs, built all 20: every final
+   build lint-clean (0 errors, 0 warnings), every one within 5 iterations (mean 3.95), agent
+   self-scores 3–4 (mean 3.7). Their reports drove a round of fixes (colorless cutters on painted
+   shapes, errors naming the script line, voxel-walk lines, thin-geometry shading, failed builds
+   logged, an overlap lint) and new DSL features (`carve`, `decal`, `masonry`, `stripes`,
+   `checker`, `panel`, `pyramid`, `polyline`, tapered capsules). Details:
+   `projects/eval/eval/agent-notes.md`; acceptance waits on the human scores in
+   `projects/eval/eval/scores.toml`.
 
 ### v1 acceptance targets
 

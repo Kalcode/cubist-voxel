@@ -3,7 +3,8 @@
 * ``box``: min corner at the origin.
 * ``sphere`` / ``ellipsoid``: centered on the origin.
 * ``cylinder`` / ``cone``: base centered on the origin, extending ``h`` along ``axis``.
-* ``capsule`` / ``line``: between two absolute points.
+* ``capsule`` / ``line`` / ``polyline`` / ``panel``: through absolute points.
+* ``pyramid``: like ``box``, narrowing to its top center.
 * ``torus``: centered on the origin, ring around ``axis``.
 * ``wedge``: like ``box``, sloping up along ``rise``.
 * ``lathe``: a profile of (height, radius) points revolved around ``axis`` at the origin.
@@ -123,18 +124,26 @@ class Cone(_Axial):
 
 
 class Capsule(Primitive):
-    def __init__(self, p0: Vec3, p1: Vec3, r: float, color: Color | None):
+    def __init__(
+        self, p0: Vec3, p1: Vec3, r: float, color: Color | None, r_end: float | None = None
+    ):
         super().__init__(color)
         _positive("capsule r", r)
         self.p0 = np.asarray(p0, dtype=np.float64)
         self.p1 = np.asarray(p1, dtype=np.float64)
         self.r = float(r)
+        self.r_end = self.r if r_end is None else float(r_end)
+        if self.r_end < 0:
+            raise ShapeError(f"capsule r_end must be >= 0, got {r_end}")
 
     def _distance(self, p):
-        return sdf.segment(p, self.p0, self.p1, self.r)
+        if self.r_end == self.r or np.allclose(self.p0, self.p1):
+            return sdf.segment(p, self.p0, self.p1, self.r)
+        return sdf.round_cone(p, self.p0, self.p1, self.r, self.r_end)
 
     def bounds(self):
-        return np.minimum(self.p0, self.p1) - self.r, np.maximum(self.p0, self.p1) + self.r
+        reach = max(self.r, self.r_end)
+        return np.minimum(self.p0, self.p1) - reach, np.maximum(self.p0, self.p1) + reach
 
 
 def box(size: Vec3, color: Color | None = None) -> Shape:
@@ -159,8 +168,12 @@ def cone(
     return Cone(r, h, axis, r_top, color)
 
 
-def capsule(p0: Vec3, p1: Vec3, r: float, color: Color | None = None) -> Shape:
-    return Capsule(p0, p1, r, color)
+def capsule(
+    p0: Vec3, p1: Vec3, r: float, color: Color | None = None, r_end: float | None = None
+) -> Shape:
+    """Round-ended tube from p0 (radius r) to p1 (radius r_end, default r): tails, horns,
+    limbs, necks."""
+    return Capsule(p0, p1, r, color, r_end)
 
 
 class Torus(Primitive):
@@ -276,6 +289,62 @@ class Extrude(Primitive):
         return lo, hi
 
 
+class Panel(Primitive):
+    def __init__(self, points, color: Color | None, thickness: float | None):
+        super().__init__(color)
+        pts = np.asarray(points, dtype=np.float64)
+        if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 3:
+            raise ShapeError("panel needs at least three (x, y, z) points")
+        u = pts[1] - pts[0]
+        normal = None
+        for q in pts[2:]:
+            n = np.cross(u, q - pts[0])
+            if np.linalg.norm(n) > 1e-9:
+                normal = n / np.linalg.norm(n)
+                break
+        if normal is None or np.linalg.norm(u) < 1e-9:
+            raise ShapeError("panel points are all on one line; give a flat polygon")
+        off_plane = np.abs((pts - pts[0]) @ normal).max()
+        if off_plane > 1e-6:
+            raise ShapeError(f"panel points must be coplanar (one is {off_plane:.3g} off)")
+        self.origin_pt, self.normal = pts[0], normal
+        self.u = u / np.linalg.norm(u)
+        self.v = np.cross(normal, self.u)
+        local = pts - pts[0]
+        self.poly = np.stack([local @ self.u, local @ self.v], axis=1)
+        if thickness is None:
+            # A standard digital plane: thin as possible without face gaps. The tiny offset
+            # breaks exact ties to one side so 45-degree plates come out 2 wide, not 3.
+            self.half, self.bias = 0.5 * float(np.abs(normal).sum()) - 5e-5, 1e-4
+        else:
+            _positive("panel thickness", thickness)
+            self.half, self.bias = thickness / 2.0, 0.0
+        self.pts = pts
+
+    def _distance(self, p):
+        local = p - self.origin_pt
+        d2 = sdf.polygon(np.stack([local @ self.u, local @ self.v], axis=1), self.poly)
+        dn = np.abs(local @ self.normal + self.bias) - self.half
+        outside = np.hypot(np.maximum(d2, 0.0), np.maximum(dn, 0.0))
+        return outside + np.minimum(np.maximum(d2, dn), 0.0)
+
+    def bounds(self):
+        pad = self.half + 1.0
+        return self.pts.min(axis=0) - pad, self.pts.max(axis=0) + pad
+
+
+class Pyramid(Box):
+    def _distance(self, p):
+        sx, sy, sz = self.size
+        d = super()._distance(p)
+        x, y, z = p[:, 0], p[:, 1], p[:, 2]
+        for along, run in ((x, sx), (z, sz)):
+            norm = np.hypot(2.0 * sy, run)
+            d = np.maximum(d, (y * run + 2.0 * sy * along - 2.0 * sy * run) / norm)
+            d = np.maximum(d, (y * run - 2.0 * sy * along) / norm)
+        return d
+
+
 def torus(R: float, r: float, axis: str = "y", color: Color | None = None) -> Shape:  # noqa: N803
     return Torus(R, r, axis, color)
 
@@ -284,9 +353,45 @@ def wedge(size: Vec3, rise: str = "+x", color: Color | None = None) -> Shape:
     return Wedge(size, rise, color)
 
 
-def line(p0: Vec3, p1: Vec3, r: float = 0.5, color: Color | None = None) -> Shape:
-    """A path between two points; the default r = 0.5 samples to a connected 1-voxel line."""
-    return Line(p0, p1, r, color)
+def line(
+    p0: Vec3,
+    p1: Vec3,
+    color: Color | None = None,
+    connect: int = 6,
+    r: float | None = None,
+) -> Shape:
+    """The voxels a segment passes through: ropes, spokes, braces, whiskers.
+
+    ``connect=6`` (default) gives a face-connected path (a 2-wide staircase on diagonals,
+    so it never counts as floating); ``connect=26`` one voxel per step, joined at edges and
+    corners. With ``r``, a thick line of max-norm radius ``r`` instead (a distance field).
+    Give endpoints directly rather than rotating a line afterwards."""
+    if r is not None:
+        return Line(p0, p1, r, color)
+    from cubist.dsl.gridops import VoxelPath
+
+    return VoxelPath([p0, p1], color, connect)
+
+
+def polyline(points, color: Color | None = None, connect: int = 6) -> Shape:
+    """``line`` through a list of points, joined end to end (bows, sagging ropes, cracks)."""
+    from cubist.dsl.gridops import VoxelPath
+
+    return VoxelPath(points, color, connect)
+
+
+def panel(points, color: Color | None = None, thickness: float | None = None) -> Shape:
+    """A flat plate through 3+ coplanar points at any angle: wings, sails, roof planes.
+
+    The default thickness is the thinnest that stays face-connected and watertight at the
+    plate's tilt (one voxel when axis-aligned, a 2-wide staircase at 45 degrees)."""
+    return Panel(points, color, thickness)
+
+
+def pyramid(size: Vec3, color: Color | None = None) -> Shape:
+    """A box narrowing to its top center: hip roofs, spires, tent tops. Odd widths keep a
+    one-voxel tip (the apex needs a voxel column)."""
+    return Pyramid(size, color)
 
 
 def lathe(profile, axis: str = "y", color: Color | None = None) -> Shape:

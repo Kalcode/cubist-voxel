@@ -50,7 +50,7 @@ def test_inspect_reports_parts_and_colors(tmp_path, capsys):
     assert [p["name"] for p in info["parts"]] == ["base", "pole"]
     assert info["parts"][1]["bounds"] == [[0, 1, 0], [1, 6, 1]]
     assert info["voxels"] == 9
-    assert info["colors"] == {"#3b2414": 4, "#8a5a32": 5}
+    assert info["colors"] == {"wood.dark": 4, "wood.light": 5}
 
 
 def test_inspect_missing_file_exits_nonzero(tmp_path, capsys):
@@ -58,7 +58,7 @@ def test_inspect_missing_file_exits_nonzero(tmp_path, capsys):
     assert "nope.vox" in capsys.readouterr().err
 
 
-def test_render_writes_contact_sheet_next_to_the_asset(tmp_path, capsys):
+def test_render_writes_render_png_and_leaves_the_build_sheet_alone(tmp_path, capsys):
     script = setup(tmp_path)
     main(["build", str(script)])
     asset_dir = tmp_path / "out" / "post"
@@ -66,8 +66,9 @@ def test_render_writes_contact_sheet_next_to_the_asset(tmp_path, capsys):
     capsys.readouterr()
     assert main(["render", str(asset_dir / "post.vox"), "--views", "front,iso"]) == 0
     info = json.loads(capsys.readouterr().out)
-    assert info["contact_sheet"] == str(asset_dir / "contact.png")
-    assert (asset_dir / "contact.png").is_file()
+    assert info["contact_sheet"] == str(asset_dir / "render.png")
+    assert (asset_dir / "render.png").is_file()
+    assert not (asset_dir / "contact.png").exists()
 
 
 def test_render_slices_use_palette_names_from_the_build(tmp_path, capsys):
@@ -124,3 +125,12 @@ def test_style_command_prints_the_parsed_bible(tmp_path, capsys):
     assert main(["style", "--style", str(tmp_path / "style.toml")]) == 0
     d = json.loads(capsys.readouterr().out)
     assert [c["name"] for c in d["palette"]] == ["wood.dark", "wood.light"]
+
+
+def test_inspect_accepts_the_asset_directory_and_names_colors(tmp_path, capsys):
+    script = setup(tmp_path)
+    main(["build", str(script)])
+    capsys.readouterr()
+    assert main(["inspect", str(tmp_path / "out" / "post")]) == 0
+    info = json.loads(capsys.readouterr().out)
+    assert info["colors"] == {"wood.dark": 4, "wood.light": 5}

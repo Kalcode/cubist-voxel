@@ -14,6 +14,7 @@
   "symmetric": null,
   "allow_floating": false,
   "voxels": 808,
+  "part_voxels": 808,
   "parts": [
     {
       "name": "body",
@@ -41,10 +42,10 @@
   ],
   "sockets": {},
   "colors": {
-    "wood.dark": 139,
-    "wood.1": 239,
-    "wood.mid": 234,
-    "wood.light": 76,
+    "wood.dark": 134,
+    "wood.1": 221,
+    "wood.mid": 253,
+    "wood.light": 80,
     "metal.dark": 120
   },
   "palette_names": {

@@ -15,6 +15,7 @@
   "symmetric": null,
   "allow_floating": false,
   "voxels": 105,
+  "part_voxels": 105,
   "parts": [
     {
       "name": "sword",
@@ -60,6 +61,6 @@
     "errors": 0,
     "warnings": 0,
     "infos": 2,
-    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 94 voxels are one voxel thick with open air on both sides and may vanish at game distance, within (0,0,0)-(7,27,3)\nINFO hidden: 9 solid voxels can't be seen from outside; export hollows them"
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 94 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 94 at (0,0,0)-(7,27,3)\nINFO hidden: 9 solid voxels can't be seen from outside; export hollows them"
   }
 }
