@@ -83,6 +83,11 @@ def build_manifest(
             for p in parents_first(asset)
         ],
         "sockets": sockets,
+        "emitters": {
+            name: {**e.to_summary(), "part": e.part or nearest_part(asset, e.position)}
+            for name, e in asset.emitters.items()
+        },
+        "particles": sorted({e.particle for e in asset.emitters.values()}),
         "lights": {
             name: {
                 "position": list(lt.position),

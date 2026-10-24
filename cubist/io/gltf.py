@@ -440,6 +440,23 @@ def encode_glb(
         owner.setdefault("children", []).append(len(nodes) - 1)
 
     _lights(asset, nodes, index_of, pivots, root, s)
+    for name, e in asset.emitters.items():  # empty nodes the engine attaches its particles to
+        owner_name = e.part or nearest_part(asset, e.position)
+        offset = np.array(e.position) - (pivots[owner_name] if owner_name in pivots else 0.0)
+        fwd = np.array(e.direction)
+        up = np.array([0.0, 1.0, 0.0]) if abs(fwd[1]) < 0.99 else np.array([0.0, 0.0, 1.0])
+        up = up - (up @ fwd) * fwd
+        up /= np.linalg.norm(up)
+        basis = np.column_stack([np.cross(up, fwd), up, fwd])
+        nodes.append(
+            {
+                "name": name,
+                "translation": [float(v) * s for v in offset],
+                "rotation": [float(c) for c in _quat(basis)],
+            }
+        )
+        owner = nodes[index_of[owner_name]] if owner_name in index_of else root
+        owner.setdefault("children", []).append(len(nodes) - 1)
     material: dict = {
         "name": "palette",
         "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 1.0},

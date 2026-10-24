@@ -20,6 +20,7 @@ from cubist.examples import ExampleError, list_examples, promote, search_example
 from cubist.export import NATIVE, ExportBlocked, export_asset, lint_loaded, load_asset
 from cubist.io.vengi import VengiError
 from cubist.io.vox import read_vox
+from cubist.motion.particles import load_particles
 from cubist.palette_import import import_palette
 from cubist.project import ProjectError, find_project, new_asset
 from cubist.render.ascii import parse_slices, slices
@@ -88,6 +89,7 @@ def cmd_render(args: argparse.Namespace) -> int:
     asset = load_asset(args.asset)
     if args.clip:
         built = BuiltAsset.from_vox(asset.scene, asset.summary, None)
+        load_particles(built, asset.vox.parent.parent)
         kind, image = render_clip(
             built,
             asset.scene.palette,

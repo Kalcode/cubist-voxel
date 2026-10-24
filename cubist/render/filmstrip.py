@@ -19,6 +19,7 @@ from cubist.core.model import BuiltAsset
 from cubist.core.style import cycle_table, glow_array
 from cubist.io.gltf import nearest_part
 from cubist.motion.clips import Clip
+from cubist.motion.particles import instance_matrix, particles_at, stand_in
 from cubist.motion.pose import dense_times, frame_indices, hidden_at, world_matrices
 from cubist.render.contact_sheet import (
     DEFAULT_VIEWS,
@@ -89,7 +90,37 @@ def motion_region(asset: BuiltAsset, clips: Sequence[Clip], scene: PosedScene) -
     for c in clips:
         for t in dense_times(asset, c, rate=24, max_turn=5):
             regions.append(scene.bounds(world_matrices(asset, c, float(t))))
+            regions.extend(particle_bounds(asset, c, float(t), scene.table))
     return _union(regions)
+
+
+def _particle_grid(asset: BuiltAsset, name: str, table: np.ndarray):
+    grid = asset.particle_models.get(name)
+    return grid if grid is not None else stand_in(table)
+
+
+def particle_instances(scene: PosedScene, asset: BuiltAsset, clip, t: float, table) -> list:
+    """(model key, matrix) for each particle alive at ``t``, adding models to the scene."""
+    out = []
+    for p in particles_at(asset, clip, t):
+        grid = _particle_grid(asset, p.particle, table)
+        key = p.particle if asset.particle_models.get(p.particle) is not None else "_stand_in"
+        scene.add_model(key, grid)
+        out.append((key, instance_matrix(grid, p)))
+    return out
+
+
+def particle_bounds(asset: BuiltAsset, clip, t: float, table) -> list:
+    """A whole-voxel box around each particle alive at ``t``."""
+    out = []
+    for p in particles_at(asset, clip, t):
+        grid = _particle_grid(asset, p.particle, table)
+        b = grid.bounds()
+        half = (np.array(b[1]) - np.array(b[0])) * p.scale / 2 + 0.5
+        lo = tuple(int(v) for v in np.floor(p.position - half))
+        hi = tuple(int(v) for v in np.ceil(p.position + half))
+        out.append((lo, hi))
+    return out
 
 
 def frame_times(clip: Clip, frames: int) -> list[float]:
@@ -156,8 +187,10 @@ def filmstrip(
             m, hide = world_matrices(asset, c, t), hidden_at(asset, c, t)
             marks, fr = light_markers(asset, m), frame_indices(asset, c, t)
             tab = cycle_table(table, asset.cycles, t)
-            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks, fr, tab).rgb)
-            ortho = scene.render(m, v, scale, region, hide, marks, fr, tab)
+            inst = particle_instances(scene, asset, c, t, table)
+            iso = scene.render(m, "iso", scale, region, hide, marks, fr, tab, inst)
+            iso_rgb = iso_framed(iso.rgb)
+            ortho = scene.render(m, v, scale, region, hide, marks, fr, tab, inst)
             rgb = _decorate(ortho, step, size_box.get(v) if size_box else None)
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
@@ -235,7 +268,8 @@ def clip_frames(
     for t in times:
         m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
         fr, tab = frame_indices(asset, clip, t), cycle_table(table, asset.cycles, t)
-        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m), fr, tab)
+        inst = particle_instances(scene, asset, clip, t, table)
+        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m), fr, tab, inst)
         images.append(Image.fromarray(iso_framed(view.rgb)))
     if not clip.loop:
         durations.append(step_cs * 10 + GIF_HOLD_MS)
@@ -273,14 +307,17 @@ def posed_sheet(
     scene = PosedScene(asset, table, glow_array(asset.glow))
     m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
     fr = frame_indices(asset, clip, t)
-    bounds = scene.bounds(m)
+    inst = particle_instances(scene, asset, clip, t, np.asarray(table))
+    bounds = _union([scene.bounds(m), *particle_bounds(asset, clip, t, np.asarray(table))])
     regions = [bounds]
     if asset.size is not None:
         regions.append(((0, 0, 0), tuple(int(s) for s in asset.size)))  # type: ignore[arg-type]
     region = _union(regions)
     grid = VoxelGrid.merge([p.grid for p in asset.parts if p.name not in hide])
     return sheet(
-        lambda view, s, r: scene.render(m, view, s, r, hide, light_markers(asset, m), fr),
+        lambda view, s, r: scene.render(
+            m, view, s, r, hide, light_markers(asset, m), fr, None, inst
+        ),
         region,
         np.asarray(table),
         names or {},

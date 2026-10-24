@@ -20,6 +20,7 @@ from cubist.examples import search_examples as find_examples
 from cubist.export import ExportBlocked, LoadedAsset, export_asset, lint_loaded, load_asset
 from cubist.io.vengi import VengiError
 from cubist.io.vox import read_vox
+from cubist.motion.particles import load_particles
 from cubist.project import new_asset as scaffold
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet, hidden_note
@@ -121,6 +122,7 @@ def create_server(project: str | Path) -> MCPServer:
         loaded = load_asset(resolve(asset))
         if clip:
             built = BuiltAsset.from_vox(loaded.scene, loaded.summary, None)
+            load_particles(built, loaded.vox.parent.parent)
             _, image = render_clip(
                 built, loaded.scene.palette, clip, at=at, frames=frames, view=view,
                 names=loaded.names,

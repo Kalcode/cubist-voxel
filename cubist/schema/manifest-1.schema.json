@@ -24,6 +24,8 @@
     "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
     "sockets": {"type": "object", "additionalProperties": {"$ref": "#/$defs/socket"}},
     "lights": {"type": "object", "additionalProperties": {"$ref": "#/$defs/light"}},
+    "emitters": {"type": "object", "additionalProperties": {"$ref": "#/$defs/emitter"}},
+    "particles": {"type": "array", "items": {"type": "string"}},
     "clips": {"type": "array", "items": {"$ref": "#/$defs/clip"}},
     "cycles": {
       "type": "array",
@@ -88,6 +90,26 @@
         "part": {"type": ["string", "null"]},
         "forward": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
         "up": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]}
+      }
+    },
+    "emitter": {
+      "type": "object",
+      "required": ["position", "particle", "direction", "rate", "burst", "life", "speed",
+                   "spread", "gravity", "grow", "fade", "seed", "part"],
+      "properties": {
+        "position": {"$ref": "#/$defs/vec3"},
+        "particle": {"type": "string"},
+        "direction": {"$ref": "#/$defs/vec3"},
+        "rate": {"type": ["number", "null"]},
+        "burst": {"type": ["integer", "null"]},
+        "life": {"type": "number", "exclusiveMinimum": 0},
+        "speed": {"type": "number"},
+        "spread": {"type": "number", "minimum": 0, "maximum": 180},
+        "gravity": {"type": "number"},
+        "grow": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+        "fade": {"type": "boolean"},
+        "seed": {"type": "integer"},
+        "part": {"type": ["string", "null"]}
       }
     },
     "light": {

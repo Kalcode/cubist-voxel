@@ -75,6 +75,11 @@ class PosedScene:
         self.table = np.asarray(table)
         self.glow = glow
         self.meshes = {p.name: [_Mesh(g) for g in (p.frames or [p.grid])] for p in asset.parts}
+        self.models: dict[str, _Mesh] = {}  # particle models, drawn as instances
+
+    def add_model(self, key: str, grid) -> None:
+        if key not in self.models:
+            self.models[key] = _Mesh(grid)
 
     def bounds(self, matrices: dict[str, np.ndarray]) -> Region:
         """The whole-voxel box around every part's posed bounding box."""
@@ -90,6 +95,7 @@ class PosedScene:
         markers: list[tuple[tuple[float, float, float], tuple[int, int, int]]] = (),
         frames: dict[str, int] | None = None,
         table: np.ndarray | None = None,
+        instances: list[tuple[str, np.ndarray]] = (),
     ) -> ViewRender:
         lo = np.array(region[0], dtype=np.float64)
         hi = np.array(region[1], dtype=np.float64)
@@ -104,6 +110,15 @@ class PosedScene:
             m = matrices.get(name, np.eye(4))
             corners.append(mesh.corners @ m[:3, :3].T + m[:3, 3])
             normals.append(mesh.normals @ m[:3, :3].T)
+            colors.append(mesh.colors)
+            ao.append(mesh.ao)
+        for key, m in instances:  # particles: scaled, so normals are renormalized
+            mesh = self.models[key]
+            if not len(mesh.colors):
+                continue
+            n = mesh.normals @ m[:3, :3].T
+            corners.append(mesh.corners @ m[:3, :3].T + m[:3, 3])
+            normals.append(n / np.linalg.norm(n, axis=1, keepdims=True))
             colors.append(mesh.colors)
             ao.append(mesh.ao)
 

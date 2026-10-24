@@ -48,7 +48,7 @@ def _built(script):
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
 def test_filmstrip_matches_golden(script):
     built, palette = _built(script)
-    clips = preview_clips(built, with_colors=True)
+    clips = preview_clips(built, with_previews=True)
     if not clips:
         pytest.skip("nothing moves")
     _compare(filmstrip(built, palette.rgba_table(), clips), GOLDEN / "motion" /

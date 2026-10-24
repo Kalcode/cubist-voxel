@@ -28,8 +28,9 @@ MAX_TURN_PER_SAMPLE = 10.0  # degrees: fast spins get more samples
 
 def check_motion(asset: BuiltAsset) -> list[Finding]:
     if not asset.clips:
-        return []
+        return check_emitters(asset)
     return [
+        *check_emitters(asset),
         *check_limits(asset),
         *check_loops(asset),
         *check_collisions(asset),
@@ -313,3 +314,57 @@ def check_hand_edits(asset: BuiltAsset, summary: dict) -> list[Finding]:
             {"changed": changed, "added": added, "removed": removed},
         )
     ]
+
+
+def check_emitters(asset: BuiltAsset) -> list[Finding]:
+    """Emitters whose particle isn't built, that spray straight into the model, and clip
+    events that fire emitters that don't exist or can't burst."""
+    from cubist.io.gltf import nearest_part
+
+    out = []
+    for name, e in asset.emitters.items():
+        if e.particle in asset.particle_models and asset.particle_models[e.particle] is None:
+            out.append(
+                Finding(
+                    "emitter_particle",
+                    "warning",
+                    f"emitter {name!r} uses particle {e.particle!r}, which hasn't been built; "
+                    f"previews draw plain cubes until you build assets/{e.particle}.py",
+                    {"emitter": name, "particle": e.particle},
+                )
+            )
+        owner = e.part or nearest_part(asset, e.position)
+        solid = {tuple(c) for p in asset.parts if p.name not in asset.hidden_parts()
+                 for c in p.grid.voxels()[0].tolist()}  # fmt: skip
+        start, d = np.array(e.position), np.array(e.direction)
+        hits = [
+            k for k in (0.75, 1.5, 2.25)
+            if tuple(int(v) for v in np.floor(start + d * k)) in solid
+        ]  # fmt: skip
+        if hits:
+            out.append(
+                Finding(
+                    "emitter_blocked",
+                    "warning",
+                    f"emitter {name!r} sprays into the model ({owner!r}) right away; move it to "
+                    "the surface or turn its direction outward",
+                    {"emitter": name},
+                )
+            )
+    for c in asset.clips:
+        for when, label in c.events:
+            if not label.startswith("emit:"):
+                continue
+            target = label[5:]
+            e = asset.emitters.get(target)
+            if e is None or not e.burst:
+                why = "there is no such emitter" if e is None else "it has no burst=..."
+                out.append(
+                    Finding(
+                        "emit_event",
+                        "warning",
+                        f"clip {c.name!r} fires {label!r} at t={when:g} s, but {why}",
+                        {"clip": c.name, "event": label},
+                    )
+                )
+    return out

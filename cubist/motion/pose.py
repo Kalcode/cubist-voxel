@@ -214,11 +214,12 @@ def used_cycles(asset: BuiltAsset) -> list:
     return [c for c in asset.cycles if used & set(c.indices)]
 
 
-def preview_clips(asset: BuiltAsset, with_colors: bool = False) -> list[Clip]:
+def preview_clips(asset: BuiltAsset, with_previews: bool = False) -> list[Clip]:
     """The clips worth previewing and exporting: the authored ones, plus a looping
     ``<part>_frames`` clip for each flipbook that no clip drives (it plays on its own). With
-    ``with_colors``, previews also get a ``colors`` clip (one full cycle) when color cycles
-    are in use and nothing else would show them; it has no tracks and isn't exported."""
+    ``with_previews``, when nothing else would show them, previews also get a ``colors`` clip
+    (one full color cycle) or a ``particles`` clip (always-on emitters, one particle life);
+    these have no tracks and aren't exported."""
     out = list(asset.clips)
     driven = {t.part for c in asset.clips for t in c.tracks if t.channel == "frame"}
     names = {c.name for c in out}
@@ -235,9 +236,12 @@ def preview_clips(asset: BuiltAsset, with_colors: bool = False) -> list[Clip]:
         out.append(Clip(name, n / fps, (track,), loop=True, ease="step"))
         names.add(name)
     cycles = used_cycles(asset)
-    if with_colors and cycles and not out:
+    if with_previews and cycles and not out:
         c = cycles[0]
         out.append(Clip("colors", len(c.indices) / c.fps, (), loop=True, ease="step"))
+    lives = [e.life for e in asset.emitters.values() if e.rate]
+    if with_previews and lives and not out:
+        out.append(Clip("particles", max(lives), (), loop=True, ease="step"))
     return out
 
 

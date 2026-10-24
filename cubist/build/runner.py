@@ -37,6 +37,7 @@ from cubist.core.style import StyleBible, StyleError, load_style
 from cubist.io.vox import encode_vox
 from cubist.lint import Finding, lint
 from cubist.manifest import build_manifest
+from cubist.motion.particles import load_particles
 from cubist.motion.pose import preview_clips
 from cubist.render.contact_sheet import contact_sheet, hidden_note
 from cubist.render.filmstrip import clip_frames, filmstrip, save_gif
@@ -171,6 +172,7 @@ def _script_traceback(exc: BaseException, script: Path) -> str:
 
 def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script: Path) -> dict:
     asset_dir.mkdir(parents=True, exist_ok=True)
+    load_particles(built, asset_dir.parent)
     vox_bytes = encode_vox(built.to_vox_scene())
     vox_path = asset_dir / f"{built.name}.vox"
     if vox_path.exists():  # keep the last build for `cubist diff`
@@ -224,7 +226,7 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
 def _write_motion(built: BuiltAsset, asset_dir: Path) -> dict:
     """Filmstrip and GIFs for an asset with clips; clears stale ones either way."""
     motion_path = asset_dir / "motion.png"
-    clips = preview_clips(built, with_colors=True)
+    clips = preview_clips(built, with_previews=True)
     keep = {f"{c.name}.gif" for c in clips}
     for old in asset_dir.glob("*.gif"):
         if old.name not in keep:

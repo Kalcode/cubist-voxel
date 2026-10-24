@@ -6,6 +6,7 @@ import hashlib
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 
+from cubist.core.emitter import Emitter
 from cubist.core.errors import ModelError
 from cubist.core.grid import VoxelGrid
 from cubist.core.light import Light
@@ -53,11 +54,13 @@ class Model:
         sockets: dict[str, Vec3] | None = None,
         clips: Sequence[Clip] | None = None,
         lights: dict[str, Light] | None = None,
+        emitters: dict[str, Emitter] | None = None,
     ):
         self.parts = _flatten(parts)
         self.sockets = {k: Socket.from_value(v, k) for k, v in (sockets or {}).items()}
         self.clips = list(clips or [])
         self.lights = dict(lights or {})
+        self.emitters = dict(emitters or {})
         names = [p.name for p in self.parts]
         dupes = sorted({n for n in names if names.count(n) > 1})
         if dupes:
@@ -92,6 +95,11 @@ class Model:
                 raise ModelError(f"light {name!r} must be made with light(...), got {value!r}")
             if value.part is not None and value.part not in names:
                 raise ModelError(f"light {name!r} names unknown part {value.part!r}")
+        for name, value in self.emitters.items():
+            if not isinstance(value, Emitter):
+                raise ModelError(f"emitter {name!r} must be made with emitter(...), got {value!r}")
+            if value.part is not None and value.part not in names:
+                raise ModelError(f"emitter {name!r} names unknown part {value.part!r}")
         self._check_clips()
         parents = {p.name: p.parent for p in self.parts}
         for name in names:
@@ -179,6 +187,9 @@ class BuiltAsset:
     clips: list[Clip] = field(default_factory=list)
     glow: dict[int, float] = field(default_factory=dict)  # palette index -> strength
     lights: dict[str, Light] = field(default_factory=dict)
+    emitters: dict[str, Emitter] = field(default_factory=dict)
+    # Particle models for previews and lint, loaded from out/ (None: not built yet); not saved.
+    particle_models: dict = field(default_factory=dict, repr=False)
     cycles: list[Cycle] = field(default_factory=list)
 
     def is_animated(self) -> bool:
@@ -278,6 +289,7 @@ class BuiltAsset:
             "clips": [c.to_dict() for c in self.clips],
             "glow": {str(i): s for i, s in sorted(self.glow.items())},
             "lights": {k: v.to_summary() for k, v in self.lights.items()},
+            "emitters": {k: v.to_summary() for k, v in self.emitters.items()},
             "cycles": [c.to_dict() for c in self.cycles],
         }
 
@@ -327,6 +339,7 @@ class BuiltAsset:
             glow={int(k): float(v) for k, v in summary.get("glow", {}).items()},
             cycles=[Cycle.from_dict(c) for c in summary.get("cycles", ())],
             lights={k: Light.from_summary(v) for k, v in summary.get("lights", {}).items()},
+            emitters={k: Emitter.from_summary(v) for k, v in summary.get("emitters", {}).items()},
         )
 
 
@@ -419,6 +432,7 @@ class AssetDef:
             glow=dict(glow or {}),
             cycles=list(cycles or []),
             lights=dict(result.lights),
+            emitters=dict(result.emitters),
         )
 
     def __repr__(self) -> str:

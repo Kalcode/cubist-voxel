@@ -19,6 +19,7 @@ from cubist.io.vox import VoxError, VoxScene, read_vox
 from cubist.lint import LintReport, lint
 from cubist.lint.motion import check_hand_edits
 from cubist.manifest import build_manifest
+from cubist.motion.particles import load_particles
 
 NATIVE = ("glb", "vox")
 
@@ -96,6 +97,7 @@ def load_asset(path: str | Path) -> LoadedAsset:
 
 def lint_loaded(asset: LoadedAsset, style: StyleBible) -> tuple[BuiltAsset, LintReport]:
     built = BuiltAsset.from_vox(asset.scene, asset.summary, style.palette)
+    load_particles(built, asset.vox.parent.parent)
     extra = check_hand_edits(built, asset.summary)
     return built, lint(built, style, rgba=asset.scene.palette, extra=extra)
 

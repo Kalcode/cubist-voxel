@@ -180,7 +180,7 @@ def pond(tmp_path):
 def test_cycling_asset_previews_a_colors_clip(tmp_path):
     a, s = pond(tmp_path)
     assert preview_clips(a) == []  # nothing to export to glTF
-    [c] = preview_clips(a, with_colors=True)
+    [c] = preview_clips(a, with_previews=True)
     assert c.name == "colors" and c.loop and c.length == pytest.approx(1.0)  # 4 shades at 4 fps
     frames, _ = clip_frames(a, s.palette.rgba_table(), c, fps=4)
     a0, a1 = np.asarray(frames[0]), np.asarray(frames[1])
