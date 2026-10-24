@@ -1,0 +1,15 @@
+# Score each asset 1-5 after looking at out/<name>/contact.png and, for moving
+# assets, its GIFs in eval/gifs/ (0 = not scored).
+# 1 unusable, 2 needs major work, 3 usable, 4 good, 5 excellent.
+cellar_hatch = 0
+dresser = 0
+flintlock = 0
+forge = 0
+fountain = 0
+jewelry_box = 0
+kobold = 0
+mage_staff = 0
+powder_keg = 0
+shop_window = 0
+twin_prop_plane = 0
+wall_sconce = 0

@@ -541,7 +541,17 @@ moves and what it looks like; the engine decides when it happens and how it is s
    emitters and particle dependencies in the manifest. Demo: the barrel explodes with smoke,
    the campfire smokes, the blaster and wand throw sparks; new `smoke_puff` and `spark`
    particle assets. Plan: `docs/superpowers/plans/2026-10-24-m10-effects.md`.
-11. **Evaluation** — twelve motion briefs built by fresh agents, scored from their GIFs.
+11. **Evaluation** — run; human scores pending. Twelve briefs, one per moment of David's
+   (torch, chest, door, window, drawer, walk, explosion, gun, wand, water, propellers, fire with
+   smoke), on objects distinct from the demo, built by four fresh agents from the docs alone:
+   12/12 built and lint-clean (0 errors, 0 warnings), 11/12 within 5 iterations (mean 4.1),
+   agent self-scores 3–4 (mean 3.5). Their reports and an independent review of M8–M10 drove a
+   round of fixes (preview clips in `render --clip`, flipbook frames in slices and thumbnails,
+   burst floor contact, `mirrored()` parents, carve through thin walls, stepped glTF keys one
+   key late, driven flipbooks in other clips, default owners skipping hidden parts, a 30 s
+   regression in dense sampling) and additions (`cubist build --check`, iteration numbers in
+   build output, `joint()`, `in`/`out` easing, `burst(start=)`). Details:
+   `projects/motion/eval/agent-notes.md`; GIFs to score in `projects/motion/eval/gifs/`.
 
 ### v1 acceptance targets
 

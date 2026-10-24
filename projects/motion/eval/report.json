@@ -1,0 +1,264 @@
+{
+  "assets": [
+    {
+      "name": "cellar_hatch",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "clips": [
+        "open",
+        "close"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/cellar_hatch-open.gif",
+        "gifs/cellar_hatch-close.gif"
+      ]
+    },
+    {
+      "name": "dresser",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 2,
+      "score": 0,
+      "clips": [
+        "open",
+        "close"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/dresser-open.gif",
+        "gifs/dresser-close.gif"
+      ]
+    },
+    {
+      "name": "flintlock",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "clips": [
+        "fire",
+        "cock"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/flintlock-fire.gif",
+        "gifs/flintlock-cock.gif"
+      ]
+    },
+    {
+      "name": "forge",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "clips": [
+        "fire_frames"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/forge-fire_frames.gif"
+      ]
+    },
+    {
+      "name": "fountain",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "clips": [
+        "splash_frames"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/fountain-splash_frames.gif"
+      ]
+    },
+    {
+      "name": "jewelry_box",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "clips": [
+        "open",
+        "close"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/jewelry_box-open.gif",
+        "gifs/jewelry_box-close.gif"
+      ]
+    },
+    {
+      "name": "kobold",
+      "category": "character",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "clips": [
+        "walk",
+        "idle"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/kobold-walk.gif",
+        "gifs/kobold-idle.gif"
+      ]
+    },
+    {
+      "name": "mage_staff",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 6,
+      "score": 0,
+      "clips": [
+        "idle",
+        "cast"
+      ],
+      "accepted": false,
+      "gifs": [
+        "gifs/mage_staff-idle.gif",
+        "gifs/mage_staff-cast.gif"
+      ]
+    },
+    {
+      "name": "powder_keg",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "clips": [
+        "explode"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/powder_keg-explode.gif"
+      ]
+    },
+    {
+      "name": "shop_window",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "clips": [
+        "open",
+        "close"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/shop_window-open.gif",
+        "gifs/shop_window-close.gif"
+      ]
+    },
+    {
+      "name": "twin_prop_plane",
+      "category": "vehicle",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 2,
+      "score": 0,
+      "clips": [
+        "spin"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/twin_prop_plane-spin.gif"
+      ]
+    },
+    {
+      "name": "wall_sconce",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "clips": [
+        "flame_frames"
+      ],
+      "accepted": null,
+      "gifs": [
+        "gifs/wall_sconce-flame_frames.gif"
+      ]
+    }
+  ],
+  "summary": {
+    "briefs": 12,
+    "built": 12,
+    "lint_pass_rate": 1.0,
+    "lint_clean_rate": 1.0,
+    "mean_iterations": 4.083333333333333,
+    "within_iterations": 0.9166666666666666,
+    "scored": 0,
+    "mean_score": null,
+    "accepted": 0,
+    "pending_score": 11,
+    "by_category": {
+      "prop": {
+        "briefs": 7,
+        "built": 7,
+        "lint_ok": 7,
+        "accepted": 0,
+        "pending": 6
+      },
+      "building": {
+        "briefs": 3,
+        "built": 3,
+        "lint_ok": 3,
+        "accepted": 0,
+        "pending": 3
+      },
+      "character": {
+        "briefs": 1,
+        "built": 1,
+        "lint_ok": 1,
+        "accepted": 0,
+        "pending": 1
+      },
+      "vehicle": {
+        "briefs": 1,
+        "built": 1,
+        "lint_ok": 1,
+        "accepted": 0,
+        "pending": 1
+      }
+    }
+  }
+}

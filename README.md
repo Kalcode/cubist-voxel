@@ -126,7 +126,14 @@ buildings, characters, creatures) in a style bible they had never seen. They bui
 ![Twenty assets built by agents from briefs](docs/images/eval-gallery.png)
 
 Their reports (bugs, confusing errors, doc gaps, wished-for features) drove the next round of
-fixes and the `carve`, `decal`, `masonry`, `panel`, and `pyramid` additions. The full record is in
+fixes and the `carve`, `decal`, `masonry`, `panel`, and `pyramid` additions.
+
+Then motion: four more fresh agents took twelve briefs, one for each moment we wanted to see
+move (a torch flickering, a chest opening, a door, a sliding window, a drawer, a creature
+walking, a keg exploding, a pistol firing, a staff casting, a fountain flowing, propellers
+spinning, a forge smoking). All twelve built lint-clean, eleven within five iterations (mean
+4.1); their notes and an independent code review drove another round of fixes. The record and
+the GIFs are in [projects/motion/eval/](projects/motion/eval/agent-notes.md). The full record is in
 [projects/eval/eval/agent-notes.md](projects/eval/eval/agent-notes.md); human scores are still to
 come.
 
@@ -155,9 +162,10 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 
 ## Status
 
-Milestones 1–10 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
-characters; 9: flipbooks, glow and lights; 10: fracture, bursts and emitters), with human scores
-for the first evaluation still to come. Next up: a motion evaluation with fresh agents
+Milestones 1–11 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
+characters; 9: flipbooks, glow and lights; 10: fracture, bursts and emitters; 11: the motion
+evaluation), with human scores for both evaluations still to come. Next up: the engine, designed
+around the manifest
 ([the plan](docs/superpowers/specs/2026-10-24-motion-and-effects-design.md)).
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
