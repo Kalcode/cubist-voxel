@@ -1,0 +1,22 @@
+# Score each asset 1-5 after looking at out/<name>/contact.png (0 = not scored).
+# 1 unusable, 2 needs major work, 3 usable, 4 good, 5 excellent.
+anvil = 0
+blacksmith_shop = 0
+bookshelf = 0
+campfire = 0
+cart = 0
+dragon_whelp = 0
+gatehouse = 0
+knight = 0
+lantern = 0
+market_stall = 0
+orc_brute = 0
+shield = 0
+skeleton_archer = 0
+slime = 0
+stone_bridge = 0
+treasure_pile = 0
+watchtower = 0
+well = 0
+windmill = 0
+wizard = 0

@@ -1,0 +1,266 @@
+{
+  "assets": [
+    {
+      "name": "anvil",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "blacksmith_shop",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "bookshelf",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "campfire",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "cart",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "dragon_whelp",
+      "category": "creature",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 1,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "gatehouse",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "knight",
+      "category": "character",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 1,
+      "iterations": 2,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "lantern",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "market_stall",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "orc_brute",
+      "category": "character",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 1,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "shield",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "skeleton_archer",
+      "category": "character",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 1,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "slime",
+      "category": "creature",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "stone_bridge",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "treasure_pile",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "watchtower",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "well",
+      "category": "prop",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 3,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "windmill",
+      "category": "building",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 0,
+      "iterations": 4,
+      "score": 0,
+      "accepted": null
+    },
+    {
+      "name": "wizard",
+      "category": "character",
+      "built": true,
+      "lint_ok": true,
+      "errors": 0,
+      "warnings": 1,
+      "iterations": 5,
+      "score": 0,
+      "accepted": null
+    }
+  ],
+  "summary": {
+    "briefs": 20,
+    "built": 20,
+    "lint_pass_rate": 1.0,
+    "lint_clean_rate": 0.75,
+    "mean_iterations": 3.95,
+    "within_iterations": 1.0,
+    "scored": 0,
+    "mean_score": null,
+    "accepted": 0,
+    "pending_score": 20,
+    "by_category": {
+      "prop": {
+        "briefs": 8,
+        "built": 8,
+        "lint_ok": 8,
+        "accepted": 0,
+        "pending": 8
+      },
+      "building": {
+        "briefs": 6,
+        "built": 6,
+        "lint_ok": 6,
+        "accepted": 0,
+        "pending": 6
+      },
+      "creature": {
+        "briefs": 2,
+        "built": 2,
+        "lint_ok": 2,
+        "accepted": 0,
+        "pending": 2
+      },
+      "character": {
+        "briefs": 4,
+        "built": 4,
+        "lint_ok": 4,
+        "accepted": 0,
+        "pending": 4
+      }
+    }
+  }
+}
