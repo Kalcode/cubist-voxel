@@ -1,0 +1,6 @@
+name = "desk"
+category = "prop"
+tags = ["prop", "wood", "furniture"]
+note = "Drawer is an open tray filling a pocket in the apron, sliding out on slide('+z', 6)."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

@@ -1,0 +1,94 @@
+{
+  "name": "smoke_puff",
+  "size": [
+    3,
+    3,
+    3
+  ],
+  "tags": [
+    "particle",
+    "smoke"
+  ],
+  "seed": 0,
+  "grounded": false,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 19,
+  "part_voxels": 19,
+  "parts": [
+    {
+      "name": "smoke_puff",
+      "voxels": 19,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          3,
+          3
+        ]
+      ],
+      "pivot": [
+        1.5,
+        0,
+        1.5
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "12e3890f0946fc5c6562e44b2f0ffd3d528928c51e1e06051a4abd1722f50070",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "stone.mid": 9,
+    "stone.light": 10
+  },
+  "palette_names": {
+    "29": "stone.mid",
+    "30": "stone.light"
+  },
+  "ops_used": [
+    "paint"
+  ],
+  "clips": [],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "smoke_puff.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 12 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 12 at (0,0,0)-(3,3,3)\nINFO hidden: 1 solid voxels can't be seen from outside; export hollows them"
+  }
+}

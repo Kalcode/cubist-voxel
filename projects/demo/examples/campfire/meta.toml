@@ -1,0 +1,6 @@
+name = "campfire"
+category = "prop"
+tags = ["prop", "light", "fire", "stone"]
+note = "Flame flipbook of three displaced tongues per frame (yellow base to orange tips), a flickering light, and an always-on smoke emitter with rising, growing puffs."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

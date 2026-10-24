@@ -14,12 +14,12 @@
   "grounded": true,
   "symmetric": null,
   "allow_floating": false,
-  "voxels": 129,
-  "part_voxels": 129,
+  "voxels": 132,
+  "part_voxels": 132,
   "parts": [
     {
       "name": "torch",
-      "voxels": 129,
+      "voxels": 75,
       "bounds": [
         [
           1,
@@ -28,7 +28,7 @@
         ],
         [
           6,
-          18,
+          11,
           6
         ]
       ],
@@ -38,17 +38,59 @@
         3.5
       ],
       "parent": null,
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "09a7f9d1366fe218a72516c1e486347a5a2ad77eeb4ba0407a63fbe49b9c541e",
+      "frame_sha256": null
+    },
+    {
+      "name": "flame",
+      "voxels": 57,
+      "bounds": [
+        [
+          1,
+          11,
+          1
+        ],
+        [
+          6,
+          17,
+          6
+        ]
+      ],
+      "pivot": [
+        3.5,
+        11,
+        3.5
+      ],
+      "parent": "torch",
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": 6,
+      "fps": 10.0,
+      "voxel_sha256": "9ccfb0ef1f24892648011346ee5265937f92d3ebd272b3d2ad18dcd524761e16",
+      "frame_sha256": [
+        "9ccfb0ef1f24892648011346ee5265937f92d3ebd272b3d2ad18dcd524761e16",
+        "2a88fd713b54bd5fdf0ec3bd8b32a787326a5dc0654b4d025149ace3523d062b",
+        "430edc41a6c7de0edd95d71c111319f2170da278677f99e0c5097ddae8002095",
+        "e5f455aac9973371d8348da27974964e4624462a774bd4e43a1613be51bd57d1",
+        "42ac159928ea7717f497cf800f17282f375f566f036b85f420b64cd7857cc434",
+        "f24d3742b4073cc2a4e9940880e22a3d5cffd77f78847b51314222728af471b1"
+      ]
     }
   ],
   "sockets": {},
   "colors": {
     "wood.1": 35,
     "metal.dark": 22,
-    "fire.dark": 2,
-    "fire.1": 7,
-    "fire.mid": 10,
-    "fire.light": 35,
+    "fire.dark": 3,
+    "fire.1": 8,
+    "fire.mid": 28,
+    "fire.light": 18,
     "cloth.brown": 18
   },
   "palette_names": {
@@ -58,10 +100,53 @@
     "20": "fire.1",
     "21": "fire.mid",
     "22": "fire.light",
-    "44": "cloth.brown"
+    "48": "cloth.brown"
   },
   "ops_used": [
     "gradient"
+  ],
+  "clips": [],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {
+    "flame": {
+      "position": [
+        3.5,
+        14.0,
+        3.5
+      ],
+      "color": 22,
+      "rgb": [
+        255,
+        224,
+        102
+      ],
+      "range": 10.0,
+      "intensity": 1.0,
+      "flicker": 0.35,
+      "part": null
+    }
+  },
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
   ],
   "script": "torch.py",
   "lint": {
@@ -69,6 +154,6 @@
     "errors": 0,
     "warnings": 0,
     "infos": 2,
-    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 44 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 28 at (2,0,2)-(5,7,5); 7 at (3,12,1)-(5,18,4); 4 at (1,10,3)-(4,12,6) (+2 smaller)\nINFO hidden: 30 solid voxels can't be seen from outside; export hollows them"
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 40 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 28 at (2,0,2)-(5,7,5); 3 at (1,10,1)-(4,13,3); 3 at (3,15,3)-(5,17,4) (+4 smaller)\nINFO hidden: 30 solid voxels can't be seen from outside; export hollows them"
   }
 }

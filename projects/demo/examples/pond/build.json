@@ -1,0 +1,109 @@
+{
+  "name": "pond",
+  "size": [
+    16,
+    3,
+    16
+  ],
+  "tags": [
+    "terrain",
+    "water",
+    "stone"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 624,
+  "part_voxels": 624,
+  "parts": [
+    {
+      "name": "pond",
+      "voxels": 624,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          16,
+          3,
+          16
+        ]
+      ],
+      "pivot": [
+        8,
+        0,
+        8
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "249d247cbd959991a7c95de66757f5624f2710f647248d6450a2d23c05f6b66b",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "stone.dark": 139,
+    "stone.1": 117,
+    "stone.mid": 83,
+    "stone.light": 141,
+    "water.dark": 36,
+    "water.1": 36,
+    "water.mid": 36,
+    "water.light": 36
+  },
+  "palette_names": {
+    "27": "stone.dark",
+    "28": "stone.1",
+    "29": "stone.mid",
+    "30": "stone.light",
+    "44": "water.dark",
+    "45": "water.1",
+    "46": "water.mid",
+    "47": "water.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "masonry",
+    "paint"
+  ],
+  "clips": [],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "pond.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO hidden: 52 solid voxels can't be seen from outside; export hollows them"
+  }
+}

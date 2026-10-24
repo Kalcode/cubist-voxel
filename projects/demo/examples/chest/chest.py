@@ -17,8 +17,12 @@ def chest(p):
     return Model(
         parts=[
             Part("body", body, pivot=(7, 0, 5)),
-            # Hinged along the back edge, so rotating about x opens it.
-            Part("lid", lid, parent="body", pivot=(7, 7, 0)),
+            # Hinged along the back edge. hinge("-x") lifts the front edge up and over.
+            Part("lid", lid, parent="body", pivot=(7, 7, 0), joint=hinge("-x", (0, 120))),
         ],
         sockets={"lock": (7, 5, 10, "body")},
+        clips=[
+            clip("open", 0.6, {"lid": [0, 115, 105]}),  # overshoot, then settle back
+            clip("close", 0.35, {"lid": [105, 0]}, ease="linear"),  # falls shut
+        ],
     )

@@ -1,0 +1,6 @@
+name = "smoke_puff"
+category = "particle"
+tags = ["particle", "smoke"]
+note = "A particle asset: a small soft ball emitters scale up and fade."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

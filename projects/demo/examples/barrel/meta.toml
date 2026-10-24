@@ -1,6 +1,6 @@
 name = "barrel"
 category = "prop"
 tags = ["prop", "wood"]
-note = "Turned-prop template. A lathe profile gives the bulge in one line, hollow(1) keeps a watertight shell, band selections paint the metal hoops, and a dithered wood ramp plus darken_crevices adds grain without noise. Reuse for buckets, pots, and columns."
+note = "Fractured with chunks(...) so the intact barrel is the chunks together; the explode clip is burst(...) with collisions=False and fires a smoke burst on emit:smoke."
 approved_by = "claude (seed, pending review)"
-date = "2026-10-23"
+date = "2026-10-24"

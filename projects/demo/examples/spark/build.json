@@ -1,0 +1,90 @@
+{
+  "name": "spark",
+  "size": [
+    1,
+    1,
+    1
+  ],
+  "tags": [
+    "particle",
+    "fire"
+  ],
+  "seed": 0,
+  "grounded": false,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 1,
+  "part_voxels": 1,
+  "parts": [
+    {
+      "name": "spark",
+      "voxels": 1,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1
+        ]
+      ],
+      "pivot": [
+        0.5,
+        0,
+        0.5
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "08c9b854e46b1236513ca699afaf02a4a53e84b703cbbf3afa60427c79f13833",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "fire.light": 1
+  },
+  "palette_names": {
+    "22": "fire.light"
+  },
+  "ops_used": [],
+  "clips": [],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "spark.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 1,
+    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO thin: 1 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 1 at (0,0,0)-(1,1,1)"
+  }
+}

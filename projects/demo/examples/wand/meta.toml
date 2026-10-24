@@ -1,0 +1,6 @@
+name = "wand"
+category = "prop"
+tags = ["prop", "magic", "wood"]
+note = "Cast flourish from free turns about the grip: wind back, flick past, settle; sparks burst from the tip on emit:sparks, flying from wherever the tip is at that moment."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

@@ -1,0 +1,197 @@
+{
+  "name": "campfire",
+  "size": [
+    15,
+    11,
+    15
+  ],
+  "tags": [
+    "prop",
+    "light",
+    "fire",
+    "stone"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 248,
+  "part_voxels": 248,
+  "parts": [
+    {
+      "name": "pit",
+      "voxels": 217,
+      "bounds": [
+        [
+          1,
+          0,
+          1
+        ],
+        [
+          14,
+          4,
+          14
+        ]
+      ],
+      "pivot": [
+        7.5,
+        0,
+        7.5
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "10318f0f74f1242762f4ff85c6026cde9067fe0a46fb5dd1bbe1b70ad43d2baf",
+      "frame_sha256": null
+    },
+    {
+      "name": "flames",
+      "voxels": 31,
+      "bounds": [
+        [
+          5,
+          3,
+          5
+        ],
+        [
+          10,
+          9,
+          9
+        ]
+      ],
+      "pivot": [
+        7.5,
+        3,
+        7.5
+      ],
+      "parent": "pit",
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": 4,
+      "fps": 8.0,
+      "voxel_sha256": "ef0d67743e9789d005cce1f45e6c5f00040f3f87db4989401dc7c7c65ab0e352",
+      "frame_sha256": [
+        "ef0d67743e9789d005cce1f45e6c5f00040f3f87db4989401dc7c7c65ab0e352",
+        "9408ec504c1011292db8872e9cadaa9c54ab4be4b5215a3308caa035ac7a7e01",
+        "9b7c187f2037476b85642388375a90de06d24dc5fc7c7563275d44e56da22865",
+        "bd5a2a8b946a88a216cdbfecd34ceb8c855711c995136abc0323852040dc2077"
+      ]
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 20,
+    "wood.1": 33,
+    "wood.mid": 13,
+    "fire.dark": 21,
+    "fire.1": 2,
+    "fire.mid": 7,
+    "fire.light": 22,
+    "stone.dark": 77,
+    "stone.1": 9,
+    "stone.mid": 31,
+    "stone.light": 13
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "2": "wood.1",
+    "3": "wood.mid",
+    "19": "fire.dark",
+    "20": "fire.1",
+    "21": "fire.mid",
+    "22": "fire.light",
+    "27": "stone.dark",
+    "28": "stone.1",
+    "29": "stone.mid",
+    "30": "stone.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "gradient",
+    "highlight_edges",
+    "paint"
+  ],
+  "clips": [],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {
+    "fire": {
+      "position": [
+        7.5,
+        6.0,
+        7.5
+      ],
+      "color": 22,
+      "rgb": [
+        255,
+        224,
+        102
+      ],
+      "range": 14.0,
+      "intensity": 2.0,
+      "flicker": 0.5,
+      "part": null
+    }
+  },
+  "emitters": {
+    "smoke": {
+      "position": [
+        7.5,
+        10.5,
+        7.5
+      ],
+      "particle": "smoke_puff",
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "rate": 2.0,
+      "burst": null,
+      "life": 2.2,
+      "speed": 3.0,
+      "spread": 18.0,
+      "gravity": -0.6,
+      "grow": [
+        0.4,
+        1.2
+      ],
+      "fade": true,
+      "seed": 0,
+      "part": null
+    }
+  },
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "campfire.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 103 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 85 at (2,0,2)-(14,9,12); 4 at (7,0,9)-(8,1,13); 2 at (1,0,7)-(2,2,8) (+6 smaller)\nINFO hidden: 13 solid voxels can't be seen from outside; export hollows them"
+  }
+}

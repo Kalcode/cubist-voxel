@@ -1,6 +1,6 @@
 name = "goblin_scout"
 category = "character"
 tags = ["character"]
-note = "Character template. Limbs are parts parented to the torso with pivots at the joints, Part.mirrored makes the right side, the head is built once and mirrored for symmetric eyes and ears, round(1) softens the head, and ramp shading comes from highlight_edges and darken_crevices. hand_r is a socket for held items."
+note = "Walk cycle from generators: legs and arms swing in opposite phases (phase=0.5), the torso bobs down -0.4 so the feet stay planted (motion_floor clean), footstep events and travel. Idle turns the head with a slow swing."
 approved_by = "claude (seed, pending review)"
-date = "2026-10-23"
+date = "2026-10-24"

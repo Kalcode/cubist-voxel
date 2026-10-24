@@ -1,0 +1,6 @@
+name = "pond"
+category = "terrain"
+tags = ["terrain", "water", "stone"]
+note = "Water in bands across all four shades of the cycling water ramp, so the color cycle makes them flow."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

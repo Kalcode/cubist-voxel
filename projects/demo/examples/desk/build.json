@@ -1,0 +1,193 @@
+{
+  "name": "desk",
+  "size": [
+    16,
+    12,
+    11
+  ],
+  "tags": [
+    "prop",
+    "wood",
+    "furniture"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 676,
+  "part_voxels": 676,
+  "parts": [
+    {
+      "name": "desk",
+      "voxels": 606,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          16,
+          12,
+          10
+        ]
+      ],
+      "pivot": [
+        8,
+        0,
+        5
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "dd09d5399c8badd2b929b7d78f6dad9c6006ad6e7cf202f89716fc4aae822d88",
+      "frame_sha256": null
+    },
+    {
+      "name": "drawer",
+      "voxels": 70,
+      "bounds": [
+        [
+          8,
+          8,
+          1
+        ],
+        [
+          13,
+          10,
+          11
+        ]
+      ],
+      "pivot": [
+        10,
+        8,
+        5
+      ],
+      "parent": "desk",
+      "symmetric": null,
+      "joint": {
+        "type": "slide",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "limits": [
+          0.0,
+          6.0
+        ]
+      },
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "a914f1139705a3fa85c1f94a3638a1f81506d62f8c7e43101c2305ce57f16582",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 167,
+    "wood.1": 85,
+    "wood.mid": 268,
+    "wood.light": 155,
+    "metal.light": 1
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "2": "wood.1",
+    "3": "wood.mid",
+    "4": "wood.light",
+    "8": "metal.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "dither",
+    "highlight_edges",
+    "paint"
+  ],
+  "clips": [
+    {
+      "name": "open",
+      "length": 0.7,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "drawer",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.7
+          ],
+          "values": [
+            0.0,
+            6.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    },
+    {
+      "name": "close",
+      "length": 0.5,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "drawer",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.5
+          ],
+          "values": [
+            6.0,
+            0.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "desk.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 3,
+    "summary": "lint: 0 errors, 0 warnings, 3 infos\nINFO motion_bounds: clip 'open' reaches (0, 0, 0)-(16, 12, 17) (6 at +z); clip 'close' reaches (0, 0, 0)-(16, 12, 17) (6 at +z)\nINFO thin: 25 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 12 at (0,11,2)-(2,12,8); 12 at (14,11,2)-(16,12,8); 1 at (10,8,10)-(11,9,11)\nINFO hidden: 147 solid voxels can't be seen from outside; export hollows them"
+  }
+}

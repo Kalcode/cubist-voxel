@@ -1,0 +1,6 @@
+name = "spark"
+category = "particle"
+tags = ["particle", "fire"]
+note = "A particle asset: one glowing voxel."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

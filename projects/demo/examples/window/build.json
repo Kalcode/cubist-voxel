@@ -1,0 +1,192 @@
+{
+  "name": "window",
+  "size": [
+    14,
+    17,
+    4
+  ],
+  "tags": [
+    "prop",
+    "wood",
+    "glass",
+    "window"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": null,
+  "allow_floating": false,
+  "voxels": 300,
+  "part_voxels": 300,
+  "parts": [
+    {
+      "name": "frame",
+      "voxels": 230,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          14,
+          17,
+          4
+        ]
+      ],
+      "pivot": [
+        7,
+        0,
+        2
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "c37f56f51f29e7ae726c5ad084e82a828ab4dcf6997110e3e324d5534126087c",
+      "frame_sha256": null
+    },
+    {
+      "name": "sash",
+      "voxels": 70,
+      "bounds": [
+        [
+          2,
+          2,
+          1
+        ],
+        [
+          12,
+          9,
+          2
+        ]
+      ],
+      "pivot": [
+        7,
+        2,
+        1.5
+      ],
+      "parent": "frame",
+      "symmetric": null,
+      "joint": {
+        "type": "slide",
+        "axis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "limits": [
+          0.0,
+          6.0
+        ]
+      },
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "8201fac1d38dcd9c325c7ba646a92e7dae82934f7cd65a4a2b08d7b83899820e",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 104,
+    "wood.light": 60,
+    "glass.dark": 74,
+    "glass.light": 6,
+    "stone.light": 56
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "4": "wood.light",
+    "9": "glass.dark",
+    "10": "glass.light",
+    "30": "stone.light"
+  },
+  "ops_used": [
+    "darken_crevices",
+    "highlight_edges"
+  ],
+  "clips": [
+    {
+      "name": "open",
+      "length": 0.8,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "sash",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.8
+          ],
+          "values": [
+            0.0,
+            6.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    },
+    {
+      "name": "close",
+      "length": 0.6,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "sash",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.6
+          ],
+          "values": [
+            6.0,
+            0.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "window.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO motion_bounds: clip 'open' reaches (0, 0, 0)-(14, 17, 4) (stays in the rest box); clip 'close' reaches (0, 0, 0)-(14, 17, 4) (stays in the rest box)\nINFO thin: 210 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 178 at (1,2,0)-(13,17,2); 32 at (0,0,0)-(14,1,4)"
+  }
+}

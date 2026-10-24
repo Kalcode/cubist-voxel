@@ -1,0 +1,6 @@
+name = "door"
+category = "prop"
+tags = ["prop", "wood", "door"]
+note = "Leaf hinged at its low-x edge on the frame's front face, swinging toward the viewer with negative hinge('y') angles; a pivot at the face (not inside the jamb) keeps it collision-free."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

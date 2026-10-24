@@ -36,7 +36,13 @@
         6
       ],
       "parent": null,
-      "symmetric": "x"
+      "symmetric": "x",
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "e7bd9899ff93474484ddba7a29bc14cf75e9a050dd0c66903b5b70bce17a2704",
+      "frame_sha256": null
     },
     {
       "name": "head",
@@ -59,7 +65,13 @@
         6
       ],
       "parent": "torso",
-      "symmetric": "x"
+      "symmetric": "x",
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "27292514d9e6a1c4c444e48ed2025e8088c3ea205f90af5ec4e69d403abfdd99",
+      "frame_sha256": null
     },
     {
       "name": "leg_r",
@@ -82,7 +94,13 @@
         6
       ],
       "parent": "torso",
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "f89b33efd6c249f095451e8a6758f495c90afe499b7813163bd1f7b3b2b69d49",
+      "frame_sha256": null
     },
     {
       "name": "leg_l",
@@ -105,7 +123,13 @@
         6
       ],
       "parent": "torso",
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "e0778f7aa8e411c27284d3b181c708366f630746632d7e40a84bfae090786c71",
+      "frame_sha256": null
     },
     {
       "name": "arm_r",
@@ -128,7 +152,13 @@
         6
       ],
       "parent": "torso",
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "bb84fe41a36e6b13aa6599018a97cb563d0cbd5492f04c6ab6aef7152e9a97e5",
+      "frame_sha256": null
     },
     {
       "name": "arm_l",
@@ -151,15 +181,34 @@
         6
       ],
       "parent": "torso",
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "09a0230e0f73c2edbd44f418c36e71286fe4fef1b6bdb4216d089bb357e7c65e",
+      "frame_sha256": null
     }
   ],
   "sockets": {
-    "hand_r": [
-      4,
-      8,
-      6
-    ]
+    "hand_r": {
+      "position": [
+        4.0,
+        8.0,
+        6.0
+      ],
+      "part": "arm_r",
+      "forward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "up": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    }
   },
   "colors": {
     "skin.dark": 2,
@@ -176,19 +225,344 @@
     "39": "skin.mid",
     "42": "tunic.mid",
     "43": "tunic.light",
-    "44": "cloth.brown",
-    "45": "eye.yellow"
+    "48": "cloth.brown",
+    "49": "eye.yellow"
   },
   "ops_used": [
     "darken_crevices",
     "highlight_edges"
+  ],
+  "clips": [
+    {
+      "name": "walk",
+      "length": 0.8,
+      "loop": true,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "leg_r",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.1,
+            0.2,
+            0.30000000000000004,
+            0.4,
+            0.5,
+            0.6000000000000001,
+            0.7000000000000001,
+            0.8
+          ],
+          "values": [
+            0.0,
+            17.677669529663685,
+            25.0,
+            17.67766952966369,
+            3.061616997868383e-15,
+            -17.677669529663685,
+            -25.0,
+            -17.677669529663692,
+            -6.123233995736766e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "leg_l",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.1,
+            0.2,
+            0.30000000000000004,
+            0.4,
+            0.5,
+            0.6000000000000001,
+            0.7000000000000001,
+            0.8
+          ],
+          "values": [
+            3.061616997868383e-15,
+            -17.677669529663685,
+            -25.0,
+            -17.677669529663692,
+            -6.123233995736766e-15,
+            17.677669529663685,
+            25.0,
+            17.67766952966371,
+            9.184850993605149e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "arm_r",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.1,
+            0.2,
+            0.30000000000000004,
+            0.4,
+            0.5,
+            0.6000000000000001,
+            0.7000000000000001,
+            0.8
+          ],
+          "values": [
+            2.4492935982947065e-15,
+            -14.14213562373095,
+            -20.0,
+            -14.142135623730955,
+            -4.898587196589413e-15,
+            14.142135623730947,
+            20.0,
+            14.142135623730969,
+            7.347880794884118e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "arm_l",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.1,
+            0.2,
+            0.30000000000000004,
+            0.4,
+            0.5,
+            0.6000000000000001,
+            0.7000000000000001,
+            0.8
+          ],
+          "values": [
+            0.0,
+            14.14213562373095,
+            20.0,
+            14.142135623730951,
+            2.4492935982947065e-15,
+            -14.14213562373095,
+            -20.0,
+            -14.142135623730955,
+            -4.898587196589413e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "torso",
+          "channel": "move_y",
+          "times": [
+            0.0,
+            0.05,
+            0.1,
+            0.15000000000000002,
+            0.2,
+            0.25,
+            0.30000000000000004,
+            0.35000000000000003,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6000000000000001,
+            0.65,
+            0.7000000000000001,
+            0.75,
+            0.8
+          ],
+          "values": [
+            -0.0,
+            -0.05857864376269049,
+            -0.19999999999999998,
+            -0.3414213562373095,
+            -0.4,
+            -0.34142135623730957,
+            -0.20000000000000007,
+            -0.058578643762690535,
+            -0.0,
+            -0.058578643762690466,
+            -0.19999999999999996,
+            -0.34142135623730935,
+            -0.4,
+            -0.34142135623730946,
+            -0.2000000000000001,
+            -0.05857864376269069,
+            -0.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [
+        [
+          0.2,
+          "footstep"
+        ],
+        [
+          0.6,
+          "footstep"
+        ]
+      ],
+      "travel": [
+        0.0,
+        0.0,
+        19.0
+      ],
+      "collisions": true
+    },
+    {
+      "name": "idle",
+      "length": 2.4,
+      "loop": true,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "head",
+          "channel": "rotate_y",
+          "times": [
+            0.0,
+            0.3,
+            0.6,
+            0.8999999999999999,
+            1.2,
+            1.5,
+            1.7999999999999998,
+            2.1,
+            2.4
+          ],
+          "values": [
+            0.0,
+            8.48528137423857,
+            12.0,
+            8.485281374238571,
+            1.4695761589768238e-15,
+            -8.48528137423857,
+            -12.0,
+            -8.485281374238571,
+            -2.9391523179536475e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "arm_r",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.15,
+            0.3,
+            0.44999999999999996,
+            0.6,
+            0.75,
+            0.8999999999999999,
+            1.05,
+            1.2,
+            1.3499999999999999,
+            1.5,
+            1.65,
+            1.7999999999999998,
+            1.95,
+            2.1,
+            2.25,
+            2.4
+          ],
+          "values": [
+            0.0,
+            2.82842712474619,
+            4.0,
+            2.8284271247461903,
+            4.898587196589413e-16,
+            -2.82842712474619,
+            -4.0,
+            -2.8284271247461907,
+            -9.797174393178826e-16,
+            2.8284271247461894,
+            4.0,
+            2.828427124746194,
+            1.4695761589768238e-15,
+            -2.8284271247461916,
+            -4.0,
+            -2.828427124746194,
+            -1.959434878635765e-15
+          ],
+          "ease": null
+        },
+        {
+          "part": "arm_l",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.15,
+            0.3,
+            0.44999999999999996,
+            0.6,
+            0.75,
+            0.8999999999999999,
+            1.05,
+            1.2,
+            1.3499999999999999,
+            1.5,
+            1.65,
+            1.7999999999999998,
+            1.95,
+            2.1,
+            2.25,
+            2.4
+          ],
+          "values": [
+            4.898587196589413e-16,
+            -2.82842712474619,
+            -4.0,
+            -2.8284271247461907,
+            -9.797174393178826e-16,
+            2.8284271247461894,
+            4.0,
+            2.828427124746194,
+            1.4695761589768238e-15,
+            -2.8284271247461916,
+            -4.0,
+            -2.828427124746194,
+            -1.959434878635765e-15,
+            2.828427124746191,
+            4.0,
+            2.8284271247461943,
+            2.4492935982947065e-15
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
   ],
   "script": "goblin_scout.py",
   "lint": {
     "ok": true,
     "errors": 0,
     "warnings": 0,
-    "infos": 2,
-    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO thin: 2 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 2 at (7,16,9)-(9,17,10)\nINFO hidden: 160 solid voxels can't be seen from outside; export hollows them"
+    "infos": 3,
+    "summary": "lint: 0 errors, 0 warnings, 3 infos\nINFO motion_bounds: clip 'walk' reaches (2, -1, 1)-(14, 22, 11) (1 at -y, 2 at -z, 1 at +z); clip 'idle' reaches (1, 0, 1)-(15, 22, 12) (1 at -x, 1 at +x, 2 at -z, 2 at +z)\nINFO thin: 2 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 2 at (7,16,9)-(9,17,10)\nINFO hidden: 160 solid voxels can't be seen from outside; export hollows them"
   }
 }

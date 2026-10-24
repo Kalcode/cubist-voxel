@@ -1,0 +1,6 @@
+name = "biplane"
+category = "vehicle"
+tags = ["vehicle", "toy"]
+note = "Propeller on spin('z') pivoted on a voxel center (10.5, 5.5, 20.5); the spin loop is two whole turns with linear easing so it closes."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

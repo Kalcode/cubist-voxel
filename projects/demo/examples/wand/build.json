@@ -1,0 +1,204 @@
+{
+  "name": "wand",
+  "size": [
+    3,
+    16,
+    3
+  ],
+  "tags": [
+    "prop",
+    "magic",
+    "wood"
+  ],
+  "seed": 0,
+  "grounded": false,
+  "symmetric": "x",
+  "allow_floating": false,
+  "voxels": 40,
+  "part_voxels": 40,
+  "parts": [
+    {
+      "name": "wand",
+      "voxels": 40,
+      "bounds": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          3,
+          16,
+          3
+        ]
+      ],
+      "pivot": [
+        1.5,
+        2,
+        1.5
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "11b5fbc3ce2c4ace58675e1946af37d51b9156b503c9d8f3c1d0b1c75703cd26",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {
+    "tip": {
+      "position": [
+        1.5,
+        16.0,
+        1.5
+      ],
+      "part": "wand",
+      "forward": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "up": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "colors": {
+    "wood.mid": 11,
+    "metal.light": 5,
+    "potion.dark": 1,
+    "potion.mid": 6,
+    "potion.light": 1,
+    "cloth.brown": 16
+  },
+  "palette_names": {
+    "3": "wood.mid",
+    "8": "metal.light",
+    "11": "potion.dark",
+    "12": "potion.mid",
+    "13": "potion.light",
+    "48": "cloth.brown"
+  },
+  "ops_used": [
+    "gradient"
+  ],
+  "clips": [
+    {
+      "name": "cast",
+      "length": 0.8,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "wand",
+          "channel": "rotate_x",
+          "times": [
+            0.0,
+            0.25,
+            0.45,
+            0.8
+          ],
+          "values": [
+            0.0,
+            -30.0,
+            45.0,
+            0.0
+          ],
+          "ease": null
+        },
+        {
+          "part": "wand",
+          "channel": "rotate_z",
+          "times": [
+            0.0,
+            0.25,
+            0.45,
+            0.8
+          ],
+          "values": [
+            0.0,
+            10.0,
+            -8.0,
+            0.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [
+        [
+          0.45,
+          "cast"
+        ],
+        [
+          0.45,
+          "emit:sparks"
+        ]
+      ],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {
+    "sparks": {
+      "position": [
+        1.5,
+        16.5,
+        1.5
+      ],
+      "particle": "spark",
+      "direction": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "rate": null,
+      "burst": 16,
+      "life": 0.6,
+      "speed": 12.0,
+      "spread": 80.0,
+      "gravity": 10.0,
+      "grow": [
+        1.0,
+        1.0
+      ],
+      "fade": true,
+      "seed": 0,
+      "part": "wand"
+    }
+  },
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "wand.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 3,
+    "summary": "lint: 0 errors, 0 warnings, 3 infos\nINFO motion_bounds: clip 'cast' reaches (-3, -1, -7)-(5, 17, 13) (3 at -x, 2 at +x, 1 at -y, 1 at +y, 7 at -z, 10 at +z)\nINFO thin: 34 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 34 at (0,0,0)-(3,16,3)\nINFO hidden: 5 solid voxels can't be seen from outside; export hollows them"
+  }
+}

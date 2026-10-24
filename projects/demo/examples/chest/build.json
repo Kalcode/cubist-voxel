@@ -38,7 +38,13 @@
         5
       ],
       "parent": null,
-      "symmetric": null
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "4a60cbe4bcabc0ec8d579f72b21d269b7d9da88acbe33f8a64fbfd6014376164",
+      "frame_sha256": null
     },
     {
       "name": "lid",
@@ -61,7 +67,24 @@
         0
       ],
       "parent": "body",
-      "symmetric": null
+      "symmetric": null,
+      "joint": {
+        "type": "hinge",
+        "axis": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "limits": [
+          0.0,
+          120.0
+        ]
+      },
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "f84221dd818ba1799d5795ffa0fdb1ee36f6669ce0b02c5891d146b4f28d1241",
+      "frame_sha256": null
     }
   ],
   "sockets": {
@@ -96,12 +119,88 @@
     "highlight_edges",
     "paint"
   ],
+  "clips": [
+    {
+      "name": "open",
+      "length": 0.6,
+      "loop": false,
+      "ease": "smooth",
+      "tracks": [
+        {
+          "part": "lid",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.3,
+            0.6
+          ],
+          "values": [
+            0.0,
+            115.0,
+            105.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    },
+    {
+      "name": "close",
+      "length": 0.35,
+      "loop": false,
+      "ease": "linear",
+      "tracks": [
+        {
+          "part": "lid",
+          "channel": "joint",
+          "times": [
+            0.0,
+            0.35
+          ],
+          "values": [
+            105.0,
+            0.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
   "script": "chest.py",
   "lint": {
     "ok": true,
     "errors": 0,
     "warnings": 0,
-    "infos": 1,
-    "summary": "lint: 0 errors, 0 warnings, 1 info\nINFO hidden: 312 solid voxels can't be seen from outside; export hollows them"
+    "infos": 2,
+    "summary": "lint: 0 errors, 0 warnings, 2 infos\nINFO motion_bounds: clip 'open' reaches (0, 0, -9)-(14, 19, 10) (7 at +y, 9 at -z); clip 'close' reaches (0, 0, -8)-(14, 19, 10) (7 at +y, 8 at -z)\nINFO hidden: 312 solid voxels can't be seen from outside; export hollows them"
   }
 }

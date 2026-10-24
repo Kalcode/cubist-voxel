@@ -1,0 +1,6 @@
+name = "blaster"
+category = "prop"
+tags = ["prop", "weapon", "metal"]
+note = "Fire clip: slide recoil on slide('-z'), a muzzle kick from a free turn on the frame, a hidden two-frame flash flipbook driven by frames(...) and visible(...), and a spark burst on emit:sparks. Oriented muzzle socket."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

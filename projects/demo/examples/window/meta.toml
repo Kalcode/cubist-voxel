@@ -1,0 +1,6 @@
+name = "window"
+category = "prop"
+tags = ["prop", "wood", "glass", "window"]
+note = "Lower sash on slide('+y') rides in front of the fixed upper sash (z = 1 vs 0), so it slides past without colliding."
+approved_by = "claude (seed, pending review)"
+date = "2026-10-24"

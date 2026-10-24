@@ -1,0 +1,173 @@
+{
+  "name": "biplane",
+  "size": [
+    21,
+    11,
+    22
+  ],
+  "tags": [
+    "vehicle",
+    "toy"
+  ],
+  "seed": 0,
+  "grounded": true,
+  "symmetric": "x",
+  "allow_floating": false,
+  "voxels": 415,
+  "part_voxels": 415,
+  "parts": [
+    {
+      "name": "plane",
+      "voxels": 405,
+      "bounds": [
+        [
+          0,
+          0,
+          4
+        ],
+        [
+          21,
+          11,
+          20
+        ]
+      ],
+      "pivot": [
+        10.5,
+        0,
+        11
+      ],
+      "parent": null,
+      "symmetric": null,
+      "joint": null,
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "fc48f0d4f54335558758390a27b72b29f914a287c9cfa2f9e707808701877a68",
+      "frame_sha256": null
+    },
+    {
+      "name": "prop",
+      "voxels": 10,
+      "bounds": [
+        [
+          10,
+          1,
+          20
+        ],
+        [
+          11,
+          10,
+          22
+        ]
+      ],
+      "pivot": [
+        10.5,
+        5.5,
+        20.5
+      ],
+      "parent": "plane",
+      "symmetric": null,
+      "joint": {
+        "type": "spin",
+        "axis": [
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rps": 2.0
+      },
+      "hidden": false,
+      "frames": null,
+      "fps": null,
+      "voxel_sha256": "913fa5f2247cb948905585135c4416ede608a14950d8d776161d69178b8a4e8b",
+      "frame_sha256": null
+    }
+  ],
+  "sockets": {},
+  "colors": {
+    "wood.dark": 12,
+    "wood.mid": 9,
+    "metal.dark": 16,
+    "metal.1": 6,
+    "metal.mid": 30,
+    "metal.light": 9,
+    "cap.mid": 103,
+    "cap.light": 33,
+    "stem.dark": 193,
+    "stem.light": 4
+  },
+  "palette_names": {
+    "1": "wood.dark",
+    "3": "wood.mid",
+    "5": "metal.dark",
+    "6": "metal.1",
+    "7": "metal.mid",
+    "8": "metal.light",
+    "15": "cap.mid",
+    "16": "cap.light",
+    "17": "stem.dark",
+    "18": "stem.light"
+  },
+  "ops_used": [
+    "highlight_edges",
+    "paint"
+  ],
+  "clips": [
+    {
+      "name": "spin",
+      "length": 1.0,
+      "loop": true,
+      "ease": "linear",
+      "tracks": [
+        {
+          "part": "prop",
+          "channel": "joint",
+          "times": [
+            0.0,
+            1.0
+          ],
+          "values": [
+            0.0,
+            2.0
+          ],
+          "ease": null
+        }
+      ],
+      "events": [],
+      "travel": null,
+      "collisions": true
+    }
+  ],
+  "glow": {
+    "11": 0.6,
+    "12": 0.6,
+    "13": 0.6,
+    "19": 1.5,
+    "20": 1.5,
+    "21": 1.5,
+    "22": 1.5
+  },
+  "lights": {},
+  "emitters": {},
+  "cycles": [
+    {
+      "name": "water",
+      "ramp": "water",
+      "indices": [
+        44,
+        45,
+        46,
+        47
+      ],
+      "fps": 6.0
+    }
+  ],
+  "script": "biplane.py",
+  "lint": {
+    "ok": true,
+    "errors": 0,
+    "warnings": 0,
+    "infos": 3,
+    "summary": "lint: 0 errors, 0 warnings, 3 infos\nINFO motion_bounds: clip 'spin' reaches (0, 0, 4)-(21, 11, 22) (stays in the rest box)\nINFO thin: 265 voxels are one voxel thick with open air on both sides and may vanish at game distance; largest: 209 at (0,0,11)-(21,9,16); 12 at (8,3,18)-(13,8,19); 12 at (10,7,4)-(11,11,7) (+5 smaller)\nINFO hidden: 27 solid voxels can't be seen from outside; export hollows them"
+  }
+}
