@@ -1,0 +1,7 @@
+name = "orc_brute"
+category = "character"
+size = [20, 28, 14]
+tags = ["character", "orc", "leather"]
+description = "A hulking orc warrior with a club."
+must_haves = ["big green orc with oversized arms and hands", "tusks", "leather armor", "a heavy wooden club", "separate limb parts"]
+references = []

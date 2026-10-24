@@ -1,0 +1,7 @@
+name = "skeleton_archer"
+category = "character"
+size = [14, 24, 10]
+tags = ["character", "bone", "undead"]
+description = "A skeleton archer holding a bow."
+must_haves = ["skull with dark eye sockets", "visible ribs", "thin bony limbs", "a bow in one hand"]
+references = []

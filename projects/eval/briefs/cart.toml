@@ -1,0 +1,7 @@
+name = "cart"
+category = "prop"
+size = [20, 12, 12]
+tags = ["prop", "wood", "vehicle"]
+description = "A wooden handcart with two big wheels."
+must_haves = ["open wooden bed with side boards", "two spoked wheels on an axle", "two long handles to pull it", "metal rims on the wheels"]
+references = []

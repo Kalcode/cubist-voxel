@@ -1,0 +1,7 @@
+name = "market_stall"
+category = "building"
+size = [20, 16, 12]
+tags = ["building", "wood", "cloth"]
+description = "A market stall with a striped awning."
+must_haves = ["wooden counter", "striped cloth awning on posts", "goods on the counter (fruit, jars or bread)", "a crate beside it"]
+references = []

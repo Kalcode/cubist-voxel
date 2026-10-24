@@ -1,0 +1,7 @@
+name = "gatehouse"
+category = "building"
+size = [40, 32, 16]
+tags = ["building", "stone", "metal", "castle"]
+description = "A castle gatehouse with two towers."
+must_haves = ["two towers with battlements", "archway between them", "metal portcullis in the arch", "arrow slits"]
+references = []

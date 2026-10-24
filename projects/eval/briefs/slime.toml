@@ -1,0 +1,7 @@
+name = "slime"
+category = "creature"
+size = [16, 12, 16]
+tags = ["creature", "slime", "creature"]
+description = "A cute blob of green slime with eyes."
+must_haves = ["round blob silhouette, wider than tall", "two big eyes", "translucent-looking highlights", "a small drip or puddle at the base"]
+references = []

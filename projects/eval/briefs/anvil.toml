@@ -1,0 +1,7 @@
+name = "anvil"
+category = "prop"
+size = [16, 12, 8]
+tags = ["prop", "metal", "wood", "smithing"]
+description = "A blacksmith's anvil sitting on a tree stump."
+must_haves = ["horn on one end", "flat face on top", "tree stump base with visible rings on top edge", "darker metal underside"]
+references = []

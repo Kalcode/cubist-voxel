@@ -1,0 +1,7 @@
+name = "treasure_pile"
+category = "prop"
+size = [16, 8, 16]
+tags = ["prop", "gold", "loot"]
+description = "A heap of gold coins with a jeweled chalice."
+must_haves = ["mound of gold coins with dithered highlights", "a chalice standing in or on the pile", "a few gems in other colors", "low, wide silhouette"]
+references = []

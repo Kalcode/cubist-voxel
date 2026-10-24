@@ -1,0 +1,7 @@
+name = "lantern"
+category = "prop"
+size = [8, 14, 8]
+tags = ["prop", "metal", "light"]
+description = "A hanging iron lantern with glowing glass panes."
+must_haves = ["iron frame with corner posts", "glowing glass panes on all four sides", "ring on top for hanging", "solid base"]
+references = []

@@ -1,0 +1,7 @@
+name = "dragon_whelp"
+category = "creature"
+size = [32, 24, 32]
+tags = ["creature", "red", "creature", "dragon"]
+description = "A small red dragon with wings."
+must_haves = ["four legs", "two spread wings", "a long tail", "horns and a snout", "lighter belly scales"]
+references = []

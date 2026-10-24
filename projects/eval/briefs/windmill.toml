@@ -1,0 +1,7 @@
+name = "windmill"
+category = "building"
+size = [24, 40, 24]
+tags = ["building", "wood", "stone"]
+description = "A stone windmill with four sails."
+must_haves = ["round or tapered stone tower", "conical roof", "four lattice sails on a hub", "a door and a window"]
+references = []

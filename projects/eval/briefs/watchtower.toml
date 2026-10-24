@@ -1,0 +1,7 @@
+name = "watchtower"
+category = "building"
+size = [16, 40, 16]
+tags = ["building", "wood", "stone", "tower"]
+description = "A tall wooden watchtower on a stone base."
+must_haves = ["stone base", "tall wooden legs with cross bracing", "lookout platform with a railing", "pointed roof on top", "a ladder"]
+references = []

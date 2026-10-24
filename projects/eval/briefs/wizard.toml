@@ -1,0 +1,7 @@
+name = "wizard"
+category = "character"
+size = [14, 28, 12]
+tags = ["character", "purple", "magic"]
+description = "A wizard in robes with a pointy hat and staff."
+must_haves = ["tall pointy hat", "long robe", "white beard", "staff with a glowing top"]
+references = []

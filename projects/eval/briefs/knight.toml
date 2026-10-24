@@ -1,0 +1,7 @@
+name = "knight"
+category = "character"
+size = [16, 24, 12]
+tags = ["character", "metal", "human"]
+description = "An armored knight with sword and shield."
+must_haves = ["helmet with a visor slit", "plate armor with lighter highlights", "sword in one hand, shield in the other", "separate parts for head, torso, arms, legs"]
+references = []

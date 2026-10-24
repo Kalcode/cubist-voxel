@@ -1,0 +1,7 @@
+name = "blacksmith_shop"
+category = "building"
+size = [32, 24, 24]
+tags = ["building", "wood", "stone", "fire"]
+description = "A small blacksmith's workshop with an open front."
+must_haves = ["open front showing the forge", "stone forge with glowing fire", "chimney", "an anvil inside or out front", "sloped roof"]
+references = []

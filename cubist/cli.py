@@ -197,6 +197,16 @@ def cmd_examples(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval(args: argparse.Namespace) -> int:
+    from cubist.evaluation import evaluate, write_report
+
+    project = _project(args)
+    report = evaluate(project)
+    paths = write_report(project, report)
+    _print({"summary": report["summary"], **{k: str(v) for k, v in paths.items()}})
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     from cubist.mcp_server import create_server
 
@@ -303,6 +313,10 @@ def parser() -> argparse.ArgumentParser:
     ex.add_argument("--force", action="store_true", help="promote despite lint errors")
     ex.add_argument("--project", type=Path, help="project directory (default: from cwd)")
     ex.set_defaults(fn=cmd_examples)
+
+    ev = sub.add_parser("eval", help="evaluate every brief: lint, iterations, scores, gallery")
+    ev.add_argument("--project", type=Path, help="project directory (default: from cwd)")
+    ev.set_defaults(fn=cmd_eval)
 
     m = sub.add_parser("mcp", help="run the MCP server on stdio")
     m.add_argument("--project", type=Path, help="project directory (default: from cwd)")

@@ -1,0 +1,7 @@
+name = "shield"
+category = "prop"
+size = [14, 14, 4]
+tags = ["prop", "wood", "metal", "weapon"]
+description = "A round wooden shield with an iron rim and boss."
+must_haves = ["round silhouette", "iron rim around the edge", "raised metal boss in the center", "a painted emblem or stripes on the wood"]
+references = []

@@ -1,0 +1,7 @@
+name = "bookshelf"
+category = "prop"
+size = [16, 20, 6]
+tags = ["prop", "wood", "furniture"]
+description = "A tall wooden bookshelf full of books."
+must_haves = ["wooden frame with three or four shelves", "books of varied colors and heights", "a few gaps or a leaning book", "flat back so it sits against a wall"]
+references = []

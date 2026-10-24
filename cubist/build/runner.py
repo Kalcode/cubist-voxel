@@ -6,7 +6,8 @@ runs it, voxelizes each ``@asset``, and writes into ``out/<name>/``:
 * ``<name>.vox`` — the model (the previous build moves to ``<name>.prev.vox``),
 * ``contact.png`` — the contact sheet,
 * ``lint.json`` — the lint report,
-* ``build.json`` — a summary including the lint result.
+* ``build.json`` — a summary including the lint result,
+* ``history.jsonl`` — one line appended per build (for counting iterations).
 
 It reports back through a result file so script output cannot corrupt it.
 
@@ -24,6 +25,7 @@ import sys
 import tempfile
 import traceback
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from cubist.core.model import AssetDef, BuiltAsset
@@ -190,6 +192,7 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
     }
     summary_path = asset_dir / "build.json"
     summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+    _log_history(asset_dir, script, built, report)
     return {
         "name": built.name,
         "vox": str(vox_path),
@@ -199,6 +202,20 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
         "summary": str(summary_path),
         "summary_data": summary,
     }
+
+
+def _log_history(asset_dir: Path, script: Path, built: BuiltAsset, report) -> None:
+    """One line per build in history.jsonl; distinct script hashes count as iterations."""
+    entry = {
+        "time": datetime.now(UTC).isoformat(timespec="seconds"),
+        "script_sha256": hashlib.sha256(script.read_bytes()).hexdigest(),
+        "voxels": built.voxel_count(),
+        "errors": report.count("error"),
+        "warnings": report.count("warning"),
+        "seed": built.seed,
+    }
+    with open(asset_dir / "history.jsonl", "a") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> list[dict]:

@@ -1,0 +1,7 @@
+name = "well"
+category = "prop"
+size = [16, 20, 16]
+tags = ["prop", "stone", "wood", "water"]
+description = "A village well with a little roof."
+must_haves = ["round stone ring with visible water inside", "two wooden posts and a crossbar", "small pitched roof", "a bucket on a rope"]
+references = []

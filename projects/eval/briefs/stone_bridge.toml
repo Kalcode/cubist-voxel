@@ -1,0 +1,7 @@
+name = "stone_bridge"
+category = "building"
+size = [40, 12, 12]
+tags = ["building", "stone"]
+description = "A small arched stone bridge."
+must_haves = ["one arch underneath", "low walls along both edges", "stone blocks texture", "walkable flat top"]
+references = []

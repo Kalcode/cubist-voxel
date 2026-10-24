@@ -1,0 +1,7 @@
+name = "campfire"
+category = "prop"
+size = [12, 10, 12]
+tags = ["prop", "fire", "stone", "wood"]
+description = "A campfire ringed with stones."
+must_haves = ["ring of stones", "crossed logs", "flames with a hot-to-cool gradient", "embers or ash in the middle"]
+references = []
