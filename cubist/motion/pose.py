@@ -52,6 +52,10 @@ def track_value(track: Track, t: float, clip: Clip) -> float:
     s = (t - times[k]) / h
     if ease == "linear":
         return float(values[k] + s * (values[k + 1] - values[k]))
+    if ease == "in":  # accelerating into each key
+        return float(values[k] + s * s * (values[k + 1] - values[k]))
+    if ease == "out":  # decelerating into each key
+        return float(values[k] + (1 - (1 - s) ** 2) * (values[k + 1] - values[k]))
     m = _tangents(times, values, clip.loop, clip.length)
     h00 = 2 * s**3 - 3 * s**2 + 1
     h10 = s**3 - 2 * s**2 + s
@@ -189,7 +193,8 @@ def visibility(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, bool
 
 def frame_index(asset: BuiltAsset, clip: Clip | None, name: str, t: float) -> int:
     """Which frame of a flipbook part shows at ``t``: the clip's ``frame`` track if it has
-    one, else the flipbook looping on its own at its fps. 0 for other parts."""
+    one; frame 0 if some other clip drives this flipbook; else the flipbook looping on its own
+    at its fps. 0 for other parts."""
     part = asset.part(name)
     if not part.frames:
         return 0
@@ -198,6 +203,8 @@ def frame_index(asset: BuiltAsset, clip: Clip | None, name: str, t: float) -> in
         for track in clip.tracks:
             if track.part == name and track.channel == "frame":
                 return int(round(track_value(track, t, clip))) % n
+    if any(tr.part == name and tr.channel == "frame" for c in asset.clips for tr in c.tracks):
+        return 0  # clips play this flipbook; between them it rests on its first frame
     return int(np.floor(t * (part.fps or 8.0) + 1e-9)) % n
 
 
@@ -286,17 +293,32 @@ def dense_times(
     rate: float = 30.0,
     max_turn: float = 10.0,
     parts: list[str] | None = None,
+    max_move: float | None = None,
 ) -> np.ndarray:
     """``sample_times``, subdivided wherever the parts (default: all) together turn more than
-    ``max_turn`` degrees between samples, so fast spins are sampled finely enough to see."""
+    ``max_turn`` degrees between samples (or, with ``max_move``, move more than that many
+    voxels), so fast spins and snaps are sampled finely enough to see and to play back."""
     base = sample_times(clip, rate)
     names = parts if parts is not None else [p.name for p in asset.parts]
+
+    def too_far(t0: float, t1: float) -> bool:
+        if sum(turn_degrees(asset, clip, n, t0, t1) for n in names) > max_turn + 1e-9:
+            return True
+        if max_move:
+            a, b = local_motion(asset, clip, t0), local_motion(asset, clip, t1)
+            return max(float(np.linalg.norm(b[n][0] - a[n][0])) for n in names) > max_move + 1e-9
+        return False
+
+    def split(t0: float, t1: float, depth: int = 0) -> list[float]:
+        """Times after t0 up to t1, halving any step that turns or moves too far."""
+        if depth >= 10 or not too_far(t0, t1):
+            return [t1]
+        mid = (t0 + t1) / 2
+        return split(t0, mid, depth + 1) + split(mid, t1, depth + 1)
+
     out = [float(base[0])]
     for t0, t1 in zip(base, base[1:], strict=False):
-        turn = sum(turn_degrees(asset, clip, n, float(t0), float(t1)) for n in names)
-        pieces = max(1, int(np.ceil(turn / max_turn - 1e-9)))
-        out.extend(float(t0 + (t1 - t0) * k / pieces) for k in range(1, pieces))
-        out.append(float(t1))
+        out.extend(split(float(t0), float(t1)))
     return np.array(out)
 
 

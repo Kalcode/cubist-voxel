@@ -89,9 +89,29 @@ def _lowest(height: float, centers: np.ndarray, pos_y: float, ang) -> float:
     return height + pos_y + float((centers @ r[1]).min()) - 0.5 * np.abs(r[1]).sum()
 
 
-def _fly(height, centers, v, omega, gravity, times):
-    """One chunk's flight sampled at ``times``: (moves (n, 3), turns (n, 3)). While rising it
-    rolls up off the floor; once falling, it stops where its lowest corner touches down."""
+def _fly(height, centers, v, omega, gravity, times, start=0.0):
+    """One chunk's flight sampled at ``times``: (moves (n, 3), turns (n, 3)). It waits until
+    ``start``; while rising it rolls up off the floor; once falling, it stops where its lowest
+    corner touches down. Keys are then lifted wherever the straight line between two keys (how
+    the clip plays them) would dip below the floor."""
+    moves, turns = _flight(height, centers, v, omega, gravity, np.maximum(times - start, 0.0))
+    for _ in range(4):
+        dipped = False
+        for k in range(1, len(times)):
+            for f in (0.25, 0.5, 0.75):
+                pos = moves[k - 1] + f * (moves[k] - moves[k - 1])
+                ang = turns[k - 1] + f * (turns[k] - turns[k - 1])
+                low = _lowest(height, centers, pos[1], ang)
+                if low < -0.05:
+                    moves[k - 1 : k + 1, 1] -= low
+                    dipped = True
+        if not dipped:
+            break
+    return moves, turns
+
+
+def _flight(height, centers, v, omega, gravity, times):
+    """The ballistic flight itself (see ``_fly``)."""
 
     def at(t):
         pos = v * t
@@ -133,12 +153,20 @@ def burst(
     gravity: float = 40.0,
     rate: float = 20.0,
     seed: int = 0,
+    start: float = 0.0,
 ) -> list[TrackSpec]:
     """Throw ``parts`` (usually from ``chunks(...)``) apart: each flies out from ``origin``
     (default: their center, at y = 0) at about ``speed`` voxels/s plus ``up``, tumbles at up to
     ``spin`` degrees/s, falls under ``gravity`` (voxels/s²) and comes to rest when its lowest
-    corner reaches the floor. Seeded; follows the build seed. Use with
-    ``clip(..., collisions=False)``: debris passes through debris."""
+    corner reaches the floor. ``start`` delays the blast (seconds) for a wind-up; ``rate`` is
+    keys per second. Seeded; follows the build seed. Use with ``clip(..., collisions=False)``:
+    debris passes through debris."""
+    for part in parts:
+        if part.pivot is None or part.frames:
+            raise ModelError(
+                f"burst needs plain parts with pivots, like the ones chunks(...) makes; part "
+                f"{part.name!r} has {'frames' if part.frames else 'no pivot'}"
+            )
     parts = list(parts)
     pivots = np.array([p.pivot for p in parts], dtype=np.float64)
     o = pivots.mean(axis=0) if origin is None else np.asarray(origin, dtype=np.float64)
@@ -151,7 +179,7 @@ def burst(
         if length in cache:
             return cache[length]
         n = max(2, math.ceil(length * rate)) + 1
-        times = np.linspace(0.0, length, n)
+        times = np.unique(np.concatenate([np.linspace(0.0, length, n), [min(start, length)]]))
         out = {}
         for i, part in enumerate(parts):
             rnd = hash_unit(np.array([[i, k, 7] for k in range(6)]), s)
@@ -167,7 +195,7 @@ def burst(
             v[1] = up * (0.6 + 0.8 * rnd[2])
             omega = spin * (2 * rnd[3:6] - 1)
 
-            moves, turns = _fly(pivots[i][1], centers, v, omega, gravity, times)
+            moves, turns = _fly(pivots[i][1], centers, v, omega, gravity, times, start)
             out[part.name] = (times, np.array(moves), np.array(turns))
         cache[length] = out
         return out

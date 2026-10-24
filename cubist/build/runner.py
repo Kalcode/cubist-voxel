@@ -78,7 +78,9 @@ def load_palette(style: Path) -> Palette:
     return load_project_style(style).palette
 
 
-def _run_worker(script: Path, style: Path, out: Path, seed: int, timeout: float) -> dict:
+def _run_worker(
+    script: Path, style: Path, out: Path, seed: int, timeout: float, check: bool = False
+) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         result_file = Path(tmp) / "result.json"
         cmd = [
@@ -90,6 +92,7 @@ def _run_worker(script: Path, style: Path, out: Path, seed: int, timeout: float)
             str(out),
             str(result_file),
             str(seed),
+            *(["check"] if check else []),
         ]
         env = {**os.environ, "PYTHONHASHSEED": "0"}
         try:
@@ -159,6 +162,33 @@ def build_script(
         )
         for r in result["assets"]
     ]
+
+
+def check_script(
+    script: str | os.PathLike,
+    style: str | os.PathLike | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+    seed: int = 0,
+) -> list[dict]:
+    """Run and lint a script without writing outputs or counting an iteration: a quick check
+    for typos and lint before a real build. Returns ``[{"name", "lint"}]``."""
+    script = Path(script).resolve()
+    style = Path(style).resolve() if style else find_style(script)
+    result = _run_worker(script, style, style.parent / "out", seed, timeout, check=True)
+    return [{"name": r["name"], "lint": r["summary_data"]["lint"]} for r in result["assets"]]
+
+
+def iteration_count(asset_dir: str | os.PathLike) -> int:
+    """Distinct script versions built for an asset, failed builds included."""
+    log = Path(asset_dir) / "history.jsonl"
+    if not log.exists():
+        return 0
+    seen: list[str] = []
+    for line in log.read_text().splitlines():
+        sha = json.loads(line)["script_sha256"]
+        if sha not in seen:
+            seen.append(sha)
+    return len(seen)
 
 
 # --- worker -----------------------------------------------------------------
@@ -272,17 +302,35 @@ def _log_history(asset_dir: Path, script: Path, built: BuiltAsset, report) -> No
     )
 
 
-def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> list[dict]:
+def _check(a: AssetDef, style: StyleBible, seed: int) -> dict:
+    """Build and lint without writing anything or counting an iteration."""
+    try:
+        built = a.build(style.palette, seed=seed, glow=style.glow, cycles=style.cycles)
+    except Exception as e:
+        raise BuildError(f"asset {a.name!r} failed:\n{e}") from e
+    report = lint(built, style)
+    return {"name": built.name, "check": True, "summary_data": {"lint": report.summary()}}
+
+
+def _build_in_process(
+    script: Path, style_path: Path, out: Path, seed: int, check: bool = False
+) -> list[dict]:
     style = load_project_style(style_path)
     try:
         namespace = runpy.run_path(str(script), run_name="__cubist_asset__")
     except Exception as e:
         message = f"{script.name} failed to load:\n{_script_traceback(e, script)}"
-        _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
+        if not check:
+            _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
         raise BuildError(message) from e
     assets = list({id(v): v for v in namespace.values() if isinstance(v, AssetDef)}.values())
     if not assets:
-        raise BuildError(f"{script.name} defines no @asset functions")
+        message = f"{script.name} defines no @asset functions"
+        if not check:
+            _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
+        raise BuildError(message)
+    if check:
+        return [_check(a, style, seed) for a in assets]
     results = []
     for a in assets:
         try:
@@ -298,8 +346,9 @@ def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> l
 def _worker(argv: list[str]) -> None:
     script, style, out, result_file = (Path(a) for a in argv[:4])
     seed = int(argv[4]) if len(argv) > 4 else 0
+    check = len(argv) > 5 and argv[5] == "check"
     try:
-        payload = {"assets": _build_in_process(script, style, out, seed)}
+        payload = {"assets": _build_in_process(script, style, out, seed, check)}
     except BuildError as e:
         payload = {"error": str(e)}
     except Exception as e:  # anything else is a bug in cubist, not the script

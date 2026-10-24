@@ -82,15 +82,20 @@ A joint says how a part moves about its pivot; a clip is named, timed motion of 
 - **Units:** seconds, degrees for hinges, voxels for slides, turns for spins. The pose as
   modeled is joint value 0, and clip values are relative to it.
 - **Tracks** map part names to keys: plain values spread evenly from 0 to `length` (one value
-  holds still), or `(time, value)` pairs. A list of `Track` objects also works.
+  holds still), or `(time, value)` pairs. In list-form clips (below), `joint(part, keys)` is
+  the same thing next to `turn`, `visible` and the rest.
 - **`ease`**: `smooth` (default) eases in and out and never overshoots its keys, so to
-  overshoot, add a key past the target: `[0, 115, 105]`. `linear` keeps a constant speed (spins,
-  conveyor belts); `step` jumps from key to key.
+  overshoot, add a key past the target: `[0, 115, 105]`. It stops only at keys where the motion
+  turns around (a peak, a valley, the ends of a one-shot clip) and keeps moving through keys
+  in between. `linear` keeps a constant speed (spins, conveyor belts); `step` jumps from key to
+  key; `in` accelerates into each key (falls, slams); `out` decelerates into each key.
 - **`loop=True`** clips should end in the pose they start in; spins end on whole turns. Lint
   warns otherwise.
 - **`events`** are `(time, name)` markers for the engine (`"creak"`, `"footstep"`); Cubist
   gives them no meaning.
-- `Part.mirrored(...)` reflects joints too: mirrored legs swing forward together.
+- `Part.mirrored(...)` reflects joints too: mirrored legs swing forward together. The twin
+  hangs from the mirrored parent (`foot_r` on `leg_r` gives `foot_l` on `leg_l`; an unsided
+  parent like `torso` is kept), or from `parent=`.
 - Clip names become file names (`out/<name>/<clip>.gif`): letters, digits, `_` and `-`.
 
 Which way a hinge turns follows the right-hand rule, like `rotate`:
@@ -167,7 +172,12 @@ fire = clip(
 - **Hidden parts** (`Part(..., hidden=True)`) start hidden, and so do their children. Contact
   sheets leave them out and name them (`HIDDEN: FLASH`); filmstrips show them while visible.
 - **`travel`** is `(x, y, z)` voxels per second, for clips that walk in place.
-- A clip needs at least one track and one joint track per part.
+- A clip needs at least one track, and at most one `joint`, `visible` or `frames` track per
+  part (free `turn`/`move` tracks on one channel add up).
+- Hidden parts and flipbook frames count for the declared size, palette and overlap like any
+  part, and every frame is checked for floating pieces. A light on a hidden part keeps shining
+  (glTF lights ignore scale); tie a muzzle-flash light to an event for the engine instead.
+- Part names can't contain `@`: `.vox` files use it for flipbook frames.
 
 ### Flipbooks
 
@@ -191,15 +201,21 @@ fire = clip(
 ```
 
 Make frames from one function with a seed or a parameter per frame, so they stay the same
-flame. Lint checks palette, bounds and floating pieces on every frame, and notes frames that
+flame. Every frame needs voxels; to blink, hide the part with `visible(...)` instead of an empty
+frame. Once any clip plays a flipbook with `frames(...)`, it no longer loops on its own: other
+clips show it at frame 0 (lint notes this as `flipbook_driven`). `cubist render --clip
+<part>_frames` renders the loop like any clip. Lint checks palette, bounds and floating pieces on every frame, and notes frames that
 change most of their voxels (`frame_pop`): small changes per frame read as motion.
 
 ### Glow, color cycles and lights
 
 Glow and color cycles are set per project in `style.toml` (`[glow]`, `[cycles]`; see
 `cubist style`), so every asset using those colors gets them. Glowing colors render nearly
-unshaded in previews and export as emissive; a cycling ramp's voxels step one shade along it
-each tick (water, lava), shown in previews and listed in the manifest for the engine.
+unshaded in previews and export as emissive (in the default palette-texture export;
+`--vertex-colors` has no emissive). A cycling ramp's voxels step one shade along it each tick
+(water, lava): a voxel painted shade k shows shade k+1, k+2, ... wrapping around, so paint
+bands dark-to-light in the direction the water should flow. Every voxel of that ramp cycles,
+in every part, so paint spray, foam and flashes from another ramp.
 
 ```python
 light(position, color, range=8, intensity=1.0, flicker=0.0, part=None)
@@ -214,8 +230,8 @@ the manifest for the engine. Posed previews mark it with a dot.
 
 ```python
 fracture(shape, pieces=8, seed=0, min_voxels=None)  # -> list of voxel shapes
-chunks(name, shape, pieces=8, seed=0, parent=None)  # -> parts name_0, name_1, ...
-burst(parts, origin=None, speed=6, up=6, spin=540, gravity=40, rate=20, seed=0)  # -> tracks
+chunks(name, shape, pieces=8, seed=0, parent=None, min_voxels=None)  # -> parts name_0, ...
+burst(parts, origin=None, speed=6, up=6, spin=540, gravity=40, rate=20, seed=0, start=0)
 ```
 
 `fracture` splits a shape into about `pieces` face-connected chunks that keep their colors (no
@@ -239,7 +255,8 @@ return Model(parts=pieces, clips=[boom], emitters={"smoke": smoke})
 ```
 
 `collisions=False` turns off the collision check for a clip whose parts are meant to pass
-through each other, like debris.
+through each other, like debris. `start=` delays the blast for a wind-up; `rate` is keys per
+second (the keys are lifted wherever the clip would play a chunk through the floor).
 
 ### Emitters and particles
 
@@ -273,7 +290,8 @@ simulation and draw each particle's model from `out/<particle>/` (build the part
 until then previews draw plain cubes and lint warns). The engine plays them for real from the
 manifest, which also lists the particle assets the asset needs. The `.glb` gets an empty node
 per emitter, its +Z along `direction`. Lint warns when an emitter sprays straight into the
-model or a clip fires an emitter that doesn't exist or has no `burst`.
+model (always-on emitters only: a burst may start inside, like an explosion) or a clip fires
+an emitter that doesn't exist or has no `burst`.
 
 ### Oriented sockets
 
@@ -308,7 +326,7 @@ Each starts at its local origin; move it with `.at(x, y, z)`.
 | `wedge(size, rise="+x", color)` | like `box`, height 0 at the low end of `rise` (`+x`, `-x`, `+z`, `-z`) |
 | `torus(R, r, axis="y", color)` | centered; ring of radius `R` around `axis`, tube radius `r` |
 | `capsule(p0, p1, r, color, r_end=None)` | round-ended tube between absolute points, tapering to `r_end` (tails, horns, limbs) |
-| `line(p0, p1, color, connect=6, r=None)` | the voxels a segment passes through: `connect=6` face-connected (a 2-wide staircase on diagonals), `connect=26` one voxel per step; with `r`, a thick line |
+| `line(p0, p1, color, connect=6, r=None)` | the voxels a segment passes through: `connect=6` face-connected (a 2-wide staircase on diagonals), `connect=26` one voxel per step (its voxels touch only at edges, which the floating check counts as detached); with `r`, a thick line |
 | `polyline(points, color, connect=6)` | `line` through a list of points (bows, sagging ropes) |
 | `panel(points, color, thickness=None)` | a flat plate through 3+ coplanar points at any angle (wings, sails); the default thickness stays watertight at any tilt |
 | `lathe(profile, axis="y", color)` | `[(height, radius), ...]`, heights increasing, revolved around `axis` (barrels, bottles, columns) |
@@ -326,7 +344,7 @@ them into a staircase.
 | `a.subtract(b, ...)`, `a - b` | `a` without `b`; keeps `a`'s colors, so cutters need no color |
 | `a.intersect(b)`, `a & b` | Only the overlap; keeps `a`'s colors |
 | `a.smooth_union(b, k)` | Union with a fillet of radius `k` voxels (distance fields only) |
-| `a.carve(cutter, color=None)` | `a - cutter`, coloring the cut's walls and back (windows, arrow slits, eye sockets) |
+| `a.carve(cutter, color=None)` | `a - cutter`, coloring the cut's walls and back (windows, arrow slits, eye sockets); one-voxel walls with outside air behind stay uncolored, so the color never shows through |
 
 Selections (`band`, `faces`, ...) only go in `where=`; use a shape to cut.
 

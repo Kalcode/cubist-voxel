@@ -17,17 +17,30 @@ glb, out_path, clip_name, times = args[0], args[1], args[2], [float(t) for t in 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=glb)
 scene = bpy.context.scene
-# The importer keeps each glTF animation as an action per object, named "<clip>_<object>"
-# or similar; make the requested clip's actions active.
+# The importer makes an action per animation (named after the clip, sometimes with the object
+# appended), one active and the rest in NLA tracks. Play the requested clip's actions; objects
+# the clip doesn't animate get no action. An object left without one keeps its last evaluated
+# pose, so everything is settled at t = 0 first (every clip here starts at rest).
+scene.frame_set(0)
+
+
+def wanted(action) -> bool:
+    return action is not None and (
+        action.name == clip_name or action.name.startswith(clip_name + "_")
+    )
+
+
 for obj in scene.objects:
     data = obj.animation_data
     if data is None:
         continue
+    chosen = data.action if wanted(data.action) else None
     for track in list(data.nla_tracks):
         for strip in track.strips:
-            if strip.action and strip.action.name.startswith(clip_name):
-                data.action = strip.action
+            if wanted(strip.action):
+                chosen = strip.action
         data.nla_tracks.remove(track)
+    data.action = chosen
 fps = scene.render.fps / scene.render.fps_base
 
 result = {"fps": fps, "poses": {}}

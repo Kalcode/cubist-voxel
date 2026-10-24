@@ -43,8 +43,18 @@ class LoadedAsset:
     summary: dict  # build.json, or {} when the .vox has none beside it
 
     @property
+    def parts(self) -> list:
+        """The scene's parts, without flipbook frames 1.. (models named ``<part>@<k>``)."""
+        names = {p.name for p in self.scene.parts}
+        return [
+            p for p in self.scene.parts
+            if not ("@" in p.name and p.name.rsplit("@", 1)[0] in names)
+        ]  # fmt: skip
+
+    @property
     def grid(self) -> VoxelGrid:
-        return VoxelGrid.merge([p.grid for p in self.scene.parts])
+        """Every part at rest (flipbooks at frame 0) in one grid."""
+        return VoxelGrid.merge([p.grid for p in self.parts])
 
     @property
     def glow(self) -> dict[int, float]:
@@ -63,12 +73,12 @@ class LoadedAsset:
                 name = parents.get(name)
             return False
 
-        return [p.name for p in self.scene.parts if hidden(p.name)]
+        return [p.name for p in self.parts if hidden(p.name)]
 
     @property
     def visible_grid(self) -> VoxelGrid:
         hidden = set(self.hidden)
-        return VoxelGrid.merge([p.grid for p in self.scene.parts if p.name not in hidden])
+        return VoxelGrid.merge([p.grid for p in self.parts if p.name not in hidden])
 
     @property
     def names(self) -> dict[int, str]:

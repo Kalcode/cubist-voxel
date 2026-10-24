@@ -261,9 +261,13 @@ class Carve(GridShape):
         origin = np.array(cut.origin) - 1
         cells = np.indices(data.shape).reshape(3, -1).T + origin
         hole = self.cutter.occupancy().lookup(cells).reshape(data.shape) > 0
+        air = (data == 0) & ~hole  # empty space outside the cut
         touching = np.zeros_like(hole)
         for d in [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]:
-            touching |= neighbor(hole, d)
+            back = tuple(-k for k in d)
+            # A one-voxel wall with outside air behind it stays unpainted, so the cut's color
+            # never shows through to the outside.
+            touching |= neighbor(hole, d) & ~neighbor(air, back)
         data = np.where((data > 0) & touching, self._paint, data)
         return VoxelGrid(data.astype(np.uint8), tuple(origin)).cropped()
 

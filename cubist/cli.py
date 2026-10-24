@@ -12,7 +12,9 @@ from cubist.build.runner import (
     DEFAULT_TIMEOUT_S,
     BuildError,
     build_script,
+    check_script,
     find_style,
+    iteration_count,
     load_project_style,
 )
 from cubist.core.model import BuiltAsset
@@ -39,6 +41,10 @@ def _print(data) -> None:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
+    if args.check:
+        checked = check_script(args.script, style=args.style, timeout=args.timeout, seed=args.seed)
+        _print(checked)
+        return 0
     results = build_script(
         args.script,
         style=args.style,
@@ -47,7 +53,28 @@ def cmd_build(args: argparse.Namespace) -> int:
         seed=args.seed,
         check_determinism=args.check_determinism,
     )
-    _print([r.summary for r in results])
+    if args.full:
+        _print([r.summary for r in results])
+        return 0
+    brief = []
+    for r in results:
+        s = r.summary
+        outputs = s["outputs"]
+        brief.append(
+            {
+                "name": s["name"],
+                "iteration": iteration_count(r.vox_path.parent),
+                "seed": s["seed"],
+                "voxels": s["voxels"],
+                "parts": [p["name"] for p in s["parts"]],
+                "clips": [c["name"] for c in s.get("clips", [])],
+                "contact_sheet": outputs["contact_sheet"],
+                **({"motion": outputs["motion"]} if "motion" in outputs else {}),
+                **({"gifs": outputs["gifs"]} if "gifs" in outputs else {}),
+                "lint": s["lint"]["summary"],
+            }
+        )
+    _print(brief)
     return 0
 
 
@@ -56,7 +83,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     names = asset.names
     meta = {p["name"]: p for p in asset.summary.get("parts", [])}
     parts, totals = [], {}
-    for part in asset.scene.parts:
+    for part in asset.parts:
         b = part.grid.bounds()
         info = meta.get(part.name, {})
         parts.append(
@@ -66,6 +93,7 @@ def cmd_inspect(args: argparse.Namespace) -> int:
                 "voxels": part.grid.count(),
                 "bounds": [list(b[0]), list(b[1])] if b else None,
                 "pivot": info.get("pivot"),
+                "frames": info.get("frames"),
             }
         )
         for index, n in part.grid.colors_used().items():
@@ -227,6 +255,13 @@ def cmd_palette_import(args: argparse.Namespace) -> int:
 
 def cmd_examples(args: argparse.Namespace) -> int:
     project = _project(args)
+    if args.action in ("list", "search") and not list_examples(project):
+        print(
+            f"note: {project / 'examples'} has no examples yet; the library is per project. "
+            "Promote assets with `cubist examples promote`, or look at another project's with "
+            "--project (the demo's are in projects/demo).",
+            file=sys.stderr,
+        )
     if args.action == "list":
         _print(list_examples(project))
     elif args.action == "search":
@@ -276,6 +311,12 @@ def parser() -> argparse.ArgumentParser:
     b.add_argument("--out", type=Path, help="output root (default: <project>/out)")
     b.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_S, help="seconds")
     b.add_argument("--seed", type=int, default=0, help="build seed mixed into every seeded op")
+    b.add_argument(
+        "--check",
+        action="store_true",
+        help="run and lint only: no outputs, and it doesn't count as an iteration",
+    )
+    b.add_argument("--full", action="store_true", help="print the whole build summary")
     b.add_argument(
         "--check-determinism",
         action="store_true",

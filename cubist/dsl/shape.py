@@ -159,6 +159,12 @@ class Shape:
     __sub__ = subtract
     __and__ = intersect
 
+    def __invert__(self):
+        """The selection of voxels outside this shape (for ``where=``)."""
+        from cubist.dsl.select import inside
+
+        return ~inside(self)
+
     # --- transforms ----------------------------------------------------------
 
     def at(self, x: float, y: float, z: float) -> Shape:

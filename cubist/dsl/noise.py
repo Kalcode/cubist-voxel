@@ -31,9 +31,10 @@ def _u32(values) -> np.ndarray:
     return (np.asarray(values, dtype=np.int64) & _M).astype(np.uint32)
 
 
-def mix_seed(op_seed: int) -> int:
-    """An op's seed combined with the current build seed."""
-    h = _lowbias32(_u32([op_seed]) ^ _lowbias32(_u32([current().seed]) + np.uint32(0x9E3779B9)))
+def mix_seed(op_seed: int, build_seed: int | None = None) -> int:
+    """An op's seed combined with the build seed (default: the current build's)."""
+    build = current().seed if build_seed is None else build_seed
+    h = _lowbias32(_u32([op_seed]) ^ _lowbias32(_u32([build]) + np.uint32(0x9E3779B9)))
     return int(h[0])
 
 

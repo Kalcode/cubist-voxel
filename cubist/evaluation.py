@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from cubist.build.runner import load_project_style
+from cubist.build.runner import iteration_count, load_project_style
 from cubist.export import lint_loaded, load_asset
 from cubist.motion.pose import preview_clips
 from cubist.project import load_brief
@@ -30,15 +30,7 @@ ACCEPT_SCORE = 3
 
 
 def iterations(project: str | Path, name: str) -> int:
-    log = Path(project) / "out" / name / "history.jsonl"
-    if not log.exists():
-        return 0
-    seen = []
-    for line in log.read_text().splitlines():
-        sha = json.loads(line)["script_sha256"]
-        if sha not in seen:
-            seen.append(sha)
-    return len(seen)
+    return iteration_count(Path(project) / "out" / name)
 
 
 def _scores(project: Path) -> dict[str, int]:
@@ -212,7 +204,7 @@ def write_report(project: str | Path, report: dict) -> dict[str, Path]:
 def _thumbnail(asset_dir: Path, fit: int) -> np.ndarray:
     """The asset's iso view scaled to fit a ``fit``-pixel square, whole and centered."""
     asset = load_asset(asset_dir)
-    grid = asset.grid
+    grid = asset.visible_grid
     lo, hi = grid.bounds()
     nx, ny, nz = (b - a for a, b in zip(lo, hi, strict=True))
     scale = 2

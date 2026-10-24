@@ -170,7 +170,7 @@ def create_server(project: str | Path) -> MCPServer:
         voxel counts, and colors by palette name."""
         loaded = load_asset(resolve(asset))
         parts = []
-        for part in loaded.scene.parts:
+        for part in loaded.parts:
             b = part.grid.bounds()
             meta = next((p for p in loaded.summary.get("parts", []) if p["name"] == part.name), {})
             parts.append(

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 
 from cubist.core.errors import ModelError
 
-EASES = ("smooth", "linear", "step")
+EASES = ("smooth", "linear", "step", "in", "out")
 ROTATE = ("rotate_x", "rotate_y", "rotate_z")
 MOVE = ("move_x", "move_y", "move_z")
 CHANNELS = ("joint", *ROTATE, *MOVE, "visible", "frame")
@@ -145,6 +145,12 @@ def _free(kind: str, part: str, axis: str, keys, ease: str | None) -> TrackSpec:
     return TrackSpec(part, f"{kind}_{name}", keys, ease)
 
 
+def joint(part: str, keys, ease: str | None = None) -> TrackSpec:
+    """Keys for a part's joint (degrees for a hinge, voxels for a slide, turns for a spin), for
+    list-form clips that mix it with ``turn``, ``visible`` and the rest."""
+    return TrackSpec(part, "joint", keys, ease)
+
+
 def visible(part: str, keys) -> TrackSpec:
     """Show (1) and hide (0) a part over the clip, stepping between keys. Pair it with
     ``Part(..., hidden=True)`` for flashes and sparks that appear for a moment."""
@@ -239,7 +245,8 @@ def clip(
     ``tracks`` maps part names to keys for their joints: plain values spread evenly from 0 to
     ``length`` (one value holds at t = 0), or ``(time, value)`` pairs. Or it is a list of
     tracks: ``turn(...)``, ``move(...)``, ``visible(...)``, generators like ``swing(...)``
-    (nested lists are fine). ``ease`` is ``smooth`` (default), ``linear`` or ``step``.
+    (nested lists are fine). ``ease`` is ``smooth`` (default), ``linear``, ``step``, ``in``
+    (accelerating into each key: falls, slams) or ``out`` (decelerating).
     ``travel`` is how fast an in-place clip (a walk) moves the asset through the world, in
     voxels per second, for the engine to match so feet don't slide. ``collisions=False`` turns
     off the check for parts passing through each other (debris tumbling past debris).
@@ -288,10 +295,13 @@ def clip(
             f"clip {name!r} has two joint tracks for {twice[0]!r}; a joint takes one track "
             "(free turn/move tracks on one channel add up instead)"
         )
-    shown = [t.part for t in built if t.channel == "visible"]
-    twice = sorted({p for p in shown if shown.count(p) > 1})
-    if twice:
-        raise ModelError(f"clip {name!r} has two visible(...) tracks for {twice[0]!r}; merge them")
+    for channel, helper in (("visible", "visible"), ("frame", "frames")):
+        on = [t.part for t in built if t.channel == channel]
+        twice = sorted({p for p in on if on.count(p) > 1})
+        if twice:
+            raise ModelError(
+                f"clip {name!r} has two {helper}(...) tracks for {twice[0]!r}; merge them"
+            )
     evs = []
     for ev in events:
         try:

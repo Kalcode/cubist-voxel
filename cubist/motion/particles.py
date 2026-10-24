@@ -74,7 +74,7 @@ def particles_at(asset: BuiltAsset, clip: Clip | None, t: float) -> list[Particl
             for j, (when, label) in enumerate(clip.events):
                 if label == f"emit:{name}" and 0 <= t - when < e.life:
                     births += [(1_000_000 * (j + 1) + i, when) for i in range(e.burst)]
-        seed = mix_seed(e.seed + 7919 * e_index)
+        seed = mix_seed(e.seed + 7919 * e_index, asset.seed)  # previews run after the build
         for k, born in births:
             age = t - born
             r = hash_unit(np.array([[k, 0, 1], [k, 0, 2], [k, 0, 3]]), seed)
@@ -123,7 +123,12 @@ def load_particles(asset: BuiltAsset, out_root: str | Path) -> dict[str, VoxelGr
     for e in asset.emitters.values():
         path = Path(out_root) / e.particle / f"{e.particle}.vox"
         try:
-            models[e.particle] = VoxelGrid.merge([p.grid for p in read_vox(path).parts])
+            parts = read_vox(path).parts
+            names = {p.name for p in parts}
+            rest = [  # frame 0 of flipbook particles; later frames are models named <part>@<k>
+                p.grid for p in parts if not ("@" in p.name and p.name.rsplit("@", 1)[0] in names)
+            ]
+            models[e.particle] = VoxelGrid.merge(rest)
         except (OSError, VoxError):
             models[e.particle] = None
     asset.particle_models = models

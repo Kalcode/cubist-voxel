@@ -109,14 +109,18 @@ def fracture(shape: Shape, pieces: int = 8, seed: int = 0, min_voxels: int | Non
         present = np.unique(labels[labels >= 0])
         sizes = {int(lab): int((labels == lab).sum()) for lab in present}
         small = sorted((size, lab) for lab, size in sizes.items() if size < min_voxels)
-        if not small or len(sizes) == 1:
+        if len(sizes) == 1:
             break
-        _, lab = small[0]
-        mask = labels == lab
-        touching = _touching(np.where(mask, -1, labels), mask)
-        if not touching:
-            break  # an island on its own; leave it
-        labels[mask] = max(sorted(touching), key=lambda t: touching[t])
+        merged = False
+        for _, lab in small:
+            mask = labels == lab
+            touching = _touching(np.where(mask, -1, labels), mask)
+            if touching:  # islands on their own stay as they are
+                labels[mask] = max(sorted(touching), key=lambda t: touching[t])
+                merged = True
+                break
+        if not merged:
+            break
 
     out = []
     final = labels[tuple(local.T)]

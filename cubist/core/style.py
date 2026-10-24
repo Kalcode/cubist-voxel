@@ -136,8 +136,8 @@ def _colors_named(palette: Palette, name: str, section: str) -> list[int]:
     try:
         for piece in str(name).split("."):
             obj = obj[int(piece)] if piece.isdigit() else getattr(obj, piece)
-    except (PaletteError, IndexError, TypeError) as e:
-        raise StyleError(f"[{section}] {name!r}: {e}") from None
+    except (PaletteError, IndexError, TypeError, AttributeError) as e:
+        raise StyleError(f"[{section}] {name!r}: not a palette color ({e})") from None
     if hasattr(obj, "index"):
         return [obj.index]
     return [c.index for c in obj]
@@ -146,6 +146,11 @@ def _colors_named(palette: Palette, name: str, section: str) -> list[int]:
 def _glow(palette: Palette, table: dict) -> dict[int, float]:
     out: dict[int, float] = {}
     for name, strength in table.items():
+        if isinstance(strength, dict):
+            raise StyleError(
+                f'[glow] {name} = {strength!r}: quote dotted names, like "{name}.'
+                f'{next(iter(strength), "light")}" = 1.5 (TOML reads an unquoted dot as a table)'
+            )
         if isinstance(strength, bool) or not isinstance(strength, (int, float)) or strength <= 0:
             raise StyleError(f"[glow] {name} must be a strength > 0, got {strength!r}")
         for index in _colors_named(palette, name, "glow"):

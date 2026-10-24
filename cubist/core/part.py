@@ -12,6 +12,19 @@ from cubist.motion.joints import Joint
 Vec3 = tuple[float, float, float]
 
 
+def _swap_side(parent: str | None, old: str, new: str) -> str | None:
+    """``parent`` with the side ``old`` -> ``new`` swaps (``_r``/``_l``, ``r_``/``l_``)."""
+    if parent is None or old == new:
+        return parent
+    for a, b in (("_r", "_l"), ("_l", "_r")):
+        if old.endswith(a) and new.endswith(b) and parent.endswith(a):
+            return parent[: -len(a)] + b
+    for a, b in (("r_", "l_"), ("l_", "r_")):
+        if old.startswith(a) and new.startswith(b) and parent.startswith(a):
+            return b + parent[len(a) :]
+    return parent
+
+
 @dataclass(frozen=True)
 class Part:
     name: str
@@ -24,14 +37,21 @@ class Part:
     frames: tuple[Shape, ...] | list[Shape] | None = None  # a flipbook: one shape per frame
     fps: float = 8.0  # flipbook frames per second when it plays on its own
 
+    def __post_init__(self):
+        if self.frames is not None and not isinstance(self.frames, (list, tuple)):
+            object.__setattr__(self, "frames", tuple(self.frames))  # generators too
+
     def mirrored(
         self,
         name: str,
         about_x: float | None = None,
         about_y: float | None = None,
         about_z: float | None = None,
+        parent: str | None = None,
     ) -> tuple[Part, Part]:
-        """This part and a reflected twin called ``name`` (e.g. arm_l -> arm_r)."""
+        """This part and a reflected twin called ``name`` (e.g. arm_l -> arm_r). The twin hangs
+        from ``parent``, or else from this part's parent with the same side swapped (foot_r on
+        leg_r mirrors to foot_l on leg_l); an unsided parent (torso) is kept."""
         planes = {"x": about_x, "y": about_y, "z": about_z}
         given = [(axis, about) for axis, about in planes.items() if about is not None]
         if len(given) != 1:
@@ -46,5 +66,13 @@ class Part:
         joint = self.joint.reflected(i) if isinstance(self.joint, Joint) else self.joint
         shape = self.shape.reflect(axis, about) if self.shape is not None else None
         frames = [f.reflect(axis, about) for f in self.frames] if self.frames else self.frames
-        twin = replace(self, name=name, shape=shape, pivot=pivot, joint=joint, frames=frames)
+        twin = replace(
+            self,
+            name=name,
+            shape=shape,
+            pivot=pivot,
+            joint=joint,
+            frames=frames,
+            parent=parent if parent is not None else _swap_side(self.parent, self.name, name),
+        )
         return self, twin

@@ -252,12 +252,19 @@ def test_masonry_paints_blocks_with_mortar():
 
 
 def test_carve_cuts_a_recess_and_colors_its_back():
+    wall = box((8, 8, 4), color=ST.mid)
+    g = carve(wall, box((2, 3, 2)).at(3, 2, 2), color=P.red).voxelize()
+    assert g.get(3, 2, 3) == 0  # cut
+    assert g.get(3, 2, 1) == P.red.index  # the back of the recess
+    assert g.get(3, 2, 0) == ST.mid.index  # ...with the wall's own back behind it
+    assert g.get(0, 0, 2) == ST.mid.index
+    assert g == wall.carve(box((2, 3, 2)).at(3, 2, 2), color=P.red).voxelize()
+
+
+def test_carve_color_stays_off_the_outside_of_thin_walls():
     wall = box((8, 8, 3), color=ST.mid)
     g = carve(wall, box((2, 3, 2)).at(3, 2, 1), color=P.red).voxelize()
-    assert g.get(3, 2, 2) == 0  # cut
-    assert g.get(3, 2, 0) == P.red.index  # the back of the recess
-    assert g.get(0, 0, 2) == ST.mid.index
-    assert g == wall.carve(box((2, 3, 2)).at(3, 2, 1), color=P.red).voxelize()
+    assert g.get(3, 2, 0) == ST.mid.index  # a 1-voxel back would show red outside
 
 
 def test_decal_paints_the_first_surface_seen_from_a_face():

@@ -20,7 +20,13 @@ from cubist.core.style import cycle_table, glow_array
 from cubist.io.gltf import nearest_part
 from cubist.motion.clips import Clip
 from cubist.motion.particles import instance_matrix, particles_at, stand_in
-from cubist.motion.pose import dense_times, frame_indices, hidden_at, world_matrices
+from cubist.motion.pose import (
+    dense_times,
+    frame_indices,
+    hidden_at,
+    preview_clips,
+    world_matrices,
+)
 from cubist.render.contact_sheet import (
     DEFAULT_VIEWS,
     GAP,
@@ -307,6 +313,7 @@ def posed_sheet(
     scene = PosedScene(asset, table, glow_array(asset.glow))
     m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
     fr = frame_indices(asset, clip, t)
+    tab = cycle_table(np.asarray(table), asset.cycles, t)
     inst = particle_instances(scene, asset, clip, t, np.asarray(table))
     bounds = _union([scene.bounds(m), *particle_bounds(asset, clip, t, np.asarray(table))])
     regions = [bounds]
@@ -316,7 +323,7 @@ def posed_sheet(
     grid = VoxelGrid.merge([p.grid for p in asset.parts if p.name not in hide])
     return sheet(
         lambda view, s, r: scene.render(
-            m, view, s, r, hide, light_markers(asset, m), fr, None, inst
+            m, view, s, r, hide, light_markers(asset, m), fr, tab, inst
         ),
         region,
         np.asarray(table),
@@ -335,10 +342,12 @@ STRIP_VIEWS = ("front", "back", "left", "right", "top")
 
 
 def clip_named(asset: BuiltAsset, name: str) -> Clip:
-    for c in asset.clips:
+    """An authored clip, or a preview clip (``<part>_frames``, ``colors``, ``particles``)."""
+    clips = preview_clips(asset, with_previews=True)
+    for c in clips:
         if c.name == name:
             return c
-    known = ", ".join(c.name for c in asset.clips) or "none (add clips=[...] to the Model)"
+    known = ", ".join(c.name for c in clips) or "none (add clips=[...] to the Model)"
     raise ValueError(f"no clip {name!r} in {asset.name}; its clips: {known}")
 
 

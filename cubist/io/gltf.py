@@ -136,8 +136,12 @@ def glb_origin(asset: BuiltAsset, center: bool = True) -> list[float]:
 
 
 def nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | None:
+    """The part with the voxel nearest ``point``, preferring parts visible at rest (sockets,
+    lights and emitters shouldn't vanish with a hidden muzzle flash)."""
+    hidden = set(asset.hidden_parts())
+    candidates = [p for p in asset.parts if p.name not in hidden] or asset.parts
     best, best_d = None, np.inf
-    for part in asset.parts:
+    for part in candidates:
         coords, _ = part.grid.voxels()
         if len(coords) == 0:
             continue
@@ -150,6 +154,7 @@ def nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | 
 SAMPLE_RATE = 30.0
 MAX_TURN_PER_KEY = 60.0  # degrees; slerp between keys must never take the short way round
 STEP_LEAD = 1e-3  # seconds: the key placed just before a step track's jump
+MAX_MOVE_PER_KEY = 0.5  # voxels; snaps like a slide's recoil get more keys
 
 
 def _quat(rot: np.ndarray) -> np.ndarray:
@@ -187,13 +192,15 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
             times = sorted({0.0, clip.length, *(t for tr in tracks for t in tr.times)})
             interpolation = "STEP"
         else:
-            times = dense_times(asset, clip, SAMPLE_RATE, MAX_TURN_PER_KEY * 0.75, [name])
+            times = dense_times(
+                asset, clip, SAMPLE_RATE, MAX_TURN_PER_KEY * 0.75, [name], max_move=MAX_MOVE_PER_KEY
+            )
             # A step track among smooth ones: a key just before each jump keeps it sharp.
             jumps = [t - STEP_LEAD for tr in steps for t in tr.times if t - STEP_LEAD > 0]
             times = sorted({*times.tolist(), *jumps})
             interpolation = "LINEAR"
         # glTF stores float32 times, which must strictly increase.
-        times = np.unique(np.asarray(times, dtype=np.float32)).astype(np.float64).tolist()
+        times = _f32_times(times)
         offset = pivots[name] - (pivots[part.parent] if part.parent in pivots else 0.0)
         trans, rots = [], []
         for t in times:
@@ -210,6 +217,20 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
             "rest_translation": offset * voxel_size_m,
             "interpolation": interpolation,
         }
+    return out
+
+
+def _f32_times(times) -> list[float]:
+    """Sorted times that stay strictly increasing once glTF stores them as float32. The
+    float64 times are kept: values must be sampled at the exact key times (a float32 time can
+    round to just before a key, and a step would then show the previous value)."""
+    out: list[float] = []
+    last = None
+    for t in sorted(times):
+        t32 = np.float32(t)
+        if last is None or t32 > last:
+            out.append(float(t))
+            last = t32
     return out
 
 
@@ -249,13 +270,13 @@ def _animation(
             add(name, "rotation", sample["rotation"], sample)
     for track in clip.tracks:
         if track.channel == "visible":
-            times = sorted({0.0, clip.length, *track.times})
+            times = _f32_times({0.0, clip.length, *track.times})
             values = [track_value(track, t, clip) for t in times]
             shown = np.array([[v, v, v] for v in values], dtype=np.float64)
             steps = {"times": np.array(times), "interpolation": "STEP"}
             add(track.part, "scale", shown, steps)
         elif track.channel == "frame" and frame_nodes:
-            times = sorted({0.0, clip.length, *track.times})
+            times = _f32_times({0.0, clip.length, *track.times})
             steps = {"times": np.array(times), "interpolation": "STEP"}
             n = len(asset.part(track.part).frames or [])
             for k in range(n):

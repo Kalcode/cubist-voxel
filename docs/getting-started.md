@@ -78,7 +78,7 @@ Open `export/lantern.vox` in MagicaVoxel or drag `export/lantern.glb` into Godot
 | Command | Does |
 | --- | --- |
 | `cubist new <name>` | Scaffold a brief and a script stub |
-| `cubist build <script>` | Build: `.vox`, contact sheet, lint report (`--seed N`, `--check-determinism`) |
+| `cubist build <script>` | Build: `.vox`, contact sheet, lint report, and for moving assets a filmstrip and GIFs; prints the iteration (`--seed N`, `--check-determinism`, `--full` for the whole summary, `--check` to run and lint without outputs or counting an iteration) |
 | `cubist render <asset>` | Re-render views (`--views front,iso,silhouette`) or print `--slices y=a..b`; `--clip NAME` draws a filmstrip (`--frames`, `--view`) or, with `--at T`, a posed contact sheet |
 | `cubist diff <asset> [<other>]` | Before/after/changes sheet (default: against the previous build) |
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |

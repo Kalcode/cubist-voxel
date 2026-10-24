@@ -24,7 +24,9 @@ at a time. Run commands from the project directory (e.g. `projects/demo`), via `
    - Does it meet every must-have in the brief?
 5. Revise and rebuild. `cubist diff out/<name>` shows what changed since the last build;
    `cubist render out/<name> --slices y=10..14` shows small regions exactly. Stop after 5
-   iterations and report honestly what still falls short.
+   iterations and report honestly what still falls short. An iteration is a distinct version
+   of the script that you built, failed builds included; `cubist build` prints which one it
+   is. `cubist build --check` runs and lints a script without counting (catch typos with it).
 
 When the user approves an asset: `cubist examples promote <name> --note "why it is good"`, then
 `cubist export out/<name>` (refuses on lint errors).

@@ -198,6 +198,13 @@ def surface() -> Selection:
 
 def inside(shape: Shape) -> Selection:
     """Voxels whose centers lie inside ``shape``."""
+    if isinstance(shape, Selection):
+        raise ShapeError(
+            "inside() takes a shape, and this is already a selection; pass it to where= as it "
+            "is (combine selections with &, |, - and ~)"
+        )
+    if not isinstance(shape, Shape):
+        raise ShapeError(f"inside() takes a shape like box(...), got {shape!r}")
     return _Inside(shape)
 
 

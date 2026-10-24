@@ -47,7 +47,9 @@ Never key motion by hand frame by frame; use generators. Work from the project d
    - Do joint limits hold (`joint_limits`)?
    - Does it match the brief and the user's words?
 6. **Revise and rebuild.** `cubist diff out/<name>` also writes `motion-diff.png` (the last
-   filmstrip above this one). Stop after 5 iterations and say honestly what still falls short.
+   filmstrip above this one). Stop after 5 iterations (distinct script versions built, failed
+   builds included; `cubist build --check` doesn't count) and say honestly what still falls
+   short. `cubist render out/<name> --clip <part>_frames --at T` works for flipbook loops too.
 7. **Report** with the filmstrip and the GIF paths (`out/<name>/<clip>.gif`), so the user can
    watch it.
 
@@ -56,5 +58,9 @@ Gotchas:
   a door hinged at its low-x edge swings toward the viewer with negative angles.
 - If a hinge collides, flip its axis before anything else.
 - Free rotations compose x, then y, then z about the parent's axes, and a joint goes on top.
+- `Part.mirrored("foot_l", ...)` hangs the twin from the mirrored parent (`leg_r` -> `leg_l`);
+  pass `parent=` to choose another.
+- A flipbook played by any clip's `frames(...)` stops looping on its own and rests on frame 0
+  elsewhere (lint notes it: `flipbook_driven`); give it its own looping clip if it should idle.
 - A walking body that bobs *down* as the legs spread keeps the feet planted. Bobbing up makes
   the asset float, and too far down sinks the feet (`motion_floor`).

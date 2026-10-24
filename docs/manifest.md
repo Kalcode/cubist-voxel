@@ -57,7 +57,7 @@ can read it before exporting.
 | `pivot` | Where the part turns, in asset space. In the `.glb` this is the part node's origin. |
 | `parent` | The part it hangs from, or `null` |
 | `joint` | How it moves (below), or `null` for a part that doesn't move on its own |
-| `frames` | A flipbook's `{count, fps, vox_models}`, or `null`. In the `.glb` the part node has a child node `<part>@<k>` per frame, frames other than 0 at scale 0; `frame` tracks become `STEP` scale channels on those nodes. Without a `frame` track it loops at `fps` (exported as a `<part>_frames` animation) |
+| `frames` | A flipbook's `{count, fps, vox_models}`, or `null`. In the `.glb` the part node has a child node `<part>@<k>` per frame, frames other than 0 at scale 0; `frame` tracks become `STEP` scale channels on those nodes. A flipbook no clip plays with a `frame` track loops at `fps` (exported as a `<part>_frames` animation); one that some clip plays rests on frame 0 elsewhere |
 | `hidden` | Starts hidden (a clip's `visible` track shows it); children of hidden parts are hidden too. In the `.glb` its node has scale 0, and `visible` tracks become `STEP` scale channels |
 | `voxels` | Voxel count |
 | `vox_model` | The model's name in the `.vox` scene graph |
@@ -167,6 +167,8 @@ Between keys `k` and `k+1`, with `s = (t - t_k) / (t_{k+1} - t_k)`:
 
 - **`step`** holds `v_k` until `t_{k+1}`.
 - **`linear`** gives `v_k + s·(v_{k+1} - v_k)`.
+- **`in`** gives `v_k + s²·(v_{k+1} - v_k)` (accelerating); **`out`** gives
+  `v_k + (1 - (1 - s)²)·(v_{k+1} - v_k)` (decelerating).
 - **`smooth`** is a monotone cubic Hermite (PCHIP):
 
   ```text

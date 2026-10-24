@@ -35,6 +35,7 @@ def check_motion(asset: BuiltAsset) -> list[Finding]:
         *check_loops(asset),
         *check_collisions(asset),
         *check_floor(asset),
+        *flipbooks_driven(asset),
         *motion_bounds(asset),
     ]
 
@@ -341,7 +342,7 @@ def check_emitters(asset: BuiltAsset) -> list[Finding]:
             k for k in (0.75, 1.5, 2.25)
             if tuple(int(v) for v in np.floor(start + d * k)) in solid
         ]  # fmt: skip
-        if hits:
+        if hits and e.rate:  # bursts (explosions) may start inside on purpose
             out.append(
                 Finding(
                     "emitter_blocked",
@@ -367,4 +368,25 @@ def check_emitters(asset: BuiltAsset) -> list[Finding]:
                         {"clip": c.name, "event": label},
                     )
                 )
+    return out
+
+
+def flipbooks_driven(asset: BuiltAsset) -> list[Finding]:
+    """Flipbooks some clip plays with frames(...): they no longer loop on their own."""
+    out = []
+    for p in asset.parts:
+        if not p.frames:
+            continue
+        players = [c.name for c in asset.clips
+                   if any(t.part == p.name and t.channel == "frame" for t in c.tracks)]  # fmt: skip
+        if players:
+            out.append(
+                Finding(
+                    "flipbook_driven",
+                    "info",
+                    f"flipbook {p.name!r} is played by clip {', '.join(map(repr, players))}, so it "
+                    "no longer loops on its own; elsewhere it rests on frame 0",
+                    {"part": p.name, "clips": players},
+                )
+            )
     return out

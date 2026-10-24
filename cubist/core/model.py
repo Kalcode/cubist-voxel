@@ -66,6 +66,11 @@ class Model:
         if dupes:
             raise ModelError(f"duplicate part names: {', '.join(dupes)}")
         for part in self.parts:
+            if "@" in part.name:
+                raise ModelError(
+                    f"part name {part.name!r}: '@' is reserved for flipbook frames in .vox files; "
+                    "use '_' instead"
+                )
             if part.parent is not None and part.parent not in names:
                 raise ModelError(f"part {part.name!r} has unknown parent {part.parent!r}")
             if part.frames is not None:
@@ -112,7 +117,7 @@ class Model:
 
     def _check_clips(self) -> None:
         joints = {p.name: p.joint for p in self.parts}
-        flipbooks = {p.name: bool(p.frames) for p in self.parts}
+        flipbooks = {p.name: len(p.frames) if p.frames else 0 for p in self.parts}
         seen: set[str] = set()
         for c in self.clips:
             if not isinstance(c, Clip):
@@ -130,6 +135,12 @@ class Model:
                     raise ModelError(
                         f"clip {c.name!r} picks frames of {t.part!r}, which is not a flipbook; "
                         "give it frames=[...]"
+                    )
+                if t.channel == "frame" and max(t.values) >= flipbooks[t.part]:
+                    n = flipbooks[t.part]
+                    raise ModelError(
+                        f"clip {c.name!r} asks for frame {int(max(t.values))} of {t.part!r}, "
+                        f"which has {n} frames (0 to {n - 1})"
                     )
                 if t.channel == "joint" and joints[t.part] is None:
                     raise ModelError(
@@ -398,6 +409,12 @@ class AssetDef:
                     if p.frames:
                         frame_grids = [f.voxelize() for f in p.frames]
                         grid = frame_grids[0]
+                        empty = [k for k, g in enumerate(frame_grids) if g.count() == 0]
+                        if empty:
+                            raise ModelError(
+                                f"frame {empty[0]} of {p.name!r} is empty; to make it blink, "
+                                "keep every frame solid and hide the part with visible(...)"
+                            )
                     else:
                         frame_grids, grid = None, p.shape.voxelize()
                 except ShapeError as e:

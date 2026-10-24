@@ -17,11 +17,11 @@ import numpy as np
 import pytest
 
 from cubist import Model, Part, asset, box, clip, hinge, slide
-from cubist.build.runner import load_palette
+from cubist.build.runner import load_project_style
 from cubist.core.model import AssetDef
 from cubist.core.palette import Palette
 from cubist.io.gltf import encode_glb, glb_origin
-from cubist.motion.pose import world_matrices
+from cubist.motion.pose import frame_index, hidden_at, world_matrices
 
 MAC_BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
 BLENDER = (
@@ -59,17 +59,28 @@ def desk(p):
     )
 
 
-def demo(name):
-    palette = load_palette(DEMO / "style.toml")
+def demo(name, clip_name=None):
+    from cubist.motion.pose import preview_clips
+
+    style = load_project_style(DEMO / "style.toml")
     [a] = [v for v in runpy.run_path(str(DEMO / "assets" / f"{name}.py")).values()
            if isinstance(v, AssetDef)]  # fmt: skip
-    return a.build(palette), palette.rgba_table()
+    built = a.build(style.palette, glow=style.glow, cycles=style.cycles)
+    clips = preview_clips(built)
+    clip = next(c for c in clips if clip_name in (None, c.name))
+    return built, style.palette.rgba_table(), clip
 
 
 def cases():
-    yield "nested", lambda: (asset(name="desk", size=(8, 4, 12))(desk).build(P), P.rgba_table())
-    for name in ("chest", "door", "window", "desk", "biplane"):
+    def nested():
+        a = asset(name="desk", size=(8, 4, 12))(desk).build(P)
+        return a, P.rgba_table(), a.clips[0]
+
+    yield "nested", nested
+    for name in ("chest", "door", "window", "desk", "biplane", "barrel", "blaster", "torch"):
         yield name, lambda name=name: demo(name)
+    for clip_name in ("walk", "idle"):
+        yield f"goblin-{clip_name}", lambda c=clip_name: demo("goblin", c)
 
 
 def blender_poses(glb: Path, out: Path, clip_name: str, times: list[float]) -> dict:
@@ -83,8 +94,7 @@ def blender_poses(glb: Path, out: Path, clip_name: str, times: list[float]) -> d
 
 @pytest.mark.parametrize("make", [m for _, m in cases()], ids=[n for n, _ in cases()])
 def test_blender_poses_match_cubist(make, tmp_path):
-    a, table = make()
-    c = a.clips[0]
+    a, table, c = make()
     glb = tmp_path / "a.glb"
     glb.write_bytes(encode_glb(a, table, voxel_size_m=S))
     times = [0.0, round(c.length * 0.3, 4), round(c.length * 0.55, 4), c.length]
@@ -93,18 +103,27 @@ def test_blender_poses_match_cubist(make, tmp_path):
     moved = False
     for t in times:
         got = poses[repr(t)]
-        mats = world_matrices(a, c, t)
+        mats, hide = world_matrices(a, c, t), hidden_at(a, c, t)
         for p in a.parts:
-            if p.name not in got:
-                continue  # empty parts have no mesh
-            m, pivot = mats[p.name], np.array(p.pivot, dtype=float)
-            # node-local glTF points: the origin and one voxel along each axis
-            local = np.array([[0, 0, 0], [S, 0, 0], [0, S, 0], [0, 0, S]])
-            world = ((local / S + pivot) @ m[:3, :3].T + m[:3, 3] - origin) * S
-            want = world @ TO_BLENDER.T
-            mw = np.array(got[p.name]["matrix"])
-            have = (local @ TO_BLENDER.T) @ mw[:3, :3].T + mw[:3, 3]
-            assert np.allclose(have, want, atol=1e-3), (p.name, t)
+            meshes = (
+                [(f"{p.name}@{k}", k == frame_index(a, c, p.name, t)) for k in range(len(p.frames))]
+                if p.frames
+                else [(p.name, True)]
+            )
+            for mesh, current in meshes:
+                if mesh not in got:
+                    continue  # empty parts have no mesh
+                shown = current and p.name not in hide
+                m, pivot = mats[p.name], np.array(p.pivot, dtype=float)
+                # node-local glTF points: the origin and one voxel along each axis
+                local = np.array([[0, 0, 0], [S, 0, 0], [0, S, 0], [0, 0, S]])
+                points = local if shown else np.zeros_like(local)  # scaled to nothing
+                world = ((points / S + pivot) @ m[:3, :3].T + m[:3, 3] - origin) * S
+                want = world @ TO_BLENDER.T
+                mw = np.array(got[mesh]["matrix"])
+                have = (local @ TO_BLENDER.T) @ mw[:3, :3].T + mw[:3, 3]
+                # sampled curves play back linearly between keys: a few mm at S = 0.25
+                assert np.allclose(have, want, atol=6e-3), (mesh, t)
         moved |= any(not np.allclose(poses[repr(times[0])][n]["matrix"], got[n]["matrix"])
                      for n in got)  # fmt: skip
     assert moved
