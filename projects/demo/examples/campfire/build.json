@@ -139,7 +139,7 @@
         224,
         102
       ],
-      "range": 14.0,
+      "range": 160.0,
       "intensity": 2.0,
       "flicker": 0.5,
       "part": null
@@ -186,7 +186,17 @@
       "fps": 6.0
     }
   ],
-  "script": "campfire.py",
+  "script": "/Users/dclausen/code/voxel-auther-system/projects/demo/assets/campfire.py",
+  "outputs": {
+    "vox": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/campfire.vox",
+    "contact_sheet": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/contact.png",
+    "lint": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/lint.json",
+    "motion": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/motion.png",
+    "gifs": {
+      "flames_frames": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/flames_frames.gif"
+    },
+    "manifest": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/campfire/manifest.json"
+  },
   "lint": {
     "ok": true,
     "errors": 0,

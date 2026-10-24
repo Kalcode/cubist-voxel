@@ -125,8 +125,17 @@ def test_light_too_short_to_light_the_floor_warns_in_metres():
 
 def test_light_reaching_the_floor_around_it_is_fine():
     assert reach(post(50, 120)) == []
-    assert reach(post(6, 14)) == []  # a campfire's light, low and wide
+    assert reach(post(6, 160)) == []  # a campfire's light, low and wide
 
 
-def test_light_reach_is_only_checked_on_grounded_assets():
-    assert reach(post(50, 10, grounded=False)) == []  # held or hung: no known floor
+def test_light_shorter_than_a_candle_warns_even_when_low():
+    # The demo campfire: 6 voxels up, so it reaches the floor, but range 14 is 0.9 m.
+    [f] = reach(post(6, 14))
+    assert "0.9 m" in f.message and "candle" in f.message
+    assert f.details["min_range"] == 32  # 2 m at 1/16 m
+
+
+def test_ungrounded_lights_only_need_a_candle_s_reach():
+    assert reach(post(50, 40, grounded=False)) == []  # held or hung: no known floor
+    [f] = reach(post(50, 10, grounded=False))
+    assert f.details["min_range"] == 32

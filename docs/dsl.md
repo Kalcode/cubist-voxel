@@ -237,8 +237,9 @@ think in metres and divide by `voxel_size_m`. Typical ranges, with voxels at 1/1
 | Lantern, lamp post, lit window | 6-10 m | 96-160 |
 | Campfire, hearth, forge | 8-12 m | 128-192 |
 
-On a grounded asset, lint warns (`light_reach`) when a light can't reach the floor as far out
-as it is high, that is when `range` is under 1.4 times its height.
+Lint warns (`light_reach`) when a light reaches less than 2 m, a candle's reach, and, on a
+grounded asset, when it can't reach the floor as far out as it is high (`range` under 1.4 times
+its height).
 
 ### Fracture and bursts
 

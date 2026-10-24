@@ -47,7 +47,7 @@ def campfire(p):
                 pivot=(C, 3, C),
             ),
         ],
-        lights={"fire": light((C, 6, C), p.fire.light, range=14, intensity=2, flicker=0.5)},
+        lights={"fire": light((C, 6, C), p.fire.light, range=160, intensity=2, flicker=0.5)},
         emitters={
             "smoke": emitter(
                 (C, 10.5, C),

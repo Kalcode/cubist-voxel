@@ -292,26 +292,35 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     return out
 
 
+MIN_LIGHT_RANGE_M = 2.0  # about what a candle lights
+
+
 def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
-    """A grounded asset's light should light the floor around it: its range should reach the
-    floor as far out as the light is high (range >= sqrt(2) * height)."""
-    if not asset.grounded:
-        return []
+    """A light should reach at least MIN_LIGHT_RANGE_M, and on a grounded asset it should light
+    the floor as far out as it is high (range >= sqrt(2) * height)."""
     m = style.voxel_size_m
+    shortest = math.ceil(MIN_LIGHT_RANGE_M / m)
     out = []
     for name, lt in asset.lights.items():
         height = float(lt.position[1])
-        need = math.ceil(math.sqrt(2) * height)
-        if height <= 0 or lt.range >= need:
+        floor = math.ceil(math.sqrt(2) * height) if asset.grounded and height > 0 else 0
+        need = max(shortest, floor)
+        if lt.range >= need:
             continue
+        reach = f"range {lt.range:g} ({lt.range * m:.1f} m)"
+        if floor > shortest:
+            why = (
+                f"light {name!r} is {height:g} voxels ({height * m:.1f} m) above the floor with "
+                f"{reach}, so it barely lights the ground around it"
+            )
+        else:
+            why = f"light {name!r} has {reach}, less than a candle lights ({MIN_LIGHT_RANGE_M:g} m)"
         out.append(
             Finding(
                 "light_reach",
                 "warning",
-                f"light {name!r} is {height:g} voxels ({height * m:.1f} m) above the floor with "
-                f"range {lt.range:g} ({lt.range * m:.1f} m), so it barely lights the ground "
-                f"around it; give it range {need} or more. Ranges are in voxels: a lantern "
-                f"lights about 6-10 m, {round(6 / m)}-{round(10 / m)} voxels here",
+                f"{why}; give it range {need} or more. Ranges are in voxels: a lantern lights "
+                f"about 6-10 m, {round(6 / m)}-{round(10 / m)} voxels here (docs/dsl.md has more)",
                 {"light": name, "height": height, "range": lt.range, "min_range": need},
             )
         )
