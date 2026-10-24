@@ -13,6 +13,7 @@ known; ``clip()`` resolves them into plain tracks, so a clip only ever holds key
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -156,9 +157,12 @@ def _float(value, what: str) -> float:
     if isinstance(value, bool):
         raise ModelError(f"{what} must be a number, got {value!r}")
     try:
-        return float(value)
+        out = float(value)
     except (TypeError, ValueError):
         raise ModelError(f"{what} must be a number, got {value!r}") from None
+    if not math.isfinite(out):
+        raise ModelError(f"{what} must be a finite number, got {value!r}")
+    return out
 
 
 def _keys(name: str, part: str, keys, length: float) -> tuple[tuple[float, ...], tuple]:
@@ -256,6 +260,13 @@ def clip(
         raise ModelError(f"clip {name!r} has no tracks; give it keys for at least one part")
     for t in built:
         _check_track(name, length, t)
+    joints = [t.part for t in built if t.channel == "joint"]
+    twice = sorted({p for p in joints if joints.count(p) > 1})
+    if twice:
+        raise ModelError(
+            f"clip {name!r} has two joint tracks for {twice[0]!r}; a joint takes one track "
+            "(free turn/move tracks on one channel add up instead)"
+        )
     shown = [t.part for t in built if t.channel == "visible"]
     twice = sorted({p for p in shown if shown.count(p) > 1})
     if twice:

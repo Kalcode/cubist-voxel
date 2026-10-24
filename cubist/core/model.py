@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from cubist.core.errors import ModelError
 from cubist.core.grid import VoxelGrid
@@ -271,8 +271,23 @@ class BuiltAsset:
             allow_floating=bool(summary.get("allow_floating", False)),
             seed=int(summary.get("seed", 0)),
             ops_used=set(summary.get("ops_used", ())),
-            clips=[Clip.from_dict(c) for c in summary.get("clips", ())],
+            clips=_surviving_clips(summary.get("clips", ()), parts),
         )
+
+
+def _surviving_clips(clips: Iterable[dict], parts: list[BuiltPart]) -> list[Clip]:
+    """Clips from a build summary, keeping only tracks whose parts (and joints) are still in
+    the .vox; a hand edit that renamed or removed a part is reported by lint, not a crash."""
+    joints = {p.name: p.joint for p in parts}
+    out = []
+    for d in clips:
+        c = Clip.from_dict(d)
+        kept = tuple(
+            t for t in c.tracks if t.part in joints and (t.channel != "joint" or joints[t.part])
+        )
+        if kept:
+            out.append(replace(c, tracks=kept))
+    return out
 
 
 class AssetDef:

@@ -132,6 +132,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
 
 def cmd_export(args: argparse.Namespace) -> int:
     formats = [f for f in NATIVE if getattr(args, f)] + (args.via_vengi or [])
+    notes: list[str] = []
     try:
         written = export_asset(
             args.asset,
@@ -142,10 +143,13 @@ def cmd_export(args: argparse.Namespace) -> int:
             vertex_colors=args.vertex_colors,
             ao=args.ao,
             center=not args.no_center,
+            notes=notes,
         )
     except ExportBlocked as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
+    for note in notes:
+        print(f"warning: {note}", file=sys.stderr)
     _print({"exported": written})
     return 0
 

@@ -1,12 +1,14 @@
 """Exported animations play in Blender the way Cubist previews them.
 
-Blender imports each .glb headless; the world-space bounding box of every part at several
-times must match Cubist's pose evaluator. Skipped when Blender isn't installed (set
-CUBIST_BLENDER to its binary, or put ``blender`` on PATH).
+Blender imports each .glb headless; every part's world matrix at several times must match
+Cubist's pose evaluator (which catches a spin turning the wrong way, not just its bounding box).
+Skipped when Blender isn't installed (set CUBIST_BLENDER to its binary, or put ``blender`` on
+PATH).
 """
 
 import json
 import os
+import runpy
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,10 +17,11 @@ import numpy as np
 import pytest
 
 from cubist import Model, Part, asset, box, clip, hinge, slide
+from cubist.build.runner import load_palette
+from cubist.core.model import AssetDef
 from cubist.core.palette import Palette
 from cubist.io.gltf import encode_glb, glb_origin
 from cubist.motion.pose import world_matrices
-from cubist.render.posed import _Mesh
 
 MAC_BLENDER = "/Applications/Blender.app/Contents/MacOS/Blender"
 BLENDER = (
@@ -31,23 +34,8 @@ pytestmark = pytest.mark.skipif(BLENDER is None, reason="Blender is not installe
 P = Palette({"wood": ["#3b2414", "#8a5a32"], "metal": "#7d8491"})
 S = 0.25
 SCRIPT = Path(__file__).parent / "blender_pose.py"
-
-
-def chest(p):
-    body = box((8, 4, 6), color=p.wood.dark) - box((6, 3, 4)).at(1, 1, 1)
-    return Model(
-        [
-            Part("body", body, pivot=(4, 0, 3)),
-            Part(
-                "lid",
-                box((8, 2, 6), color=p.wood.light).at(0, 4, 0),
-                parent="body",
-                pivot=(4, 4, 0),
-                joint=hinge("-x", (0, 120)),
-            ),
-        ],
-        clips=[clip("open", 0.5, {"lid": [0, 115, 100]})],
-    )
+DEMO = Path(__file__).parent.parent / "projects" / "demo"
+TO_BLENDER = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=float)  # glTF Y-up -> Z-up
 
 
 def desk(p):
@@ -71,38 +59,52 @@ def desk(p):
     )
 
 
-def blender_boxes(glb: Path, out: Path, times: list[float]) -> dict:
+def demo(name):
+    palette = load_palette(DEMO / "style.toml")
+    [a] = [v for v in runpy.run_path(str(DEMO / "assets" / f"{name}.py")).values()
+           if isinstance(v, AssetDef)]  # fmt: skip
+    return a.build(palette), palette.rgba_table()
+
+
+def cases():
+    yield "nested", lambda: (asset(name="desk", size=(8, 4, 12))(desk).build(P), P.rgba_table())
+    for name in ("chest", "door", "window", "desk", "biplane"):
+        yield name, lambda name=name: demo(name)
+
+
+def blender_poses(glb: Path, out: Path, clip_name: str, times: list[float]) -> dict:
     subprocess.run(
         [BLENDER, "-b", "--factory-startup", "--python", str(SCRIPT), "--", str(glb), str(out),
-         *map(str, times)],
+         clip_name, *map(str, times)],
         check=True, capture_output=True, timeout=120,
     )  # fmt: skip
     return json.loads(out.read_text())["poses"]
 
 
-@pytest.mark.parametrize(
-    "fn,name,size,times",
-    [
-        (chest, "chest", (8, 7, 6), [0.0, 0.2, 0.35, 0.5]),
-        (desk, "desk", (8, 4, 12), [0.0, 0.4, 1.0]),
-    ],
-)
-def test_blender_poses_match_cubist(fn, name, size, times, tmp_path):
-    a = asset(name=name, size=size)(fn).build(P)
-    glb = tmp_path / f"{name}.glb"
-    glb.write_bytes(encode_glb(a, P.rgba_table(), voxel_size_m=S))
-    poses = blender_boxes(glb, tmp_path / "poses.json", times)
+@pytest.mark.parametrize("make", [m for _, m in cases()], ids=[n for n, _ in cases()])
+def test_blender_poses_match_cubist(make, tmp_path):
+    a, table = make()
+    c = a.clips[0]
+    glb = tmp_path / "a.glb"
+    glb.write_bytes(encode_glb(a, table, voxel_size_m=S))
+    times = [0.0, round(c.length * 0.3, 4), round(c.length * 0.55, 4), c.length]
+    poses = blender_poses(glb, tmp_path / "poses.json", c.name, times)
     origin = np.array(glb_origin(a))
-    meshes = {p.name: _Mesh(p.grid) for p in a.parts}
+    moved = False
     for t in times:
         got = poses[repr(t)]
-        mats = world_matrices(a, a.clips[0], t)
-        for part, mesh in meshes.items():
-            m = mats[part]
-            pts = mesh.corners.reshape(-1, 3) @ m[:3, :3].T + m[:3, 3]
-            metres = (pts - origin) * S
-            blender = np.stack([metres[:, 0], -metres[:, 2], metres[:, 1]], axis=1)
-            want = [blender.min(axis=0), blender.max(axis=0)]
-            assert np.allclose(got[part], want, atol=1e-3), (part, t, got[part], want)
-    moved = a.clips[0].tracks[0].part
-    assert not np.allclose(poses[repr(times[0])][moved], poses[repr(times[-1])][moved])
+        mats = world_matrices(a, c, t)
+        for p in a.parts:
+            if p.name not in got:
+                continue  # empty parts have no mesh
+            m, pivot = mats[p.name], np.array(p.pivot, dtype=float)
+            # node-local glTF points: the origin and one voxel along each axis
+            local = np.array([[0, 0, 0], [S, 0, 0], [0, S, 0], [0, 0, S]])
+            world = ((local / S + pivot) @ m[:3, :3].T + m[:3, 3] - origin) * S
+            want = world @ TO_BLENDER.T
+            mw = np.array(got[p.name]["matrix"])
+            have = (local @ TO_BLENDER.T) @ mw[:3, :3].T + mw[:3, 3]
+            assert np.allclose(have, want, atol=1e-3), (p.name, t)
+        moved |= any(not np.allclose(poses[repr(times[0])][n]["matrix"], got[n]["matrix"])
+                     for n in got)  # fmt: skip
+    assert moved

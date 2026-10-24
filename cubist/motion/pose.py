@@ -30,7 +30,7 @@ def _tangents(times: np.ndarray, values: np.ndarray, loop: bool, length: float) 
 
     for k in range(1, n - 1):
         m[k] = blend(d[k - 1], d[k], h[k - 1], h[k])
-    if loop and n >= 3 and times[0] == 0 and abs(times[-1] - length) < 1e-9:
+    if loop and n >= 2 and times[0] == 0 and abs(times[-1] - length) < 1e-9:
         # The first and last keys are the same moment in a loop: blend across the wrap.
         m[0] = m[-1] = blend(d[-1], d[0], h[-1], h[0])
     return m
@@ -193,6 +193,42 @@ def moving_parts(asset: BuiltAsset, clip: Clip) -> list[str]:
         return False
 
     return [p.name for p in asset.parts if moves(p.name)]
+
+
+def turn_degrees(asset: BuiltAsset, clip: Clip, part: str, t0: float, t1: float) -> float:
+    """Degrees a part's own rotating tracks travel between two times."""
+    total = 0.0
+    for track in clip.tracks:
+        if track.part != part:
+            continue
+        dv = abs(track_value(track, t1, clip) - track_value(track, t0, clip))
+        if track.channel.startswith("rotate_"):
+            total += dv
+        elif track.channel == "joint":
+            joint = asset.part(track.part).joint
+            if joint is not None and joint.kind != "slide":
+                total += dv * (360.0 if joint.kind == "spin" else 1.0)
+    return total
+
+
+def dense_times(
+    asset: BuiltAsset,
+    clip: Clip,
+    rate: float = 30.0,
+    max_turn: float = 10.0,
+    parts: list[str] | None = None,
+) -> np.ndarray:
+    """``sample_times``, subdivided wherever the parts (default: all) together turn more than
+    ``max_turn`` degrees between samples, so fast spins are sampled finely enough to see."""
+    base = sample_times(clip, rate)
+    names = parts if parts is not None else [p.name for p in asset.parts]
+    out = [float(base[0])]
+    for t0, t1 in zip(base, base[1:], strict=False):
+        turn = sum(turn_degrees(asset, clip, n, float(t0), float(t1)) for n in names)
+        pieces = max(1, int(np.ceil(turn / max_turn - 1e-9)))
+        out.extend(float(t0 + (t1 - t0) * k / pieces) for k in range(1, pieces))
+        out.append(float(t1))
+    return np.array(out)
 
 
 def sample_times(clip: Clip, rate: float = 30.0) -> np.ndarray:

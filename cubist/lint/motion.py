@@ -12,10 +12,10 @@ from cubist.lint.checks import Finding
 from cubist.motion.clips import Clip
 from cubist.motion.joints import Joint
 from cubist.motion.pose import (
+    dense_times,
     hidden_at,
     moving_parts,
     posed_bounds,
-    sample_times,
     world_matrices,
 )
 
@@ -23,6 +23,7 @@ LIMIT_TOLERANCE = 1e-6
 LOOP_TOLERANCE = 0.05  # voxels a part's corners may drift between a loop's ends
 AXIS_FORGIVENESS = 1.5  # voxels near a turning joint's axis that may brush neighbors
 COLLISION_SAMPLES_PER_S = 24
+MAX_TURN_PER_SAMPLE = 10.0  # degrees: fast spins get more samples
 
 
 def check_motion(asset: BuiltAsset) -> list[Finding]:
@@ -183,7 +184,7 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
 
         worst: dict[tuple[str, str], tuple[int, float]] = {}
         names = [p.name for p in asset.parts if len(voxels[p.name])]
-        for t in sample_times(c, rate=COLLISION_SAMPLES_PER_S):
+        for t in dense_times(asset, c, COLLISION_SAMPLES_PER_S, MAX_TURN_PER_SAMPLE):
             m = world_matrices(asset, c, float(t))
             hide = hidden_at(asset, c, float(t))
             posed = {}
@@ -196,6 +197,8 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
                 for b in names:
                     if b == a or b in hide or (b in moving and names.index(b) < names.index(a)):
                         continue
+                    if np.allclose(m[a], m[b]):
+                        continue  # moving together, rigidly: nothing new can overlap
                     hits = np.isin(posed[a], posed[b])
                     hits &= ~np.isin(rest_keys[a], rest_keys[b])  # shared at rest: overlap lint
                     hits &= ~forgiven[a]
@@ -220,8 +223,8 @@ def motion_bounds(asset: BuiltAsset) -> list[Finding]:
     rest = posed_bounds(asset, {})
     clips, lines = {}, []
     for c in asset.clips:
-        boxes = [posed_bounds(asset, world_matrices(asset, c, float(t))) for t in
-                 sample_times(c, rate=COLLISION_SAMPLES_PER_S)]  # fmt: skip
+        times = dense_times(asset, c, COLLISION_SAMPLES_PER_S, MAX_TURN_PER_SAMPLE)
+        boxes = [posed_bounds(asset, world_matrices(asset, c, float(t))) for t in times]
         lo = [min(b[0][i] for b in boxes) for i in range(3)]
         hi = [max(b[1][i] for b in boxes) for i in range(3)]
         beyond = {}

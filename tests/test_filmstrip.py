@@ -123,8 +123,8 @@ def test_looping_gif_does_not_repeat_the_wrap_frame():
         return Model([blade], clips=[clip("spin", 1.0, {"prop": [0, 1]}, loop=True, ease="linear")])
 
     a = build(prop)
-    frames, durations = clip_frames(a, TABLE, a.clips[0], fps=8)
-    assert len(frames) == 8 and len(set(durations)) == 1
+    frames, durations = clip_frames(a, TABLE, a.clips[0], fps=10)
+    assert len(frames) == 10 and len(set(durations)) == 1
 
 
 def test_gif_frames_share_one_size():

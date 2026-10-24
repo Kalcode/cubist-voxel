@@ -31,7 +31,7 @@ from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
 from cubist.io.mesh import Quad, greedy_mesh
 from cubist.motion.clips import Clip
-from cubist.motion.pose import local_motion, sample_times, track_value
+from cubist.motion.pose import dense_times, local_motion, track_value
 
 AO_LEVELS = (0.5, 0.7, 0.85, 1.0)
 _FLOAT, _UINT, _USHORT = 5126, 5125, 5123
@@ -149,6 +149,7 @@ def nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | 
 
 SAMPLE_RATE = 30.0
 MAX_TURN_PER_KEY = 60.0  # degrees; slerp between keys must never take the short way round
+STEP_LEAD = 1e-3  # seconds: the key placed just before a step track's jump
 
 
 def _quat(rot: np.ndarray) -> np.ndarray:
@@ -171,22 +172,6 @@ def _quat(rot: np.ndarray) -> np.ndarray:
     return q / np.linalg.norm(q)
 
 
-def _turn(asset: BuiltAsset, clip: Clip, part: str, t0: float, t1: float) -> float:
-    """Degrees a part's own rotating tracks travel between two times."""
-    total = 0.0
-    for track in clip.tracks:
-        if track.part != part:
-            continue
-        dv = abs(track_value(track, t1, clip) - track_value(track, t0, clip))
-        if track.channel.startswith("rotate_"):
-            total += dv
-        elif track.channel == "joint":
-            joint = asset.part(track.part).joint
-            if joint is not None and joint.kind != "slide":
-                total += dv * (360.0 if joint.kind == "spin" else 1.0)
-    return total
-
-
 def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.0625) -> dict:
     """Per driven part: ``times``, node ``translation`` (n, 3) in metres, ``rotation`` (n, 4)
     xyzw, and the glTF ``interpolation``."""
@@ -196,17 +181,19 @@ def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.062
     for name in dict.fromkeys(t.part for t in motion):
         tracks = [t for t in motion if t.part == name]
         part = asset.part(name)
-        if all(clip.track_ease(t) == "step" for t in tracks):
-            times = sorted({t for tr in tracks for t in tr.times})
+        steps = [t for t in tracks if clip.track_ease(t) == "step"]
+        if len(steps) == len(tracks):
+            # Keys only, plus the clip's end so the animation lasts the whole clip.
+            times = sorted({0.0, clip.length, *(t for tr in tracks for t in tr.times)})
             interpolation = "STEP"
         else:
-            base = sample_times(clip, SAMPLE_RATE).tolist()
-            times = [base[0]]
-            for t0, t1 in zip(base, base[1:], strict=False):
-                pieces = int(np.ceil(_turn(asset, clip, name, t0, t1) / (MAX_TURN_PER_KEY * 0.75)))
-                times.extend(t0 + (t1 - t0) * k / max(1, pieces) for k in range(1, max(1, pieces)))
-                times.append(t1)
+            times = dense_times(asset, clip, SAMPLE_RATE, MAX_TURN_PER_KEY * 0.75, [name])
+            # A step track among smooth ones: a key just before each jump keeps it sharp.
+            jumps = [t - STEP_LEAD for tr in steps for t in tr.times if t - STEP_LEAD > 0]
+            times = sorted({*times.tolist(), *jumps})
             interpolation = "LINEAR"
+        # glTF stores float32 times, which must strictly increase.
+        times = np.unique(np.asarray(times, dtype=np.float32)).astype(np.float64).tolist()
         offset = pivots[name] - (pivots[part.parent] if part.parent in pivots else 0.0)
         trans, rots = [], []
         for t in times:
@@ -256,8 +243,10 @@ def _animation(
             add(name, "rotation", sample["rotation"], sample)
     for track in clip.tracks:
         if track.channel == "visible":
-            shown = np.array([[v, v, v] for v in track.values], dtype=np.float64)
-            steps = {"times": np.array(track.times), "interpolation": "STEP"}
+            times = sorted({0.0, clip.length, *track.times})
+            values = [track_value(track, t, clip) for t in times]
+            shown = np.array([[v, v, v] for v in values], dtype=np.float64)
+            steps = {"times": np.array(times), "interpolation": "STEP"}
             add(track.part, "scale", shown, steps)
     if not channels and samples:
         # A clip that moves nothing still exists, so engines can find it by name.

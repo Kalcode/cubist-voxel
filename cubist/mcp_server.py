@@ -92,10 +92,12 @@ def create_server(project: str | Path) -> MCPServer:
         for r in build_script(script, style=project / "style.toml", seed=seed):
             s = r.summary
             motion = s["outputs"].get("motion")
+            gifs = s["outputs"].get("gifs", {})
             out.append(
                 f"{s['name']}: {s['voxels']} voxels, {len(s['parts'])} part(s)\n"
                 f"{s['lint']['summary']}\nvox: {r.vox_path}\ncontact sheet: {r.contact_path}"
                 + (f"\nmotion: {motion}" if motion else "")
+                + "".join(f"\n{name}.gif: {path}" for name, path in gifs.items())
             )
             out.append(Image(path=r.contact_path))
             if motion:
@@ -200,6 +202,7 @@ def create_server(project: str | Path) -> MCPServer:
     ) -> str:
         """Export a built asset (default glb and vox) to <project>/export. Blocked by lint
         errors unless force. Other formats go through vengi-voxconvert."""
+        notes: list[str] = []
         written = export_asset(
             resolve(asset),
             formats=formats or ("glb", "vox"),
@@ -207,8 +210,9 @@ def create_server(project: str | Path) -> MCPServer:
             style=project / "style.toml",
             ao=ao,
             vertex_colors=vertex_colors,
+            notes=notes,
         )
-        return json.dumps(written, indent=2)
+        return json.dumps({**written, **({"warnings": notes} if notes else {})}, indent=2)
 
     @server.tool()
     @_tool_errors

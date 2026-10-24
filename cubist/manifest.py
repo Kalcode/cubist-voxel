@@ -16,6 +16,23 @@ SCHEMA_PATH = Path(__file__).parent / "schema" / "manifest-1.schema.json"
 UNITS = {"length": "voxel", "angle": "degree", "time": "second", "spin": "turn"}
 
 
+def parents_first(asset: BuiltAsset) -> list:
+    """Parts depth-first from the roots, each part's children in model order."""
+    children: dict[str | None, list] = {}
+    names = {p.name for p in asset.parts}
+    for p in asset.parts:
+        children.setdefault(p.parent if p.parent in names else None, []).append(p)
+    out = []
+
+    def visit(parent: str | None) -> None:
+        for p in children.get(parent, []):
+            out.append(p)
+            visit(p.name)
+
+    visit(None)
+    return out
+
+
 def build_manifest(
     asset: BuiltAsset,
     voxel_size_m: float,
@@ -48,7 +65,7 @@ def build_manifest(
                 "voxels": p.grid.count(),
                 "vox_model": p.name,
             }
-            for p in asset.parts
+            for p in parents_first(asset)
         ],
         "sockets": sockets,
         "clips": [c.to_dict() for c in asset.clips],

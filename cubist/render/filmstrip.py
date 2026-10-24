@@ -17,7 +17,7 @@ from PIL import Image
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.motion.clips import Clip
-from cubist.motion.pose import hidden_at, sample_times, world_matrices
+from cubist.motion.pose import dense_times, hidden_at, world_matrices
 from cubist.render.contact_sheet import (
     DEFAULT_VIEWS,
     GAP,
@@ -70,7 +70,7 @@ def motion_region(asset: BuiltAsset, clips: Sequence[Clip], scene: PosedScene) -
     if asset.size is not None:
         regions.append(((0, 0, 0), tuple(int(s) for s in asset.size)))  # type: ignore[arg-type]
     for c in clips:
-        for t in sample_times(c, rate=24):
+        for t in dense_times(asset, c, rate=24, max_turn=5):
             regions.append(scene.bounds(world_matrices(asset, c, float(t))))
     return _union(regions)
 
@@ -180,9 +180,13 @@ def _size_boxes(asset: BuiltAsset, region: Region) -> dict | None:
 
 
 def clip_frames(
-    asset: BuiltAsset, table: np.ndarray, clip: Clip, fps: float = 15, scale: int | None = None
+    asset: BuiltAsset, table: np.ndarray, clip: Clip, fps: float = 20, scale: int | None = None
 ) -> tuple[list[Image.Image], list[int]]:
-    """Iso frames of ``clip`` at ``fps`` and each frame's duration in milliseconds."""
+    """Iso frames of ``clip`` at about ``fps`` and each frame's duration in milliseconds.
+
+    GIFs store durations in whole centiseconds, so frames are spaced by a whole number of them
+    and the durations add up to the clip's length: it plays at real speed. A one-shot clip's
+    last frame (its end pose) holds a little longer before the GIF restarts."""
     scene = PosedScene(asset, table)
     region = motion_region(asset, [clip], scene)
     if scale is None:
@@ -190,19 +194,22 @@ def clip_frames(
         cap = max(2, GIF_MAX_ISO_PX // max(1, dims[0] + dims[2]))
         scale = min(choose_scale(dims), cap)
         scale = max(2, scale - scale % 2)
-    n = max(2, round(clip.length * fps))
-    if clip.loop:
-        times = [clip.length * k / n for k in range(n)]
-    else:
-        times = [clip.length * k / n for k in range(n + 1)]
-    frame_ms = round(1000 / fps)
+    step_cs = max(1, round(100 / fps))
+    times = []
+    k = 0
+    while k * step_cs / 100 < clip.length - 1e-9:
+        times.append(k * step_cs / 100)
+        k += 1
+    if not clip.loop:
+        times.append(clip.length)
+    ends = times[1:] + ([clip.length] if clip.loop else [])
+    durations = [max(10, round((b - a) * 100) * 10) for a, b in zip(times, ends, strict=False)]
     images = []
     for t in times:
         m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
         images.append(Image.fromarray(iso_framed(scene.render(m, "iso", scale, region, hide).rgb)))
-    durations = [frame_ms] * len(images)
     if not clip.loop:
-        durations[-1] += GIF_HOLD_MS
+        durations.append(step_cs * 10 + GIF_HOLD_MS)
     return images, durations
 
 

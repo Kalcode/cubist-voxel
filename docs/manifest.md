@@ -134,8 +134,10 @@ Before the first key a track holds the first value; after the last key, the last
 ### In the `.glb`
 
 Each clip is a glTF animation with the same name, and `extras: {"loop", "length"}`. Tracks are
-sampled 30 times a second (more where a part turns fast) with `LINEAR` interpolation. Tracks
-that are all `step` keep only their keys, with `STEP`. Node translations are full local
+sampled 30 times a second (more where a part turns fast, so no step between keys turns 60° or
+more) with `LINEAR` interpolation. A part whose tracks are all `step` keeps only its keys, plus
+keys at 0 and `length` so every animation lasts the whole clip, with `STEP`. A step track mixed
+with smooth ones gets an extra key 1 ms before each jump. Node translations are full local
 translations: rest offset plus slide. An engine can play the `.glb` animations as they are, or
 rebuild motion from the authored keys above.
 

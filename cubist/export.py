@@ -105,16 +105,22 @@ def export_asset(
     vertex_colors: bool = False,
     ao: bool = False,
     center: bool = True,
+    notes: list[str] | None = None,
 ) -> dict[str, str]:
     """Export to ``out_dir`` (default ``<project>/export``); returns {format: path}. A
     manifest (``<name>.cubist.json``) describing the parts and motion goes beside any .glb or
-    .vox, under the key ``manifest``."""
+    .vox, under the key ``manifest``. ``notes`` collects warnings, such as the lint errors a
+    forced export went past."""
     asset = load_asset(path)
     style_path = Path(style) if style else find_style(asset.vox)
     bible = load_project_style(style_path)
     built, report = lint_loaded(asset, bible)
     if not report.ok and not force:
         raise ExportBlocked(report)
+    if not report.ok and notes is not None:
+        errors = [ln for ln in report.summary().splitlines() if ln.startswith("ERROR")]
+        notes.append(f"exported despite {len(errors)} lint error(s) (--force)")
+        notes.extend(errors)
     out = Path(out_dir) if out_dir else style_path.parent / "export"
     out.mkdir(parents=True, exist_ok=True)
     written: dict[str, str] = {}
