@@ -36,6 +36,7 @@ from cubist.dsl import (
     torus,
     wedge,
 )
+from cubist.dsl.fracture import chunks, fracture
 from cubist.motion import (
     Track,
     TrackSpec,
@@ -68,6 +69,7 @@ __all__ = [
     "capsule",
     "carve",
     "checker",
+    "chunks",
     "clip",
     "colored",
     "cone",
@@ -76,6 +78,7 @@ __all__ = [
     "ellipsoid",
     "extrude",
     "faces",
+    "fracture",
     "frames",
     "heightmap",
     "hinge",
