@@ -28,6 +28,12 @@ BACKGROUND = np.array([233, 230, 223], dtype=np.float64)
 ISO_HEIGHT = 1.2247  # vertical edge length per horizontal unit for a 30 degree camera
 
 
+def glow_lift(strength: np.ndarray) -> np.ndarray:
+    """How far a glowing color's shading is lifted toward its full color: 1 - e^-strength,
+    so strong glow is nearly unshaded but keeps a hint of form."""
+    return 1.0 - np.exp(-np.asarray(strength, dtype=np.float64))
+
+
 @dataclass
 class ViewRender:
     rgb: np.ndarray  # (H, W, 3) uint8
@@ -151,7 +157,7 @@ def ortho(
     if glow is not None and np.any(glow[color[hit]] > 0):
         # Glowing colors: shading lifted toward the full color by the glow strength.
         shade = _upscale((FACE_LIGHT[light] * cue).T, scale) * _bilinear(ao, scale)
-        lift = _upscale(np.minimum(1.0, glow[color]).T, scale)
+        lift = _upscale(glow_lift(glow[color]).T, scale)
         shade = shade + (1.0 - shade) * lift
         rgb = _upscale(palette[color, :3].astype(np.float64).transpose(1, 0, 2), scale)
         rgb = rgb * shade[..., None]
@@ -289,7 +295,7 @@ def iso(
         dep.append((vox @ view)[:, None].repeat(len(dx), 1).ravel() + np.tile(d_off, len(vox)))
         if glow is not None and np.any(glow[colors] > 0):
             shade = ISO_LIGHT[name] * ao
-            shade = shade + (1.0 - shade) * np.minimum(1.0, glow[colors])[:, None]
+            shade = shade + (1.0 - shade) * glow_lift(glow[colors])[:, None]
             col.append((palette[colors, :3][:, None, :] * shade[..., None]).reshape(-1, 3))
         else:
             col.append((base[:, None, :] * ao[..., None]).reshape(-1, 3))

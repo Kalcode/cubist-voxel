@@ -14,6 +14,7 @@ from PIL import Image
 
 from cubist.build.runner import load_project_style
 from cubist.core.model import AssetDef
+from cubist.motion.pose import preview_clips
 from cubist.render.contact_sheet import contact_sheet, hidden_note
 from cubist.render.filmstrip import filmstrip
 
@@ -47,9 +48,10 @@ def _built(script):
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
 def test_filmstrip_matches_golden(script):
     built, palette = _built(script)
-    if not built.clips:
-        pytest.skip("no clips")
-    _compare(filmstrip(built, palette.rgba_table(), built.clips), GOLDEN / "motion" /
+    clips = preview_clips(built, with_colors=True)
+    if not clips:
+        pytest.skip("nothing moves")
+    _compare(filmstrip(built, palette.rgba_table(), clips), GOLDEN / "motion" /
              f"{built.name}.png")  # fmt: skip
 
 

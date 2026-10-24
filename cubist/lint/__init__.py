@@ -62,6 +62,11 @@ def with_frames(asset: BuiltAsset) -> BuiltAsset:
     return replace(asset, parts=[*asset.parts, *extra])
 
 
+def _floating(asset: BuiltAsset, others: list, grid) -> tuple[list[Finding], list]:
+    found = checks.check_floating(asset, VoxelGrid.merge([*others, grid]))
+    return found, [f.details.get("list") for f in found]
+
+
 def frame_checks(asset: BuiltAsset) -> list[Finding]:
     """Floating pieces on each later flipbook frame, and frames that pop instead of flowing."""
     out = []
@@ -69,8 +74,12 @@ def frame_checks(asset: BuiltAsset) -> list[Finding]:
         if not p.frames:
             continue
         others = [q.grid for q in asset.parts if q.name != p.name]
+        _, rest = _floating(asset, others, p.frames[0])
         for k, grid in enumerate(p.frames[1:], start=1):
-            for f in checks.check_floating(asset, VoxelGrid.merge([*others, grid])):
+            found, listed = _floating(asset, others, grid)
+            if listed == rest:
+                continue  # the same pieces as the rest pose, already reported
+            for f in found:
                 f.message = f"frame {k} of {p.name!r}: {f.message}"
                 out.append(f)
         pops = []

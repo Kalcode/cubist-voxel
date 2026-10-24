@@ -15,15 +15,25 @@ def blaster(p):
     slide_top = box((3, 2, 9), color=p.metal.light).at(0, 8, 2)
     slide_top = slide_top.paint(p.metal.mid, where=stripes("z", period=2, width=1) & band("y", 9))
 
-    star = box((1, 3, 1), color=p.fire.light).at(1, 5, 0) | box((3, 1, 1), color=p.fire.light).at(
-        0, 6, 0
-    )
-    flash = (star | box((1, 1, 1), color=p.fire.dark).at(1, 6, 0)).at(0, 0, 16)
+    def flash(size):
+        a, b = size // 2, size
+        star = box((1, b, 1), color=p.fire.light).at(1, 6 - a, 0) | box(
+            (3 if size < 3 else 3, 1, 1), color=p.fire.light
+        ).at(0, 6, 0)
+        return (star | box((1, 1, 1), color=p.fire.dark).at(1, 6, 0)).at(0, 0, 16)
+
     return Model(
         parts=[
             Part("frame", frame, pivot=(1.5, 2, 4)),
             Part("slide", slide_top, parent="frame", pivot=(1.5, 8, 6), joint=slide("-z", 3)),
-            Part("flash", flash, parent="frame", pivot=(1.5, 6.5, 16.5), hidden=True),
+            # Two frames, played once by the fire clip: a small star, then a taller one.
+            Part(
+                "flash",
+                frames=[flash(2), flash(3)],
+                parent="frame",
+                pivot=(1.5, 6.5, 16.5),
+                hidden=True,
+            ),
         ],
         sockets={
             "grip": socket((1.5, 2, 4), part="frame", forward="+z"),
@@ -36,6 +46,7 @@ def blaster(p):
                 [
                     TrackSpec("slide", "joint", [(0, 0), (0.04, 3), (0.3, 0)]),
                     visible("flash", [(0, 1), (0.06, 0)]),
+                    frames("flash", [(0, 0), (0.03, 1)]),
                     turn("frame", "x", [(0, 0), (0.05, -10), (0.35, 0)]),  # muzzle kicks up
                 ],
                 events=[(0.0, "fire")],

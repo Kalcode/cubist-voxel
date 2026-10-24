@@ -162,7 +162,7 @@ def filmstrip(
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
         title = (
-            f"{c.name.upper()}   {c.length:g} S   {'LOOP' if c.loop else 'ONCE'}   "
+            f"{c.name.upper()}   {c.length:.3g} S   {'LOOP' if c.loop else 'ONCE'}   "
             f"ISO + {TITLES[v]}"
         )
         row = _row(cells)

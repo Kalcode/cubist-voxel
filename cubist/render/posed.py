@@ -27,6 +27,7 @@ from cubist.render.raster import (
     _finish,
     _iso_dims,
     _ticks,
+    glow_lift,
 )
 
 _CORNERS = ((0, 0), (1, 0), (0, 1), (1, 1))  # (u, v) per corner, as Quad.ao is ordered
@@ -207,7 +208,7 @@ class PosedScene:
         base = table[colors, :3].astype(np.float64) * light[:, None]
         glowing = None
         if self.glow is not None and np.any(self.glow[colors] > 0):
-            glowing = np.minimum(1.0, self.glow[colors])
+            glowing = glow_lift(self.glow[colors])
         d0, d1, d2 = dist[:, 0], dist[:, 1] - dist[:, 0], dist[:, 2] - dist[:, 0]
 
         buckets: dict[tuple[int, int], list[int]] = defaultdict(list)

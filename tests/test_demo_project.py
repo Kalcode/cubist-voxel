@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from cubist.build.runner import build_script, load_palette, load_project_style
-from cubist.core.model import AssetDef
+from cubist.core.model import AssetDef, BuiltAsset
 from cubist.io.vox import read_vox
 from cubist.lint import lint
 
@@ -15,8 +15,8 @@ DEMO = Path(__file__).parent.parent / "projects" / "demo"
 SCRIPTS = sorted((DEMO / "assets").glob("*.py"))
 
 
-def test_there_are_sixteen_demo_scripts():
-    assert len(SCRIPTS) == 16
+def test_there_are_eighteen_demo_scripts():
+    assert len(SCRIPTS) == 18
 
 
 @pytest.mark.parametrize("script", SCRIPTS, ids=lambda s: s.stem)
@@ -27,9 +27,11 @@ def test_demo_builds_and_round_trips_exactly(script, tmp_path):
     built = asset.build(palette)
 
     scene = read_vox(result.vox_path)
-    assert [p.name for p in scene.parts] == [p.name for p in built.parts]
-    for read_part, built_part in zip(scene.parts, built.parts, strict=True):
+    again = BuiltAsset.from_vox(scene, result.summary, palette)  # folds flipbook frames back in
+    assert [p.name for p in again.parts] == [p.name for p in built.parts]
+    for read_part, built_part in zip(again.parts, built.parts, strict=True):
         assert read_part.grid == built_part.grid, read_part.name
+        assert read_part.frames == built_part.frames, read_part.name
     assert np.array_equal(scene.palette, palette.rgba_table())
 
 

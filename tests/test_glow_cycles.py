@@ -124,7 +124,9 @@ def test_glowing_voxels_render_at_full_color(tmp_path):
     full = table[s.palette.eye.yellow.index, :3]
     region = ((0, 0, 0), (2, 2, 2))
     front = raster.ortho(a.merged_grid(), table, "front", 4, region, glow=g)
-    assert np.abs(front.rgb[2:6, 2:6].reshape(-1, 3).astype(int) - full).max() <= 1
+    lift = 1 - np.exp(-2.5)  # eye.yellow glows at 2.5
+    want = full * (0.86 + (1 - 0.86) * lift)
+    assert np.abs(front.rgb[2:6, 2:6].reshape(-1, 3).astype(int) - want).max() <= 1
     iso = raster.iso(a.merged_grid(), table, 4, region, glow=g)
     posed = PosedScene(a, table, glow=g).render({}, "iso", 4, region)
     assert np.array_equal(iso.mask, posed.mask)
