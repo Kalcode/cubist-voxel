@@ -8,4 +8,15 @@ def barrel(p):
     for y in (2, 13):
         body = body.paint(p.metal.dark, where=band(axis="y", at=y, height=1))
     body = body.dither(p.wood.ramp, seed=1).darken_crevices()
-    return Model(parts=[Part("body", body, pivot=(6, 0, 6))])
+    # Built from chunks so it can blow apart: together they are the whole barrel.
+    pieces = chunks("stave", body, pieces=8, seed=2)
+    boom = clip(
+        "explode",
+        1.6,
+        burst(pieces, speed=11, up=10, spin=600, seed=1),
+        events=[(0.0, "emit:smoke")],
+        collisions=False,  # debris tumbles through debris
+    )
+    smoke = emitter((6, 8, 6), "smoke_puff", burst=10, life=1.2, speed=5, spread=80,
+                    gravity=-2, grow=(1.2, 2.5), part="stave_0")  # fmt: skip
+    return Model(parts=pieces, clips=[boom], emitters={"smoke": smoke})

@@ -24,7 +24,20 @@ def wand(p):
                     turn("wand", "x", [(0, 0), (0.25, -30), (0.45, 45), (0.8, 0)]),
                     turn("wand", "z", [(0, 0), (0.25, 10), (0.45, -8), (0.8, 0)]),
                 ],
-                events=[(0.45, "cast")],
+                events=[(0.45, "cast"), (0.45, "emit:sparks")],
             )
         ],
+        emitters={
+            "sparks": emitter(
+                (C, 16.5, C),
+                "spark",
+                direction="+y",
+                burst=16,
+                life=0.6,
+                speed=12,
+                spread=80,
+                gravity=10,
+                part="wand",
+            )  # fmt: skip
+        },
     )

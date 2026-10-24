@@ -49,7 +49,19 @@ def blaster(p):
                     frames("flash", [(0, 0), (0.03, 1)]),
                     turn("frame", "x", [(0, 0), (0.05, -10), (0.35, 0)]),  # muzzle kicks up
                 ],
-                events=[(0.0, "fire")],
+                events=[(0.0, "fire"), (0.0, "emit:sparks")],
             )
         ],
+        emitters={
+            "sparks": emitter(
+                (1.5, 6.5, 17.5),
+                "spark",
+                direction="+z",
+                burst=10,
+                life=0.3,
+                speed=24,
+                spread=40,
+                gravity=30,
+            )  # fmt: skip
+        },
     )

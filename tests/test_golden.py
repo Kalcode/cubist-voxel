@@ -42,6 +42,10 @@ def _built(script):
     style = load_project_style(DEMO / "style.toml")
     [asset] = [v for v in runpy.run_path(str(script)).values() if isinstance(v, AssetDef)]
     built = asset.build(style.palette, glow=style.glow, cycles=style.cycles)
+    for e in built.emitters.values():  # particle models come from their own demo scripts
+        [part_def] = [v for v in runpy.run_path(str(DEMO / "assets" / f"{e.particle}.py"))
+                      .values() if isinstance(v, AssetDef)]  # fmt: skip
+        built.particle_models[e.particle] = part_def.build(style.palette).merged_grid()
     return built, style.palette
 
 

@@ -48,4 +48,16 @@ def campfire(p):
             ),
         ],
         lights={"fire": light((C, 6, C), p.fire.light, range=14, intensity=2, flicker=0.5)},
+        emitters={
+            "smoke": emitter(
+                (C, 10.5, C),
+                "smoke_puff",
+                rate=2,
+                life=2.2,
+                speed=3,
+                spread=18,
+                gravity=-0.6,
+                grow=(0.4, 1.2),
+            )  # fmt: skip
+        },
     )
