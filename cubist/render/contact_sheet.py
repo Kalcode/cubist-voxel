@@ -7,7 +7,7 @@ exact positions. The declared asset size is outlined in blue when the model leav
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 from PIL import Image
@@ -188,17 +188,64 @@ def contact_sheet(
     names: dict[int, str] | None = None,
     scale: int | None = None,
 ) -> Image.Image:
+    check_views(views)
+    table, names = palette_table(palette, names)
+
+    def render(view: str, s: int, region) -> ViewRender:
+        if view == "iso":
+            return iso(grid, table, s, region)
+        return ortho(grid, table, view, s, region)
+
+    return sheet(
+        render,
+        asset_region(grid, size),
+        table,
+        names,
+        name,
+        grid.colors_used(),
+        grid.count(),
+        grid.bounds(),
+        size=size,
+        views=views,
+        scale=scale,
+    )
+
+
+def check_views(views: Sequence[str]) -> None:
     unknown = [v for v in views if v not in TITLES]
     if unknown:
         raise ValueError(f"unknown view {unknown[0]!r}; choose from {', '.join(TITLES)}")
+
+
+def palette_table(
+    palette: Palette | np.ndarray, names: dict[int, str] | None
+) -> tuple[np.ndarray, dict[int, str]]:
+    """The RGBA table to draw with and the color names for the legend."""
     if isinstance(palette, Palette):
         table = palette.rgba_table()
         names = {c.index: c.name for c in palette.colors()} if names is None else names
     else:
         table = np.asarray(palette, dtype=np.uint8)
-    names = names or {}
+    return table, names or {}
 
-    region = asset_region(grid, size)
+
+def sheet(
+    render: Callable[[str, int, tuple], ViewRender],
+    region,
+    table: np.ndarray,
+    names: dict[int, str],
+    name: str,
+    colors: dict[int, int],
+    voxels: int,
+    bounds,
+    size: Sequence[int] | None = None,
+    views: Sequence[str] = DEFAULT_VIEWS,
+    scale: int | None = None,
+    note: str | None = None,
+) -> Image.Image:
+    """A contact sheet drawn with ``render(view, scale, region)``: today's views of a voxel
+    grid, or of a posed asset. ``note`` goes at the end of the info line."""
+    check_views(views)
     dims = [b - a for a, b in zip(*region, strict=True)]
     scale = scale or choose_scale(dims)
     step = _major_step(scale, max(abs(v) for v in (*region[0], *region[1])))
@@ -218,28 +265,25 @@ def contact_sheet(
     panels = []
     for v in views:
         if v == "iso":
-            view = iso(grid, table, scale, region).rgb
-            framed = np.pad(view, ((ISO_MARGIN,) * 2, (ISO_MARGIN,) * 2, (0, 0)))
-            framed[:ISO_MARGIN] = framed[-ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
-            framed[:, :ISO_MARGIN] = framed[:, -ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
-            panels.append(_titled(TITLES[v], framed))
+            panels.append(_titled(TITLES[v], iso_framed(render("iso", scale, region).rgb)))
             continue
         base_view = "front" if v == "silhouette" else v
         assert base_view in VIEWS
-        render = ortho(grid, table, base_view, scale, region)
+        view = render(base_view, scale, region)
         if v == "silhouette":
-            render.rgb = np.where(render.mask[..., None], 0, BACKGROUND).astype(np.uint8)
-        rgb = _decorate(render, step, size_box[base_view] if size_box else None)
-        ruled, offset = _ruled(render, rgb, step)
+            view.rgb = np.where(view.mask[..., None], 0, BACKGROUND).astype(np.uint8)
+        rgb = _decorate(view, step, size_box[base_view] if size_box else None)
+        ruled, offset = _ruled(view, rgb, step)
         panels.append(_titled(TITLES[v], ruled, body_x=offset))
 
-    b = grid.bounds()
-    info = [f"{grid.count()} VOXELS"]
+    info = [f"{voxels} VOXELS"]
     if size is not None:
         info.insert(0, "SIZE " + "X".join(str(s) for s in size))
-    if b is not None:
-        info.append(f"BOUNDS ({','.join(map(str, b[0]))})-({','.join(map(str, b[1]))})")
+    if bounds is not None:
+        info.append(f"BOUNDS ({','.join(map(str, bounds[0]))})-({','.join(map(str, bounds[1]))})")
     info.append(f"1 VOXEL = {scale} PX")
+    if note:
+        info.append(note)
     info_line = "   ".join(info)
 
     rows = _flow(panels)
@@ -251,7 +295,7 @@ def contact_sheet(
     draw_text(header, 0, 0, name, INK, scale=2)
     draw_text(header, 0, text_height(2) + 7, info_line, MUTED)
 
-    legend = _legend(grid.colors_used(), table, names, body_w)
+    legend = _legend(colors, table, names, body_w)
     blocks = [header]
     for row in rows:
         row_h = max(p.shape[0] for p in row)
@@ -262,11 +306,23 @@ def contact_sheet(
             x += p.shape[1] + GAP
         blocks.append(strip)
     blocks.append(legend)
+    return stack(blocks, width)
 
+
+def iso_framed(rgb: np.ndarray) -> np.ndarray:
+    """An iso render with a background margin all round."""
+    framed = np.pad(rgb, ((ISO_MARGIN,) * 2, (ISO_MARGIN,) * 2, (0, 0)))
+    framed[:ISO_MARGIN] = framed[-ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
+    framed[:, :ISO_MARGIN] = framed[:, -ISO_MARGIN:] = BACKGROUND.astype(np.uint8)
+    return framed
+
+
+def stack(blocks: list[np.ndarray], width: int) -> Image.Image:
+    """Blocks top to bottom with gaps and margins, on the sheet background."""
     height = sum(blk.shape[0] for blk in blocks) + GAP * (len(blocks) - 1) + 2 * MARGIN
-    sheet = np.full((height, width, 3), SHEET_BG, dtype=np.uint8)
+    out = np.full((height, width, 3), SHEET_BG, dtype=np.uint8)
     y = MARGIN
     for blk in blocks:
-        sheet[y : y + blk.shape[0], MARGIN : MARGIN + blk.shape[1]] = blk
+        out[y : y + blk.shape[0], MARGIN : MARGIN + blk.shape[1]] = blk
         y += blk.shape[0] + GAP
-    return Image.fromarray(sheet)
+    return Image.fromarray(out)
