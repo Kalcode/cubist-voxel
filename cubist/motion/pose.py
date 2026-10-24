@@ -110,6 +110,26 @@ def world_matrices(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, 
     return out
 
 
+def posed_bounds(asset: BuiltAsset, matrices: dict[str, np.ndarray]) -> tuple:
+    """The whole-voxel box around every part's posed voxel bounds."""
+    pts = []
+    for p in asset.parts:
+        b = p.grid.bounds()
+        if b is None:
+            continue
+        lo, hi = np.array(b[0], float), np.array(b[1], float)
+        corners = np.array([[(hi if i & k else lo)[j] for j, k in enumerate((1, 2, 4))]
+                            for i in range(8)])  # fmt: skip
+        m = matrices.get(p.name, np.eye(4))
+        pts.append(corners @ m[:3, :3].T + m[:3, 3])
+    if not pts:
+        return (0, 0, 0), (1, 1, 1)
+    allp = np.round(np.concatenate(pts), 6)
+    lo = tuple(int(v) for v in np.floor(allp.min(axis=0)))
+    hi = tuple(int(v) for v in np.ceil(allp.max(axis=0)))
+    return lo, hi
+
+
 def moving_parts(asset: BuiltAsset, clip: Clip) -> list[str]:
     """Parts the clip drives, plus everything hanging from them, in model order."""
     driven = {t.part for t in clip.tracks}

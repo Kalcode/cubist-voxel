@@ -15,6 +15,7 @@ import numpy as np
 
 from cubist.core.model import BuiltAsset
 from cubist.io.mesh import greedy_mesh
+from cubist.motion.pose import posed_bounds
 from cubist.render.raster import (
     _VIEWS,
     AO_LEVELS,
@@ -51,8 +52,6 @@ class _Mesh:
             self.colors[i] = q.color
             if q.ao is not None:
                 self.ao[i] = AO_LEVELS[list(q.ao)]
-        b = grid.bounds()
-        self.box = None if b is None else (np.array(b[0], float), np.array(b[1], float))
 
 
 def _iso_light(n: np.ndarray) -> np.ndarray:
@@ -71,30 +70,13 @@ def _next_pow2(v: np.ndarray) -> np.ndarray:
 
 class PosedScene:
     def __init__(self, asset: BuiltAsset, table: np.ndarray):
+        self.asset = asset
         self.table = np.asarray(table)
         self.meshes = {p.name: _Mesh(p.grid) for p in asset.parts}
 
     def bounds(self, matrices: dict[str, np.ndarray]) -> Region:
         """The whole-voxel box around every part's posed bounding box."""
-        pts = []
-        for name, mesh in self.meshes.items():
-            if mesh.box is None:
-                continue
-            lo, hi = mesh.box
-            corners = np.array(
-                [
-                    [(hi if i & 1 else lo)[0], (hi if i & 2 else lo)[1], (hi if i & 4 else lo)[2]]
-                    for i in range(8)
-                ]
-            )
-            m = matrices.get(name, np.eye(4))
-            pts.append(corners @ m[:3, :3].T + m[:3, 3])
-        if not pts:
-            return (0, 0, 0), (1, 1, 1)
-        allp = np.round(np.concatenate(pts), 6)
-        lo = tuple(int(v) for v in np.floor(allp.min(axis=0)))
-        hi = tuple(int(v) for v in np.ceil(allp.max(axis=0)))
-        return lo, hi  # type: ignore[return-value]
+        return posed_bounds(self.asset, matrices)
 
     def render(
         self, matrices: dict[str, np.ndarray], view: str, scale: int, region: Region
