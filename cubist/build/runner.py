@@ -7,7 +7,10 @@ runs it, voxelizes each ``@asset``, and writes into ``out/<name>/``:
 * ``contact.png`` — the contact sheet,
 * ``lint.json`` — the lint report,
 * ``build.json`` — a summary including the lint result,
-* ``history.jsonl`` — one line appended per build (for counting iterations).
+* ``history.jsonl`` — one line appended per build (for counting iterations),
+* ``manifest.json`` — parts, joints and clips as an engine reads them (see docs/manifest.md),
+* for assets with clips: ``motion.png`` (the filmstrip; the previous one moves to
+  ``motion.prev.png``) and ``<clip>.gif`` per clip.
 
 It reports back through a result file so script output cannot corrupt it.
 
@@ -33,7 +36,9 @@ from cubist.core.palette import Palette
 from cubist.core.style import StyleBible, StyleError, load_style
 from cubist.io.vox import encode_vox
 from cubist.lint import Finding, lint
+from cubist.manifest import build_manifest
 from cubist.render.contact_sheet import contact_sheet
+from cubist.render.filmstrip import clip_frames, filmstrip, save_gif
 
 DEFAULT_TIMEOUT_S = 30.0
 
@@ -178,6 +183,12 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
     lint_path = asset_dir / "lint.json"
     lint_path.write_text(json.dumps(report.to_dict(), indent=2) + "\n")
     outputs = {"vox": str(vox_path), "contact_sheet": str(contact_path), "lint": str(lint_path)}
+    outputs.update(_write_motion(built, asset_dir))
+    manifest_path = asset_dir / "manifest.json"
+    manifest = build_manifest(built, style.voxel_size_m)
+    del manifest["files"]
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+    outputs["manifest"] = str(manifest_path)
     summary = {
         **built.summary(),
         "script": str(script),
@@ -202,6 +213,29 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
         "summary": str(summary_path),
         "summary_data": summary,
     }
+
+
+def _write_motion(built: BuiltAsset, asset_dir: Path) -> dict:
+    """Filmstrip and GIFs for an asset with clips; clears stale ones either way."""
+    motion_path = asset_dir / "motion.png"
+    keep = {f"{c.name}.gif" for c in built.clips}
+    for old in asset_dir.glob("*.gif"):
+        if old.name not in keep:
+            old.unlink()
+    if not built.clips:
+        for old in (motion_path, asset_dir / "motion.prev.png"):
+            old.unlink(missing_ok=True)
+        return {}
+    table = built.palette.rgba_table()
+    if motion_path.exists():
+        motion_path.replace(asset_dir / "motion.prev.png")
+    filmstrip(built, table, built.clips).save(motion_path)
+    gifs = {}
+    for c in built.clips:
+        frames, durations = clip_frames(built, table, c)
+        save_gif(frames, durations, asset_dir / f"{c.name}.gif")
+        gifs[c.name] = str(asset_dir / f"{c.name}.gif")
+    return {"motion": str(motion_path), "gifs": gifs}
 
 
 def _append_history(asset_dir: Path, script: Path, **fields) -> None:

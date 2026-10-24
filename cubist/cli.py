@@ -15,6 +15,7 @@ from cubist.build.runner import (
     find_style,
     load_project_style,
 )
+from cubist.core.model import BuiltAsset
 from cubist.examples import ExampleError, list_examples, promote, search_examples
 from cubist.export import NATIVE, ExportBlocked, export_asset, lint_loaded, load_asset
 from cubist.io.vengi import VengiError
@@ -24,6 +25,7 @@ from cubist.project import ProjectError, find_project, new_asset
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
 from cubist.render.diff import diff_sheet
+from cubist.render.filmstrip import render_clip
 
 
 def _hex(rgba) -> str:
@@ -84,6 +86,21 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 def cmd_render(args: argparse.Namespace) -> int:
     asset = load_asset(args.asset)
+    if args.clip:
+        built = BuiltAsset.from_vox(asset.scene, asset.summary, None)
+        kind, image = render_clip(
+            built,
+            asset.scene.palette,
+            args.clip,
+            at=args.at,
+            frames=args.frames,
+            view=args.view,
+            names=asset.names,
+        )
+        out = args.out or asset.vox.parent / "render.png"
+        image.save(out)
+        _print({kind: str(out)})
+        return 0
     grid, size, name = asset.grid, asset.summary.get("size"), asset.name
     if args.slices:
         axis, start, stop = parse_slices(args.slices)
@@ -251,6 +268,10 @@ def parser() -> argparse.ArgumentParser:
     r.add_argument("--views", help=f"comma-separated (default: {','.join(DEFAULT_VIEWS)})")
     r.add_argument("--slices", help="layers to print, like y=10..14 or x=3")
     r.add_argument("--out", type=Path, help="image path (default: render.png beside the .vox)")
+    r.add_argument("--clip", help="render a clip: a filmstrip, or a posed sheet with --at")
+    r.add_argument("--at", type=float, help="with --clip: a contact sheet posed at this time (s)")
+    r.add_argument("--frames", type=int, default=8, help="with --clip: frames in the filmstrip")
+    r.add_argument("--view", help="with --clip: the filmstrip's orthographic view")
     r.set_defaults(fn=cmd_render)
 
     li = sub.add_parser("lint", help="lint a built asset (exit 2 when there are errors)")

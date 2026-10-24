@@ -15,6 +15,7 @@ from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from cubist.build.runner import BuildError, build_script, load_project_style
+from cubist.core.model import BuiltAsset
 from cubist.examples import search_examples as find_examples
 from cubist.export import ExportBlocked, LoadedAsset, export_asset, lint_loaded, load_asset
 from cubist.io.vengi import VengiError
@@ -23,6 +24,7 @@ from cubist.project import new_asset as scaffold
 from cubist.render.ascii import parse_slices, slices
 from cubist.render.contact_sheet import DEFAULT_VIEWS, asset_region, contact_sheet
 from cubist.render.diff import change_grid, diff_sheet
+from cubist.render.filmstrip import render_clip
 
 INSTRUCTIONS = """Cubist builds game-ready voxel assets from Python scripts. Never place voxels one
 at a time: write a script with the DSL (primitives, CSG, transforms, paint ops) and build it.
@@ -89,19 +91,41 @@ def create_server(project: str | Path) -> MCPServer:
         out = []
         for r in build_script(script, style=project / "style.toml", seed=seed):
             s = r.summary
+            motion = s["outputs"].get("motion")
             out.append(
                 f"{s['name']}: {s['voxels']} voxels, {len(s['parts'])} part(s)\n"
                 f"{s['lint']['summary']}\nvox: {r.vox_path}\ncontact sheet: {r.contact_path}"
+                + (f"\nmotion: {motion}" if motion else "")
             )
             out.append(Image(path=r.contact_path))
+            if motion:
+                out.append(Image(path=motion))
         return out
 
     @server.tool()
     @_tool_errors
-    def render(asset: str, views: list[str] | None = None, slices: str | None = None) -> list:
+    def render(
+        asset: str,
+        views: list[str] | None = None,
+        slices: str | None = None,
+        clip: str | None = None,
+        at: float | None = None,
+        frames: int = 8,
+        view: str | None = None,
+    ) -> list:
         """Re-render a built asset's contact sheet (views like front,right,back,top,iso,
-        silhouette) and/or print ASCII slices (like y=10..14) for precise work."""
+        silhouette) and/or print ASCII slices (like y=10..14) for precise work. With clip: a
+        filmstrip of that clip (frames, view), or with at (seconds) a contact sheet posed then."""
         loaded = load_asset(resolve(asset))
+        if clip:
+            built = BuiltAsset.from_vox(loaded.scene, loaded.summary, None)
+            _, image = render_clip(
+                built, loaded.scene.palette, clip, at=at, frames=frames, view=view,
+                names=loaded.names,
+            )  # fmt: skip
+            path = loaded.vox.parent / "render.png"
+            image.save(path)
+            return [Image(path=path)]
         spec = slices  # the parameter shadows the module function; _slices calls that
         out: list = []
         if spec:

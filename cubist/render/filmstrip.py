@@ -256,3 +256,36 @@ def posed_sheet(
         views=views,
         note=f"CLIP {clip.name.upper()} T={t:.2f}S",
     )
+
+
+STRIP_VIEWS = ("front", "back", "left", "right", "top")
+
+
+def clip_named(asset: BuiltAsset, name: str) -> Clip:
+    for c in asset.clips:
+        if c.name == name:
+            return c
+    known = ", ".join(c.name for c in asset.clips) or "none (add clips=[...] to the Model)"
+    raise ValueError(f"no clip {name!r} in {asset.name}; its clips: {known}")
+
+
+def render_clip(
+    asset: BuiltAsset,
+    table: np.ndarray,
+    name: str,
+    at: float | None = None,
+    frames: int = 8,
+    view: str | None = None,
+    names: dict[int, str] | None = None,
+) -> tuple[str, Image.Image]:
+    """("filmstrip", image) for a clip, or ("contact_sheet", image) posed at time ``at``."""
+    c = clip_named(asset, name)
+    if at is not None:
+        if not 0 <= at <= c.length:
+            raise ValueError(f"--at {at:g} is outside clip {name!r} (0 to {c.length:g} s)")
+        return "contact_sheet", posed_sheet(asset, table, c, at, names=names)
+    if view is not None and view not in STRIP_VIEWS:
+        raise ValueError(f"unknown view {view!r}; choose from {', '.join(STRIP_VIEWS)}")
+    if frames < 2:
+        raise ValueError(f"frames must be at least 2, got {frames}")
+    return "filmstrip", filmstrip(asset, table, [c], frames=frames, view=view)

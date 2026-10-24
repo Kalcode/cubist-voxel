@@ -138,7 +138,7 @@ class BuiltAsset:
     size: Vec3 | None
     tags: tuple[str, ...]
     parts: list[BuiltPart]
-    palette: Palette
+    palette: Palette | None
     sockets: dict[str, Vec3] = field(default_factory=dict)
     grounded: bool = False
     symmetric: str | None = None
@@ -217,8 +217,9 @@ class BuiltAsset:
         }
 
     @classmethod
-    def from_vox(cls, scene, summary: dict, palette: Palette) -> BuiltAsset:
-        """Rebuild an asset from its .vox file and build.json (empty dict if none) for lint.
+    def from_vox(cls, scene, summary: dict, palette: Palette | None) -> BuiltAsset:
+        """Rebuild an asset from its .vox file and build.json (empty dict if none) for lint
+        and posed renders (which need no palette names; pass None there).
 
         Color indices stay as they are in the file, which may differ from ``palette``."""
         info = {p["name"]: p for p in summary.get("parts", [])}
