@@ -84,6 +84,7 @@ Open `export/lantern.vox` in MagicaVoxel or drag `export/lantern.glb` into Godot
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist inspect <file.vox>` | Parts, bounds, and color counts as JSON |
 | `cubist export <asset>` | `.glb`, `.vox` and the manifest `<name>.cubist.json` (blocked by lint errors unless `--force`); `--via-vengi FORMAT` |
+| `cubist export --all` | The same for every built asset in `out/`, say after a style change; a game that loads `export/` should commit it |
 | `cubist style` | The parsed style bible with every palette name |
 | `cubist palette import <file>` | Use a palette file (.png, .gif, .gpl, .hex) as the palette source |
 | `cubist examples list \| search \| promote` | The example library |

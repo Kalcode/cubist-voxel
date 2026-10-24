@@ -19,7 +19,14 @@ from cubist.build.runner import (
 )
 from cubist.core.model import BuiltAsset
 from cubist.examples import ExampleError, list_examples, promote, search_examples
-from cubist.export import NATIVE, ExportBlocked, export_asset, lint_loaded, load_asset
+from cubist.export import (
+    NATIVE,
+    ExportBlocked,
+    export_all,
+    export_asset,
+    lint_loaded,
+    load_asset,
+)
 from cubist.io.vengi import VengiError
 from cubist.io.vox import read_vox
 from cubist.motion.particles import load_particles
@@ -164,18 +171,29 @@ def cmd_lint(args: argparse.Namespace) -> int:
 def cmd_export(args: argparse.Namespace) -> int:
     formats = [f for f in NATIVE if getattr(args, f)] + (args.via_vengi or [])
     notes: list[str] = []
+    options = dict(
+        formats=formats or NATIVE,
+        out_dir=args.out,
+        force=args.force,
+        style=args.style,
+        vertex_colors=args.vertex_colors,
+        ao=args.ao,
+        center=not args.no_center,
+        notes=notes,
+    )
+    if args.all:
+        done, blocked = export_all(_project(args), **options)
+        for note in notes:
+            print(f"warning: {note}", file=sys.stderr)
+        for name, why in blocked.items():
+            print(f"error: {name}: {why}", file=sys.stderr)
+        _print({"exported": done, "blocked": {k: v.splitlines()[0] for k, v in blocked.items()}})
+        return 2 if blocked else 0
+    if args.asset is None:
+        print("error: export needs an asset (a .vox or out/<name>/) or --all", file=sys.stderr)
+        raise SystemExit(2)
     try:
-        written = export_asset(
-            args.asset,
-            formats=formats or NATIVE,
-            out_dir=args.out,
-            force=args.force,
-            style=args.style,
-            vertex_colors=args.vertex_colors,
-            ao=args.ao,
-            center=not args.no_center,
-            notes=notes,
-        )
+        written = export_asset(args.asset, **options)
     except ExportBlocked as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -341,7 +359,13 @@ def parser() -> argparse.ArgumentParser:
     li.set_defaults(fn=cmd_lint)
 
     e = sub.add_parser("export", help="export .glb/.vox (blocked by lint errors unless --force)")
-    e.add_argument("asset", type=Path, help="a .vox file or its out/<name>/ directory")
+    e.add_argument("asset", type=Path, nargs="?", help="a .vox file or its out/<name>/ directory")
+    e.add_argument(
+        "--all",
+        action="store_true",
+        help="every built asset in the project's out/ (exit 2 if lint blocks any)",
+    )
+    e.add_argument("--project", type=Path, help="with --all: the project (default: from cwd)")
     e.add_argument("--glb", action="store_true", help="glTF binary (default: --glb --vox)")
     e.add_argument("--vox", action="store_true", help="MagicaVoxel .vox")
     e.add_argument(

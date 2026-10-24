@@ -8,8 +8,9 @@ from pygltflib import GLTF2
 
 from cubist.build.runner import build_script
 from cubist.cli import main
-from cubist.export import ExportBlocked, export_asset
+from cubist.export import ExportBlocked, export_all, export_asset
 from cubist.io.vengi import VengiError
+from cubist.project import ProjectError
 
 STYLE = '[project]\nvoxel_size_m = 0.25\n\n[palette]\nwood = ["#3b2414", "#8a5a32"]\n'
 
@@ -105,3 +106,44 @@ def test_cli_export_blocked_exits_2(project, capsys):
     capsys.readouterr()
     assert main(["export", str(asset_dir)]) == 2
     assert "blocked" in capsys.readouterr().err
+
+
+def test_export_all_exports_every_built_asset_and_reports_blocked_ones(project):
+    built(project)
+    built(project, name="wide", body="box((3, 2, 2), color=p.wood.dark)")
+    built(project, name="log", body="box((2, 1, 2), color=p.wood.light)", size="(2, 1, 2)")
+    done, blocked = export_all(project)
+    assert sorted(done) == ["crate", "log"]
+    assert set(done["crate"]) == {"glb", "vox", "manifest"}
+    assert list(blocked) == ["wide"] and "bounds" in blocked["wide"]
+    assert (project / "export" / "log.cubist.json").exists()
+    assert not (project / "export" / "wide.glb").exists()
+
+
+def test_export_all_skips_the_previous_build_kept_for_diff(project):
+    built(project)
+    built(project)  # the second build keeps crate.prev.vox beside crate.vox
+    done, blocked = export_all(project)
+    assert list(done) == ["crate"] and blocked == {}
+
+
+def test_export_all_with_nothing_built_is_a_clear_error(project):
+    with pytest.raises(ProjectError, match="cubist build"):
+        export_all(project)
+
+
+def test_cli_export_all(project, capsys, monkeypatch):
+    built(project)
+    built(project, name="wide", body="box((3, 2, 2), color=p.wood.dark)")
+    capsys.readouterr()
+    monkeypatch.chdir(project)
+    assert main(["export", "--all"]) == 2  # one blocked
+    info = json.loads(capsys.readouterr().out)
+    assert list(info["exported"]) == ["crate"] and list(info["blocked"]) == ["wide"]
+    assert main(["export", "--all", "--force", "--project", str(project)]) == 0
+
+
+def test_cli_export_needs_an_asset_or_all(project, capsys):
+    with pytest.raises(SystemExit):
+        main(["export"])
+    assert "--all" in capsys.readouterr().err

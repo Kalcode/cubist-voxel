@@ -20,6 +20,7 @@ from cubist.lint import LintReport, lint
 from cubist.lint.motion import check_hand_edits
 from cubist.manifest import build_manifest
 from cubist.motion.particles import load_particles
+from cubist.project import ProjectError
 
 NATIVE = ("glb", "vox")
 
@@ -58,7 +59,8 @@ class LoadedAsset:
 
     @property
     def glow(self) -> dict[int, float]:
-        return {int(k): float(v) for k, v in self.summary.get("glow", {}).items()}
+        glow = {int(k): float(v) for k, v in self.summary.get("glow", {}).items()}
+        return glow or dict(self.scene.glow)  # no build.json: the file's MATL materials
 
     @property
     def hidden(self) -> list[str]:
@@ -110,6 +112,24 @@ def lint_loaded(asset: LoadedAsset, style: StyleBible) -> tuple[BuiltAsset, Lint
     load_particles(built, asset.vox.parent.parent)
     extra = check_hand_edits(built, asset.summary)
     return built, lint(built, style, rgba=asset.scene.palette, extra=extra)
+
+
+def export_all(project: str | Path, **options) -> tuple[dict[str, dict], dict[str, str]]:
+    """Export every built asset in ``<project>/out`` with ``export_asset``'s options. Returns
+    (what was written, per asset) and (why lint blocked it, per asset); one blocked asset
+    doesn't stop the rest."""
+    project = Path(project)
+    dirs = sorted(d for d in (project / "out").glob("*") if (d / f"{d.name}.vox").is_file())
+    if not dirs:
+        raise ProjectError(f"no built assets in {project / 'out'}; run cubist build first")
+    done: dict[str, dict] = {}
+    blocked: dict[str, str] = {}
+    for d in dirs:
+        try:
+            done[d.name] = export_asset(d, **options)
+        except ExportBlocked as e:
+            blocked[d.name] = str(e)
+    return done, blocked
 
 
 def export_asset(

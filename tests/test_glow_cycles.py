@@ -116,6 +116,22 @@ def test_bare_vox_takes_its_glow_from_its_materials(tmp_path):
     assert again.glow == pytest.approx(s.glow)
 
 
+def test_loaded_bare_vox_previews_with_its_material_glow(tmp_path):
+    # `cubist render` on a MagicaVoxel file: no build.json, so glow comes from MATL.
+    from cubist.export import load_asset
+    from cubist.io.vox import write_vox
+
+    s = style(tmp_path)
+
+    def fn(p):
+        return Model([Part("orb", box((2, 2, 2), color=p.eye.yellow))])
+
+    a = asset(name="orb", size=(2, 2, 2))(fn).build(s.palette, glow=s.glow)
+    (tmp_path / "painted").mkdir()
+    write_vox(tmp_path / "painted" / "orb.vox", a.to_vox_scene())
+    assert load_asset(tmp_path / "painted" / "orb.vox").glow == pytest.approx(s.glow)
+
+
 def test_style_to_dict_lists_glow_and_cycles(tmp_path):
     d = style(tmp_path).to_dict()
     assert d["glow"]["eye.yellow"] == 2.5 and d["cycles"][0]["ramp"] == "water"

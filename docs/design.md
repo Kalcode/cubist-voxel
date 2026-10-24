@@ -342,6 +342,7 @@ image content so the agent sees them without opening files.
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist style` | Parsed `style.toml` with palette names |
 | `cubist export <asset> [--glb] [--vox] [--via-vengi FMT] [--ao] [--vertex-colors]` | Export (blocked by lint errors unless `--force`; exit 2) |
+| `cubist export --all [--project DIR]` | Export every built asset in `out/`, same options; a blocked asset is reported and the rest still export (exit 2 if any was blocked) |
 | `cubist inspect <asset>` | Bounds, parts, pivots, voxel counts, color histogram as JSON |
 | `cubist diff <asset> [<other>]` | Before/after/changes sheet; with one argument, against the previous build (`<name>.prev.vox`) |
 | `cubist palette import <file>` | Import a palette into `style.toml` |
