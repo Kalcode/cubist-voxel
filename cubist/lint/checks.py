@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -245,6 +246,32 @@ def check_grounding(asset: BuiltAsset, merged: VoxelGrid) -> list[Finding]:
             {"lowest_y": b[0][1]},
         )
     ]
+
+
+def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
+    """A grounded asset's light should light the floor around it: its range should reach the
+    floor as far out as the light is high (range >= sqrt(2) * height)."""
+    if not asset.grounded:
+        return []
+    m = style.voxel_size_m
+    out = []
+    for name, lt in asset.lights.items():
+        height = float(lt.position[1])
+        need = math.ceil(math.sqrt(2) * height)
+        if height <= 0 or lt.range >= need:
+            continue
+        out.append(
+            Finding(
+                "light_reach",
+                "warning",
+                f"light {name!r} is {height:g} voxels ({height * m:.1f} m) above the floor with "
+                f"range {lt.range:g} ({lt.range * m:.1f} m), so it barely lights the ground "
+                f"around it; give it range {need} or more. Ranges are in voxels: a lantern "
+                f"lights about 6-10 m, {round(6 / m)}-{round(10 / m)} voxels here",
+                {"light": name, "height": height, "range": lt.range, "min_range": need},
+            )
+        )
+    return out
 
 
 def check_budgets(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> list[Finding]:

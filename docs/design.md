@@ -253,6 +253,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Budgets | Voxel, color, part, or post-meshing triangle count over the style bible's limits | Warning |
 | Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
+| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
 | Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |

@@ -126,6 +126,7 @@ def lint(
         *frame_checks(asset),
         *checks.check_symmetry(asset, merged, style),
         *checks.check_grounding(asset, merged),
+        *checks.check_light_reach(asset, style),
         *checks.check_budgets(asset, merged, style),
         *checks.check_thin(merged),
         *checks.check_hidden(merged),

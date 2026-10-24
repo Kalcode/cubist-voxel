@@ -33,5 +33,5 @@ def torch(p):
                 pivot=(C, 11, C),
             ),
         ],
-        lights={"flame": light((C, 14, C), p.fire.light, range=10, flicker=0.35)},
+        lights={"flame": light((C, 14, C), p.fire.light, range=96, flicker=0.35)},
     )

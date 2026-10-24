@@ -220,12 +220,25 @@ in every part, so paint spray, foam and flashes from another ramp.
 
 ```python
 light(position, color, range=8, intensity=1.0, flicker=0.0, part=None)
-Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=10, flicker=0.35)})
+Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=96, flicker=0.35)})
 ```
 
 A point light in a palette color, moving with `part` (default: the part with the nearest voxel).
 It becomes a `KHR_lights_punctual` light in the `.glb`; `flicker` (0 steady to 1 wild) goes in
 the manifest for the engine. Posed previews mark it with a dot.
+
+`range` is where the light fades to nothing, in voxels, and is easy to set far too short:
+think in metres and divide by `voxel_size_m`. Typical ranges, with voxels at 1/16 m:
+
+| Light | Range | Voxels at 1/16 m |
+| --- | --- | --- |
+| Candle, glowing potion, wand tip | 2-3 m | 32-48 |
+| Torch, sconce | 5-6 m | 80-96 |
+| Lantern, lamp post, lit window | 6-10 m | 96-160 |
+| Campfire, hearth, forge | 8-12 m | 128-192 |
+
+On a grounded asset, lint warns (`light_reach`) when a light can't reach the floor as far out
+as it is high, that is when `range` is under 1.4 times its height.
 
 ### Fracture and bursts
 

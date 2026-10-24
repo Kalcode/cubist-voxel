@@ -93,3 +93,40 @@ def test_static_assets_have_no_lights_extension():
     from test_gltf_anim import static
 
     assert b"KHR_lights" not in encode_glb(gbuild(static), GP.rgba_table(), voxel_size_m=0.5)
+
+
+# --- lint: lights that can't reach the floor ------------------------------------------
+
+from cubist.core.style import StyleBible  # noqa: E402
+from cubist.lint import lint  # noqa: E402
+
+
+def post(height, range_, grounded=True):
+    def fn(p):
+        pole = Part("pole", box((1, height, 1), color=p.wood.dark), pivot=(0.5, 0, 0.5))
+        lamp = light((0.5, height + 0.5, 0.5), p.fire.light, range=range_)
+        return Model([pole], lights={"lamp": lamp})
+
+    return asset(name="post", size=(1, height, 1), grounded=grounded)(fn).build(P)
+
+
+def reach(a):
+    style = StyleBible(path=None, name="t", voxel_size_m=0.0625, palette=P)
+    return [f for f in lint(a, style).findings if f.check == "light_reach"]
+
+
+def test_light_too_short_to_light_the_floor_warns_in_metres():
+    # The lamp post that started this: 50 voxels up, range 48.
+    [f] = reach(post(50, 48))
+    assert f.severity == "warning"
+    assert "lamp" in f.message and "3.2 m" in f.message and "3.0 m" in f.message
+    assert f.details["min_range"] == 72  # ceil(sqrt(2) * 50.5)
+
+
+def test_light_reaching_the_floor_around_it_is_fine():
+    assert reach(post(50, 120)) == []
+    assert reach(post(6, 14)) == []  # a campfire's light, low and wide
+
+
+def test_light_reach_is_only_checked_on_grounded_assets():
+    assert reach(post(50, 10, grounded=False)) == []  # held or hung: no known floor
