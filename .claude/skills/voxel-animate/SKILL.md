@@ -20,6 +20,9 @@ Never key motion by hand frame by frame; use generators. Work from the project d
    - changes shape (flame, splash): a flipbook, `Part(..., frames=[...], fps=)`, built from one
      function with a different seed per frame; `frames(...)` plays chosen frames in a clip
    - gives off light: a `[glow]` color in `style.toml` and a `light(...)` with some flicker
+   - breaks apart: `chunks(...)` for the parts, a `burst(...)` clip with `collisions=False`
+   - smokes or sparks: a particle asset (build it first) and an `emitter(...)`, always on with
+     `rate` or fired by an `emit:<name>` clip event with `burst`
 2. **Split the model into parts that move separately**, each with its pivot where it really
    turns: the hinge edge at the face it swings away from, the hip, the shoulder, the grip.
    Moving parts must be separate parts. Children ride along with their parents.

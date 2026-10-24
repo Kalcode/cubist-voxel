@@ -532,7 +532,15 @@ moves and what it looks like; the engine decides when it happens and how it is s
    every frame. Demo: the torch and a campfire flicker and glow, a pond's water flows, the
    blaster's flash plays two frames. Godot imports the moving demo assets with their animations,
    lights and emission. Plan: `docs/superpowers/plans/2026-10-24-m9-flipbooks-glow.md`.
-10. **Effects** — fracture, baked bursts, particle models and emitters.
+10. **Effects** — done. `fracture`/`chunks` (seeded farthest-point seeds, jittered cuts,
+   strays and slivers merged so every chunk is one connected piece); `burst` (a baked ballistic
+   clip of plain keys: chunks roll up off the floor while rising and rest where they touch
+   down); `clip(collisions=False)` for debris; `emitter(...)` with rate and/or burst on
+   `emit:<name>` events, previewed by a seeded simulation that draws particle assets from
+   `out/` (stand-in cubes and a lint warning when unbuilt), oriented empty nodes in the `.glb`,
+   emitters and particle dependencies in the manifest. Demo: the barrel explodes with smoke,
+   the campfire smokes, the blaster and wand throw sparks; new `smoke_puff` and `spark`
+   particle assets. Plan: `docs/superpowers/plans/2026-10-24-m10-effects.md`.
 11. **Evaluation** — twelve motion briefs built by fresh agents, scored from their GIFs.
 
 ### v1 acceptance targets

@@ -103,6 +103,25 @@ An engine can drive joints directly, such as a door the player pushes, using the
 - **`lights`**: point lights in asset space; `range` in voxels; `flicker` 0..1 for the engine.
   The `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`.
 
+## Emitters and particles
+
+```json
+"emitters": {"sparks": {"position": [1.5, 6.5, 17.5], "part": "frame", "particle": "spark",
+                        "direction": [0, 0, 1], "rate": null, "burst": 10, "life": 0.3,
+                        "speed": 24, "spread": 40, "gravity": 30, "grow": [1, 1],
+                        "fade": true, "seed": 0}},
+"particles": ["spark"]
+```
+
+- An emitter sprays the `particle` asset (its own `.glb`/manifest; `particles` lists every one
+  this asset needs) from `position` along `direction`, within `spread` degrees: `rate` per
+  second always, and `burst` at once whenever a clip event `emit:<name>` fires.
+- Particles live `life` seconds, start at `speed` voxels/s (Cubist's previews vary it by
+  ±25%), fall under `gravity` voxels/s² (negative rises), scale from `grow[0]` to `grow[1]`,
+  and with `fade` shrink to nothing over the last 30% of their life.
+- The `.glb` has an empty node per emitter under `part`, its local +Z along `direction`.
+- Clips with `"collisions": false` are effects whose parts pass through each other (debris).
+
 ## Sockets
 
 ```json

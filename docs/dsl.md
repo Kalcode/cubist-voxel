@@ -210,6 +210,71 @@ A point light in a palette color, moving with `part` (default: the part with the
 It becomes a `KHR_lights_punctual` light in the `.glb`; `flicker` (0 steady to 1 wild) goes in
 the manifest for the engine. Posed previews mark it with a dot.
 
+### Fracture and bursts
+
+```python
+fracture(shape, pieces=8, seed=0, min_voxels=None)  # -> list of voxel shapes
+chunks(name, shape, pieces=8, seed=0, parent=None)  # -> parts name_0, name_1, ...
+burst(parts, origin=None, speed=6, up=6, spin=540, gravity=40, rate=20, seed=0)  # -> tracks
+```
+
+`fracture` splits a shape into about `pieces` face-connected chunks that keep their colors (no
+slivers: tiny pieces merge into a neighbor). `chunks` makes them parts pivoted at their centers
+of mass, so the intact asset is just the chunks together. `burst` throws them out from `origin`
+(default their center at the floor) at about `speed` plus `up` voxels/s, tumbling at up to
+`spin` degrees/s under `gravity`; rising chunks roll up off the floor and each comes to rest
+where its lowest corner touches down. It's a baked clip of plain keys, so it plays anywhere;
+the manifest has each chunk for engines that want real physics.
+
+```python
+pieces = chunks("stave", body, pieces=8, seed=2)
+boom = clip(
+    "explode",
+    1.6,
+    burst(pieces, speed=11, up=10, seed=1),
+    events=[(0.0, "emit:smoke")],
+    collisions=False,
+)
+return Model(parts=pieces, clips=[boom], emitters={"smoke": smoke})
+```
+
+`collisions=False` turns off the collision check for a clip whose parts are meant to pass
+through each other, like debris.
+
+### Emitters and particles
+
+```python
+emitter(
+    position,
+    particle,
+    direction="+y",
+    rate=None,
+    burst=None,
+    life=1.0,
+    speed=2.0,
+    spread=20,
+    gravity=0.0,
+    grow=(1, 1),
+    fade=True,
+    seed=0,
+    part=None,
+)
+Model(parts, ..., emitters={"smoke": emitter(...)})
+```
+
+An emitter sprays copies of a particle asset (an ordinary asset, tagged `particle`, like
+`smoke_puff` or `spark`): `rate` per second always, and/or `burst` at once on each
+`emit:<name>` clip event. `spread` is degrees around `direction`; `gravity` pulls down in
+voxels/s² (negative rises, for smoke); `grow` is the size at birth and at death; `fade` shrinks
+particles away over the last 30% of their life. It moves with `part` (default the nearest).
+
+Cubist only describes and previews emitters: filmstrips and GIFs run a simple seeded
+simulation and draw each particle's model from `out/<particle>/` (build the particle first;
+until then previews draw plain cubes and lint warns). The engine plays them for real from the
+manifest, which also lists the particle assets the asset needs. The `.glb` gets an empty node
+per emitter, its +Z along `direction`. Lint warns when an emitter sprays straight into the
+model or a clip fires an emitter that doesn't exist or has no `burst`.
+
 ### Oriented sockets
 
 ```python

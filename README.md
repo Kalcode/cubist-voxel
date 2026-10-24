@@ -46,8 +46,9 @@ def barrel(p):
   and the linter holds every asset to it: off-palette colors, out-of-bounds voxels, floating
   pieces, broken symmetry, budgets, thin walls, hidden interiors.
 - **Motion.** Hinges, slides and spins on parts, clips written as code, walk cycles from
-  generators, flipbooks for flames, glowing colors, lights and color-cycling water: the chest
-  lid opens, the goblin walks, the torch flickers. Every build with clips renders a filmstrip for
+  generators, flipbooks for flames, glowing colors, lights, color-cycling water, fracture with
+  baked explosions, and smoke and spark emitters: the chest lid opens, the goblin walks, the
+  torch flickers, the barrel blows apart. Every build with clips renders a filmstrip for
   the agent and a GIF for you, lints the motion (limits, loops that hitch, parts passing through
   each other), and exports glTF animations plus a manifest for your engine.
 
@@ -154,9 +155,9 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 
 ## Status
 
-Milestones 1–9 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
-characters; 9: flipbooks, glow and lights), with human scores for the first evaluation still to
-come. Next up: voxel effects (fracture, particles), then a motion evaluation
+Milestones 1–10 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
+characters; 9: flipbooks, glow and lights; 10: fracture, bursts and emitters), with human scores
+for the first evaluation still to come. Next up: a motion evaluation with fresh agents
 ([the plan](docs/superpowers/specs/2026-10-24-motion-and-effects-design.md)).
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
