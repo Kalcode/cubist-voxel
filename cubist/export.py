@@ -162,7 +162,9 @@ def export_asset(
     native = {f: Path(p).name for f, p in written.items() if f in NATIVE}
     if native:
         target = out / f"{asset.name}.cubist.json"
-        manifest = build_manifest(built, bible.voxel_size_m, files=native, center=center)
+        manifest = build_manifest(
+            built, bible.voxel_size_m, files=native, center=center, table=asset.scene.palette
+        )
         target.write_text(json.dumps(manifest, indent=2) + "\n")
         written["manifest"] = str(target)
     return written

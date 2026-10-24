@@ -41,12 +41,31 @@ def _color_name(asset: BuiltAsset, index: int) -> str:
         return f"#{index}"
 
 
+def _colors(asset: BuiltAsset, table) -> dict:
+    """Every color the manifest names (glow, cycles, lights) with its .vox index and RGB."""
+    indices = {i for i in asset.glow if i in used_colors(asset)}
+    indices.update(i for c in used_cycles(asset) for i in c.indices)
+    indices.update(lt.color for lt in asset.lights.values())
+    if table is None and asset.palette is not None:
+        table = asset.palette.rgba_table()
+    out = {}
+    for i in sorted(indices):
+        entry: dict = {"index": int(i)}
+        if table is not None:
+            entry["rgb"] = "#" + "".join(f"{int(v):02x}" for v in table[i][:3])
+        out[_color_name(asset, i)] = entry
+    return out
+
+
 def build_manifest(
     asset: BuiltAsset,
     voxel_size_m: float,
     files: dict[str, str] | None = None,
     center: bool = True,
+    table=None,
 ) -> dict:
+    """``table`` is the (256, 4) palette the colors resolve through, the .vox's own on
+    export; by default the asset's palette."""
     sockets = {}
     for name, value in asset.sockets.items():
         sock = Socket.from_value(value, name)
@@ -87,6 +106,7 @@ def build_manifest(
             name: {**e.to_summary(), "part": e.part or nearest_part(asset, e.position)}
             for name, e in asset.emitters.items()
         },
+        "colors": _colors(asset, table),
         "particles": sorted({e.particle for e in asset.emitters.values()}),
         "lights": {
             name: {

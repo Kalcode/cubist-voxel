@@ -175,6 +175,23 @@ def test_manifest_lists_used_glowing_colors_by_name(tmp_path):
     assert build_manifest(a, voxel_size_m=1)["glow"] == {"eye.yellow": 2.5}
 
 
+def test_manifest_resolves_glow_names_to_vox_index_and_rgb(tmp_path):
+    a, s = lit(tmp_path)
+    index = s.palette.eye.yellow.index
+    assert build_manifest(a, voxel_size_m=1)["colors"] == {
+        "eye.yellow": {"index": index, "rgb": "#ffd23f"}
+    }
+
+
+def test_manifest_colors_come_from_the_file_palette_when_given(tmp_path):
+    # An export resolves through the .vox's own palette, as the .glb's texture does.
+    a, s = lit(tmp_path)
+    table = s.palette.rgba_table().copy()
+    table[s.palette.eye.yellow.index, :3] = (1, 2, 3)
+    colors = build_manifest(a, voxel_size_m=1, table=table)["colors"]
+    assert colors["eye.yellow"]["rgb"] == "#010203"
+
+
 # --- color cycles in previews and the manifest ------------------------------------
 
 from cubist.build.runner import build_script  # noqa: E402
@@ -218,6 +235,13 @@ def test_manifest_lists_used_cycles_by_color_name(tmp_path):
         {"name": "shimmer", "ramp": "water", "fps": 4.0,
          "colors": ["water.dark", "water.1", "water.mid", "water.light"]}
     ]  # fmt: skip
+
+
+def test_manifest_resolves_cycle_colors(tmp_path):
+    a, s = pond(tmp_path)
+    colors = build_manifest(a, voxel_size_m=1)["colors"]
+    assert colors["water.dark"] == {"index": s.palette.water.dark.index, "rgb": "#123456"}
+    assert set(colors) == {"water.dark", "water.1", "water.mid", "water.light"}
 
 
 def test_build_of_cycling_asset_writes_colors_preview(tmp_path):

@@ -88,6 +88,7 @@ An engine can drive joints directly, such as a door the player pushes, using the
 
 ```json
 "glow": {"fire.light": 1.5},
+"colors": {"fire.light": {"index": 22, "rgb": "#ffe066"}},
 "cycles": [{"name": "water", "ramp": "water", "fps": 6,
             "colors": ["water.dark", "water.1", "water.mid", "water.light"]}],
 "lights": {"flame": {"position": [3.5, 14, 3.5], "part": "torch", "color": "fire.light",
@@ -99,6 +100,10 @@ An engine can drive joints directly, such as a door the player pushes, using the
   strength is above 1, `KHR_materials_emissive_strength`. The `.vox` has every glowing palette
   color as a `MATL` emissive material on its color index, strength `_emit * 10 ^ _flux`
   (MagicaVoxel's HDR emission), so an engine can take glow from the `.vox` alone.
+- **`colors`**: every color name the manifest uses (in `glow`, `cycles` and `lights`) with
+  its `.vox` color index, which is also its texel in the `.glb` palette texture, and its RGB
+  from the file's palette. Match by `index`, not RGB: palettes can repeat a color under two
+  names. With it, an engine needs no style bible.
 - **`cycles`**: each tick (`1/fps` s) every voxel of a listed color shows the next color in the
   list, wrapping around. Not in the `.glb`: with a 256×1 palette texture an engine can rotate
   those texels.

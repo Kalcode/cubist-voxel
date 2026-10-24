@@ -41,6 +41,17 @@
       }
     },
     "glow": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}},
+    "colors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["index"],
+        "properties": {
+          "index": {"type": "integer", "minimum": 1, "maximum": 255},
+          "rgb": {"type": "string", "pattern": "^#[0-9a-f]{6}$"}
+        }
+      }
+    },
     "files": {"type": "object", "additionalProperties": {"type": "string"}}
   },
   "$defs": {

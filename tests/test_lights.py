@@ -63,6 +63,7 @@ def test_manifest_records_light_with_color_name_and_flicker():
         "position": [0.5, 7.0, 0.5], "part": "stick", "color": "fire.light", "rgb": "#ffe066",
         "range": 6.0, "intensity": 2.0, "flicker": 0.3,
     }  # fmt: skip
+    assert m["colors"]["fire.light"] == {"index": P.fire.light.index, "rgb": "#ffe066"}
 
 
 def test_bad_flicker_and_unknown_part_are_errors():
