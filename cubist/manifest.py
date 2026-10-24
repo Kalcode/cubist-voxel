@@ -9,7 +9,7 @@ from pathlib import Path
 
 from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
-from cubist.io.gltf import glb_origin, nearest_part
+from cubist.io.gltf import glb_origin, nearest_part, used_colors
 
 MANIFEST_VERSION = 1
 SCHEMA_PATH = Path(__file__).parent / "schema" / "manifest-1.schema.json"
@@ -31,6 +31,13 @@ def parents_first(asset: BuiltAsset) -> list:
 
     visit(None)
     return out
+
+
+def _color_name(asset: BuiltAsset, index: int) -> str:
+    try:
+        return asset.palette.name_of(index) if asset.palette else f"#{index}"
+    except IndexError:
+        return f"#{index}"
 
 
 def build_manifest(
@@ -69,5 +76,10 @@ def build_manifest(
         ],
         "sockets": sockets,
         "clips": [c.to_dict() for c in asset.clips],
+        "glow": {
+            _color_name(asset, i): s
+            for i, s in sorted(asset.glow.items())
+            if i in used_colors(asset)
+        },
         "files": dict(files or {}),
     }

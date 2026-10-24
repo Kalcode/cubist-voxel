@@ -142,6 +142,7 @@ def create_server(project: str | Path) -> MCPServer:
                 views=views or DEFAULT_VIEWS,
                 names=loaded.names,
                 note=hidden_note(loaded.hidden),
+                glow=loaded.glow,
             )
             path = loaded.vox.parent / "render.png"
             sheet.save(path)

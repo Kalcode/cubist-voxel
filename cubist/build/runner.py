@@ -182,6 +182,7 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
         name=built.name,
         size=built.size,
         note=hidden_note(built.hidden_parts()),
+        glow=built.glow,
     ).save(contact_path)
     report = lint(built, style)
     lint_path = asset_dir / "lint.json"

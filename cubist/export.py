@@ -46,6 +46,10 @@ class LoadedAsset:
         return VoxelGrid.merge([p.grid for p in self.scene.parts])
 
     @property
+    def glow(self) -> dict[int, float]:
+        return {int(k): float(v) for k, v in self.summary.get("glow", {}).items()}
+
+    @property
     def hidden(self) -> list[str]:
         """Parts the build marked hidden at rest, and parts hanging from them."""
         meta = {p["name"]: p for p in self.summary.get("parts", [])}

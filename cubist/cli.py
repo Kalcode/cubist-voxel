@@ -116,6 +116,7 @@ def cmd_render(args: argparse.Namespace) -> int:
             views=views,
             names=asset.names,
             note=hidden_note(asset.hidden),
+            glow=asset.glow,
         )
         sheet.save(out)
         _print({"contact_sheet": str(out)})

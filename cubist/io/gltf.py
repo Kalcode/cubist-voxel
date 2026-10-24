@@ -264,6 +264,39 @@ def _animation(
     }
 
 
+def used_colors(asset: BuiltAsset) -> set[int]:
+    used: set[int] = set()
+    for part in asset.parts:
+        for grid in getattr(part, "frames", None) or [part.grid]:
+            used.update(grid.colors_used())
+    return used
+
+
+def _emissive(asset: BuiltAsset, rgba: np.ndarray, doc: dict, binary, material: dict) -> None:
+    """Glowing colors as an emissive palette texture (black elsewhere); strengths above 1 go
+    in KHR_materials_emissive_strength. Assets with no glowing color are left as they were."""
+    glow = {i: s for i, s in asset.glow.items() if i in used_colors(asset)}
+    if not glow:
+        return
+    peak = max(glow.values())
+    scale = max(1.0, peak)
+    table = np.zeros((256, 4), dtype=np.uint8)
+    table[:, 3] = 255
+    for index, strength in glow.items():
+        table[index, :3] = np.rint(rgba[index, :3].astype(np.float64) * min(1.0, strength / scale))
+    png = io.BytesIO()
+    Image.fromarray(table[None, :, :], "RGBA").save(png, format="PNG")
+    doc["images"].append(
+        {"name": "glow", "mimeType": "image/png", "bufferView": binary.view(png.getvalue())}
+    )
+    doc["textures"].append({"sampler": 0, "source": len(doc["images"]) - 1})
+    material["emissiveTexture"] = {"index": len(doc["textures"]) - 1}
+    material["emissiveFactor"] = [1.0, 1.0, 1.0]
+    if peak > 1.0:
+        material["extensions"] = {"KHR_materials_emissive_strength": {"emissiveStrength": peak}}
+        doc.setdefault("extensionsUsed", []).append("KHR_materials_emissive_strength")
+
+
 def encode_glb(
     asset: BuiltAsset,
     rgba: np.ndarray,
@@ -379,6 +412,7 @@ def encode_glb(
         ]
         doc["textures"] = [{"sampler": 0, "source": 0}]
         material["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
+        _emissive(asset, rgba, doc, binary, material)
     if asset.clips:
         doc["animations"] = [_animation(asset, c, binary, index_of, s) for c in asset.clips]
     doc["extras"] = {

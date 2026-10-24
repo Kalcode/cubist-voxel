@@ -16,6 +16,7 @@ from PIL import Image
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
+from cubist.core.style import glow_array
 from cubist.motion.clips import Clip
 from cubist.motion.pose import dense_times, hidden_at, world_matrices
 from cubist.render.contact_sheet import (
@@ -127,7 +128,7 @@ def filmstrip(
 ) -> Image.Image:
     """One block per clip: a title line, then frames (iso above ``view``, default the view that
     shows the motion best) labeled with their times."""
-    scene = PosedScene(asset, table)
+    scene = PosedScene(asset, table, glow_array(asset.glow))
     region = motion_region(asset, clips, scene)
     scale = scale or _strip_scale(region)
     step = _major_step(scale, max(abs(v) for v in (*region[0], *region[1])))
@@ -192,7 +193,7 @@ def clip_frames(
     GIFs store durations in whole centiseconds, so frames are spaced by a whole number of them
     and the durations add up to the clip's length: it plays at real speed. A one-shot clip's
     last frame (its end pose) holds a little longer before the GIF restarts."""
-    scene = PosedScene(asset, table)
+    scene = PosedScene(asset, table, glow_array(asset.glow))
     region = motion_region(asset, [clip], scene)
     if scale is None:
         dims = [h - lo for lo, h in zip(*region, strict=True)]
@@ -246,7 +247,7 @@ def posed_sheet(
     views: Sequence[str] = DEFAULT_VIEWS,
 ) -> Image.Image:
     """Today's contact sheet of the asset posed at time ``t`` of ``clip``."""
-    scene = PosedScene(asset, table)
+    scene = PosedScene(asset, table, glow_array(asset.glow))
     m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
     bounds = scene.bounds(m)
     regions = [bounds]

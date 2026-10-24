@@ -120,6 +120,7 @@ def ortho(
     view: str,
     scale: int,
     region: Region | None = None,
+    glow: np.ndarray | None = None,
 ) -> ViewRender:
     if view not in _VIEWS:
         raise ValueError(f"unknown view {view!r}; choose from {', '.join(VIEWS)}")
@@ -147,8 +148,16 @@ def ortho(
     ao = np.stack(corners, axis=-1).transpose(1, 0, 2)  # (v, u, 4)
 
     cue = 1.0 - DEPTH_CUE * (w / max(1, nw - 1))
-    base = palette[color, :3].astype(np.float64) * (FACE_LIGHT[light] * cue)[..., None]
-    rgb = _upscale(base.transpose(1, 0, 2), scale) * _bilinear(ao, scale)[..., None]
+    if glow is not None and np.any(glow[color[hit]] > 0):
+        # Glowing colors: shading lifted toward the full color by the glow strength.
+        shade = _upscale((FACE_LIGHT[light] * cue).T, scale) * _bilinear(ao, scale)
+        lift = _upscale(np.minimum(1.0, glow[color]).T, scale)
+        shade = shade + (1.0 - shade) * lift
+        rgb = _upscale(palette[color, :3].astype(np.float64).transpose(1, 0, 2), scale)
+        rgb = rgb * shade[..., None]
+    else:
+        base = palette[color, :3].astype(np.float64) * (FACE_LIGHT[light] * cue)[..., None]
+        rgb = _upscale(base.transpose(1, 0, 2), scale) * _bilinear(ao, scale)[..., None]
     depth = _upscale(np.where(hit, w, np.inf).T.astype(np.float64), scale)
 
     lo, hi = region
@@ -224,7 +233,11 @@ _ISO_FACES = {
 
 
 def iso(
-    grid: VoxelGrid, palette: np.ndarray, scale: int, region: Region | None = None
+    grid: VoxelGrid,
+    palette: np.ndarray,
+    scale: int,
+    region: Region | None = None,
+    glow: np.ndarray | None = None,
 ) -> ViewRender:
     """3/4 view from the front-right, above: shows top, front (+Z), and right (+X) faces."""
     a, b, c = _iso_dims(scale)
@@ -270,10 +283,16 @@ def iso(
             + ao_c[1, 1] * (u * v)
         )
 
-        base = palette[vol[tuple(vox.T)], :3].astype(np.float64) * ISO_LIGHT[name]
+        colors = vol[tuple(vox.T)]
+        base = palette[colors, :3].astype(np.float64) * ISO_LIGHT[name]
         pix.append((sy * width + sx).ravel())
         dep.append((vox @ view)[:, None].repeat(len(dx), 1).ravel() + np.tile(d_off, len(vox)))
-        col.append((base[:, None, :] * ao[..., None]).reshape(-1, 3))
+        if glow is not None and np.any(glow[colors] > 0):
+            shade = ISO_LIGHT[name] * ao
+            shade = shade + (1.0 - shade) * np.minimum(1.0, glow[colors])[:, None]
+            col.append((palette[colors, :3][:, None, :] * shade[..., None]).reshape(-1, 3))
+        else:
+            col.append((base[:, None, :] * ao[..., None]).reshape(-1, 3))
 
     rgb = np.zeros((height * width, 3))
     depth = np.full(height * width, np.inf)

@@ -14,6 +14,7 @@ from PIL import Image
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.palette import Palette
+from cubist.core.style import glow_array
 from cubist.render.font import draw_text, text_height, text_width
 from cubist.render.raster import BACKGROUND, VIEWS, ViewRender, iso, ortho
 
@@ -188,14 +189,16 @@ def contact_sheet(
     names: dict[int, str] | None = None,
     scale: int | None = None,
     note: str | None = None,
+    glow: dict[int, float] | None = None,
 ) -> Image.Image:
     check_views(views)
     table, names = palette_table(palette, names)
+    lift = glow_array(glow) if glow else None
 
     def render(view: str, s: int, region) -> ViewRender:
         if view == "iso":
-            return iso(grid, table, s, region)
-        return ortho(grid, table, view, s, region)
+            return iso(grid, table, s, region, glow=lift)
+        return ortho(grid, table, view, s, region, glow=lift)
 
     return sheet(
         render,

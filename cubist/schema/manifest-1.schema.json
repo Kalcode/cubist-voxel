@@ -24,6 +24,7 @@
     "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
     "sockets": {"type": "object", "additionalProperties": {"$ref": "#/$defs/socket"}},
     "clips": {"type": "array", "items": {"$ref": "#/$defs/clip"}},
+    "glow": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}},
     "files": {"type": "object", "additionalProperties": {"type": "string"}}
   },
   "$defs": {

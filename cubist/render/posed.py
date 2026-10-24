@@ -69,9 +69,10 @@ def _next_pow2(v: np.ndarray) -> np.ndarray:
 
 
 class PosedScene:
-    def __init__(self, asset: BuiltAsset, table: np.ndarray):
+    def __init__(self, asset: BuiltAsset, table: np.ndarray, glow: np.ndarray | None = None):
         self.asset = asset
         self.table = np.asarray(table)
+        self.glow = glow
         self.meshes = {p.name: _Mesh(p.grid) for p in asset.parts}
 
     def bounds(self, matrices: dict[str, np.ndarray]) -> Region:
@@ -187,7 +188,11 @@ class PosedScene:
         x1 = np.ceil(sx.max(axis=1)).astype(np.int64)
         y1 = np.ceil(sy.max(axis=1)).astype(np.int64)
         ok &= (x1 > 0) & (y1 > 0) & (x0 < width) & (y0 < height)
-        base = self.table[colors, :3].astype(np.float64) * light_of(normals)[:, None]
+        light = light_of(normals)
+        base = self.table[colors, :3].astype(np.float64) * light[:, None]
+        glowing = None
+        if self.glow is not None and np.any(self.glow[colors] > 0):
+            glowing = np.minimum(1.0, self.glow[colors])
         d0, d1, d2 = dist[:, 0], dist[:, 1] - dist[:, 0], dist[:, 2] - dist[:, 0]
 
         buckets: dict[tuple[int, int], list[int]] = defaultdict(list)
@@ -220,9 +225,16 @@ class PosedScene:
                 + a[:, 3] * s * t
             )
             d = d0[k] + s * d1[k] + t * d2[k]
-            c = base[k] * shade[:, None]
-            if cue_depth is not None:
-                c = c * (1.0 - DEPTH_CUE * d / cue_depth)[:, None]
+            if glowing is None:
+                c = base[k] * shade[:, None]
+                if cue_depth is not None:
+                    c = c * (1.0 - DEPTH_CUE * d / cue_depth)[:, None]
+            else:
+                f = light[k] * shade
+                if cue_depth is not None:
+                    f = f * (1.0 - DEPTH_CUE * d / cue_depth)
+                f = f + (1.0 - f) * glowing[k]
+                c = self.table[colors[k], :3] * f[:, None]
             pix.append(iy[q, r, 0] * width + ix[q, 0, cidx])
             dep.append(d)
             col.append(c)

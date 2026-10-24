@@ -96,3 +96,55 @@ def test_glow_and_cycles_survive_summary_and_vox(tmp_path):
 def test_style_to_dict_lists_glow_and_cycles(tmp_path):
     d = style(tmp_path).to_dict()
     assert d["glow"]["eye.yellow"] == 2.5 and d["cycles"][0]["ramp"] == "water"
+
+
+# --- glow in previews, the GLB and the manifest -------------------------------
+
+from pygltflib import GLTF2  # noqa: E402
+
+from cubist.io.gltf import encode_glb  # noqa: E402
+from cubist.manifest import build_manifest  # noqa: E402
+from cubist.render import raster  # noqa: E402
+from cubist.render.posed import PosedScene  # noqa: E402
+
+
+def lit(tmp_path, color="eye"):
+    s = style(tmp_path)
+
+    def fn(p):
+        c = p.eye.yellow if color == "eye" else p.wood.light
+        return Model([Part("orb", box((2, 2, 2), color=c))])
+
+    return asset(name="orb", size=(2, 2, 2))(fn).build(s.palette, glow=s.glow), s
+
+
+def test_glowing_voxels_render_at_full_color(tmp_path):
+    a, s = lit(tmp_path)
+    table, g = s.palette.rgba_table(), glow_array(a.glow)
+    full = table[s.palette.eye.yellow.index, :3]
+    region = ((0, 0, 0), (2, 2, 2))
+    front = raster.ortho(a.merged_grid(), table, "front", 4, region, glow=g)
+    assert np.abs(front.rgb[2:6, 2:6].reshape(-1, 3).astype(int) - full).max() <= 1
+    iso = raster.iso(a.merged_grid(), table, 4, region, glow=g)
+    posed = PosedScene(a, table, glow=g).render({}, "iso", 4, region)
+    assert np.array_equal(iso.mask, posed.mask)
+    assert np.abs(iso.rgb.astype(int) - posed.rgb.astype(int)).max() <= 1
+    dull = raster.iso(a.merged_grid(), table, 4, region)
+    assert iso.rgb[iso.mask].mean() > dull.rgb[dull.mask].mean()
+
+
+def test_glb_emissive_only_when_a_glowing_color_is_used(tmp_path):
+    a, s = lit(tmp_path)
+    data = encode_glb(a, s.palette.rgba_table(), voxel_size_m=1)
+    g = GLTF2.load_from_bytes(data)
+    m = g.materials[0]
+    assert m.emissiveTexture is not None and m.emissiveFactor == [1.0, 1.0, 1.0]
+    assert m.extensions["KHR_materials_emissive_strength"]["emissiveStrength"] == 2.5
+    assert "KHR_materials_emissive_strength" in g.extensionsUsed
+    plain, _ = lit(tmp_path, color="wood")
+    assert b"emissive" not in encode_glb(plain, s.palette.rgba_table(), voxel_size_m=1)
+
+
+def test_manifest_lists_used_glowing_colors_by_name(tmp_path):
+    a, _ = lit(tmp_path)
+    assert build_manifest(a, voxel_size_m=1)["glow"] == {"eye.yellow": 2.5}
