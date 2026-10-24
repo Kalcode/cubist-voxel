@@ -123,7 +123,18 @@ def _quad_geometry(quads: list[Quad], pivot: np.ndarray, scale: float):
     return pos, normals.reshape(-1, 3), color.reshape(-1), ao.reshape(-1), tris.reshape(-1)
 
 
-def _nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | None:
+def glb_origin(asset: BuiltAsset, center: bool = True) -> list[float]:
+    """The DSL point that lands on the GLB origin: the footprint center at y = 0 when
+    centered (the declared size's, else the voxels'), else the DSL origin."""
+    if not center:
+        return [0, 0, 0]
+    if asset.size is not None:
+        return [asset.size[0] / 2.0, 0, asset.size[2] / 2.0]
+    b = VoxelGrid.merge([p.grid for p in asset.parts]).bounds() or ((0, 0, 0), (0, 0, 0))
+    return [(b[0][0] + b[1][0]) / 2.0, 0, (b[0][2] + b[1][2]) / 2.0]
+
+
+def nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | None:
     best, best_d = None, np.inf
     for part in asset.parts:
         coords, _ = part.grid.voxels()
@@ -267,11 +278,7 @@ def encode_glb(
 
     root = {"name": asset.name, "children": []}
     if center:
-        if asset.size is not None:
-            cx, cz = asset.size[0] / 2.0, asset.size[2] / 2.0
-        else:
-            b = VoxelGrid.merge([p.grid for p in asset.parts]).bounds() or ((0, 0, 0), (0, 0, 0))
-            cx, cz = (b[0][0] + b[1][0]) / 2.0, (b[0][2] + b[1][2]) / 2.0
+        cx, _, cz = glb_origin(asset)
         root["translation"] = [-cx * s, 0.0, -cz * s]
     nodes: list[dict] = [root]
     meshes: list[dict] = []
@@ -329,7 +336,7 @@ def encode_glb(
 
     for name, value in asset.sockets.items():
         point = socket_position(value)
-        owner_name = socket_part(value) or _nearest_part(asset, point)
+        owner_name = socket_part(value) or nearest_part(asset, point)
         offset = np.array(point) - (pivots[owner_name] if owner_name in pivots else 0.0)
         nodes.append({"name": name, "translation": [float(v) * s for v in offset]})
         owner = nodes[index_of[owner_name]] if owner_name in index_of else root

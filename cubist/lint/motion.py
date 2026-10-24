@@ -7,7 +7,7 @@ import math
 
 import numpy as np
 
-from cubist.core.model import BuiltAsset
+from cubist.core.model import BuiltAsset, voxel_sha256
 from cubist.lint.checks import Finding
 from cubist.motion.clips import Clip
 from cubist.motion.joints import Joint
@@ -211,3 +211,34 @@ def motion_bounds(asset: BuiltAsset) -> list[Finding]:
         reach = ", ".join(f"{n} at {side}" for side, n in beyond.items()) or "stays in the rest box"
         lines.append(f"clip {c.name!r} reaches {tuple(lo)}-{tuple(hi)} ({reach})")
     return [Finding("motion_bounds", "info", "; ".join(lines), {"rest": rest, "clips": clips})]
+
+
+def check_hand_edits(asset: BuiltAsset, summary: dict) -> list[Finding]:
+    """Animated assets come from their script: a .vox that no longer matches its build would
+    export motion made for other voxels."""
+    if not asset.is_animated() or not summary.get("parts"):
+        return []
+    recorded = {p["name"]: p.get("voxel_sha256") for p in summary["parts"]}
+    names = [p.name for p in asset.parts]
+    changed = [p.name for p in asset.parts
+               if recorded.get(p.name) and recorded[p.name] != voxel_sha256(p.grid)]  # fmt: skip
+    added = [n for n in names if n not in recorded]
+    removed = [n for n in recorded if n not in names]
+    if not (changed or added or removed):
+        return []
+    what = ", ".join(
+        [f"part {n!r} changed" for n in changed]
+        + [f"part {n!r} added" for n in added]
+        + [f"part {n!r} removed" for n in removed]
+    )
+    name = summary.get("name", asset.name)
+    return [
+        Finding(
+            "hand_edit",
+            "error",
+            f"out/{name}/{name}.vox no longer matches its build ({what}). Animated assets come "
+            "from their script: rebuild, or export with --force to use the edited voxels with "
+            "the build's motion",
+            {"changed": changed, "added": added, "removed": removed},
+        )
+    ]

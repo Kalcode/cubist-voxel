@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cubist.dev/schema/manifest-1.schema.json",
+  "title": "Cubist asset manifest, version 1",
+  "type": "object",
+  "required": ["cubist_manifest", "name", "size", "voxel_size_m", "glb_origin", "units", "parts",
+               "sockets", "clips", "files"],
+  "properties": {
+    "cubist_manifest": {"const": 1},
+    "name": {"type": "string"},
+    "size": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
+    "voxel_size_m": {"type": "number", "exclusiveMinimum": 0},
+    "glb_origin": {"$ref": "#/$defs/vec3"},
+    "units": {
+      "type": "object",
+      "properties": {
+        "length": {"const": "voxel"},
+        "angle": {"const": "degree"},
+        "time": {"const": "second"},
+        "spin": {"const": "turn"}
+      },
+      "required": ["length", "angle", "time", "spin"]
+    },
+    "parts": {"type": "array", "items": {"$ref": "#/$defs/part"}},
+    "sockets": {"type": "object", "additionalProperties": {"$ref": "#/$defs/socket"}},
+    "clips": {"type": "array", "items": {"$ref": "#/$defs/clip"}},
+    "files": {"type": "object", "additionalProperties": {"type": "string"}}
+  },
+  "$defs": {
+    "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "part": {
+      "type": "object",
+      "required": ["name", "parent", "pivot", "joint", "voxels", "vox_model"],
+      "properties": {
+        "name": {"type": "string"},
+        "parent": {"type": ["string", "null"]},
+        "pivot": {"$ref": "#/$defs/vec3"},
+        "joint": {"oneOf": [{"$ref": "#/$defs/joint"}, {"type": "null"}]},
+        "voxels": {"type": "integer", "minimum": 0},
+        "vox_model": {"type": "string"}
+      }
+    },
+    "joint": {
+      "type": "object",
+      "required": ["type", "axis"],
+      "properties": {
+        "type": {"enum": ["hinge", "slide", "spin"]},
+        "axis": {"$ref": "#/$defs/vec3"},
+        "limits": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+        "rps": {"type": ["number", "null"]}
+      }
+    },
+    "socket": {
+      "type": "object",
+      "required": ["position", "part"],
+      "properties": {
+        "position": {"$ref": "#/$defs/vec3"},
+        "part": {"type": ["string", "null"]}
+      }
+    },
+    "track": {
+      "type": "object",
+      "required": ["part", "channel", "times", "values", "ease"],
+      "properties": {
+        "part": {"type": "string"},
+        "channel": {"enum": ["joint"]},
+        "times": {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 1},
+        "values": {"type": "array", "items": {"type": "number"}, "minItems": 1},
+        "ease": {"enum": ["smooth", "linear", "step", null]}
+      }
+    },
+    "clip": {
+      "type": "object",
+      "required": ["name", "length", "loop", "ease", "tracks", "events"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"},
+        "length": {"type": "number", "exclusiveMinimum": 0},
+        "loop": {"type": "boolean"},
+        "ease": {"enum": ["smooth", "linear", "step"]},
+        "tracks": {"type": "array", "items": {"$ref": "#/$defs/track"}},
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [{"type": "number"}, {"type": "string"}],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    }
+  }
+}

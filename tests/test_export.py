@@ -58,7 +58,7 @@ def test_formats_and_options(project, tmp_path):
     out = export_asset(
         built(project), formats=("glb",), out_dir=tmp_path / "game", vertex_colors=True
     )
-    assert set(out) == {"glb"}
+    assert set(out) == {"glb", "manifest"}
     g = GLTF2.load_from_bytes(open(out["glb"], "rb").read())
     assert g.meshes[0].primitives[0].attributes.COLOR_0 is not None
 
@@ -97,7 +97,7 @@ def test_cli_export(project, capsys):
     capsys.readouterr()
     assert main(["export", str(asset_dir), "--glb", "--ao"]) == 0
     info = json.loads(capsys.readouterr().out)
-    assert set(info["exported"]) == {"glb"}
+    assert set(info["exported"]) == {"glb", "manifest"}
 
 
 def test_cli_export_blocked_exits_2(project, capsys):

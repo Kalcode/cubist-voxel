@@ -16,6 +16,7 @@ cubist = "cubist.cli:main"
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4",
     "pygltflib>=1.16.5",
     "pytest>=8",
     "ruff>=0.6",

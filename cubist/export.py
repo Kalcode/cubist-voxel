@@ -17,6 +17,8 @@ from cubist.io import vengi
 from cubist.io.gltf import write_glb
 from cubist.io.vox import VoxError, VoxScene, read_vox
 from cubist.lint import LintReport, lint
+from cubist.lint.motion import check_hand_edits
+from cubist.manifest import build_manifest
 
 NATIVE = ("glb", "vox")
 
@@ -70,7 +72,8 @@ def load_asset(path: str | Path) -> LoadedAsset:
 
 def lint_loaded(asset: LoadedAsset, style: StyleBible) -> tuple[BuiltAsset, LintReport]:
     built = BuiltAsset.from_vox(asset.scene, asset.summary, style.palette)
-    return built, lint(built, style, rgba=asset.scene.palette)
+    extra = check_hand_edits(built, asset.summary)
+    return built, lint(built, style, rgba=asset.scene.palette, extra=extra)
 
 
 def export_asset(
@@ -83,7 +86,9 @@ def export_asset(
     ao: bool = False,
     center: bool = True,
 ) -> dict[str, str]:
-    """Export to ``out_dir`` (default ``<project>/export``); returns {format: path}."""
+    """Export to ``out_dir`` (default ``<project>/export``); returns {format: path}. A
+    manifest (``<name>.cubist.json``) describing the parts and motion goes beside any .glb or
+    .vox, under the key ``manifest``."""
     asset = load_asset(path)
     style_path = Path(style) if style else find_style(asset.vox)
     bible = load_project_style(style_path)
@@ -112,4 +117,10 @@ def export_asset(
         else:
             vengi.convert(asset.vox, target)
         written[fmt] = str(target)
+    native = {f: Path(p).name for f, p in written.items() if f in NATIVE}
+    if native:
+        target = out / f"{asset.name}.cubist.json"
+        manifest = build_manifest(built, bible.voxel_size_m, files=native, center=center)
+        target.write_text(json.dumps(manifest, indent=2) + "\n")
+        written["manifest"] = str(target)
     return written
