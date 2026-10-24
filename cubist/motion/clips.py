@@ -67,6 +67,7 @@ class Clip:
     ease: str = "smooth"
     events: tuple[tuple[float, str], ...] = ()
     travel: tuple[float, float, float] | None = None  # voxels per second, for in-place walks
+    collisions: bool = True  # False: parts may pass through each other (debris, effects)
 
     def track_ease(self, track: Track) -> str:
         if track.channel in STEPPED:
@@ -82,6 +83,7 @@ class Clip:
             "tracks": [t.to_dict() for t in self.tracks],
             "events": [[t, name] for t, name in self.events],
             "travel": list(self.travel) if self.travel else None,
+            "collisions": self.collisions,
         }
 
     @classmethod
@@ -94,6 +96,7 @@ class Clip:
             d.get("ease", "smooth"),
             tuple((float(t), str(name)) for t, name in d.get("events", ())),
             tuple(float(v) for v in d["travel"]) if d.get("travel") else None,  # type: ignore[arg-type]
+            bool(d.get("collisions", True)),
         )
 
 
@@ -229,6 +232,7 @@ def clip(
     ease: str = "smooth",
     events: Iterable[tuple[float, str]] = (),
     travel=None,
+    collisions: bool = True,
 ) -> Clip:
     """A named clip ``length`` seconds long.
 
@@ -237,7 +241,8 @@ def clip(
     tracks: ``turn(...)``, ``move(...)``, ``visible(...)``, generators like ``swing(...)``
     (nested lists are fine). ``ease`` is ``smooth`` (default), ``linear`` or ``step``.
     ``travel`` is how fast an in-place clip (a walk) moves the asset through the world, in
-    voxels per second, for the engine to match so feet don't slide.
+    voxels per second, for the engine to match so feet don't slide. ``collisions=False`` turns
+    off the check for parts passing through each other (debris tumbling past debris).
     """
     if not isinstance(name, str) or not _NAME.match(name):
         raise ModelError(
@@ -305,4 +310,6 @@ def clip(
             move_by = ()
         if len(move_by) != 3:
             raise ModelError(f"clip {name!r} travel must be (x, y, z) voxels per second")
-    return Clip(name, length, tuple(built), bool(loop), ease, tuple(sorted(evs)), move_by)
+    return Clip(
+        name, length, tuple(built), bool(loop), ease, tuple(sorted(evs)), move_by, bool(collisions)
+    )

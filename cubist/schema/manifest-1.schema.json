@@ -125,6 +125,7 @@
         "ease": {"enum": ["smooth", "linear", "step"]},
         "tracks": {"type": "array", "items": {"$ref": "#/$defs/track"}},
         "travel": {"oneOf": [{"$ref": "#/$defs/vec3"}, {"type": "null"}]},
+        "collisions": {"type": "boolean"},
         "events": {
           "type": "array",
           "items": {

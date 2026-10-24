@@ -151,7 +151,7 @@ def check_collisions(asset: BuiltAsset) -> list[Finding]:
     rest_keys = {n: _keys(np.floor(v)) for n, v in voxels.items()}
     for c in asset.clips:
         moving = moving_parts(asset, c)
-        if not moving:
+        if not moving or not c.collisions:
             continue
         forgiven: dict[str, np.ndarray] = {}
         hint: dict[str, str] = {}
