@@ -71,6 +71,7 @@ def test_build_writes_vox_and_summary_under_project_out(project):
     assert len(part.pop("voxel_sha256")) == 64
     assert part.pop("frames") is None and part.pop("fps") is None
     assert part.pop("frame_sha256") is None
+    assert part.pop("occlusion") is None
     assert part == {
         "name": "crate",
         "voxels": 64,

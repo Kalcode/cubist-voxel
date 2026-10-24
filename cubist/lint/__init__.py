@@ -128,6 +128,7 @@ def lint(
         *checks.check_grounding(asset, merged),
         *checks.check_light_reach(asset, style),
         *checks.check_scale(asset, style),
+        *checks.check_occlusion(asset),
         *checks.check_budgets(asset, merged, style),
         *checks.check_thin(merged),
         *checks.check_hidden(merged),

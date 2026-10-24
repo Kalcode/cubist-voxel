@@ -295,6 +295,35 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
 MIN_LIGHT_RANGE_M = 2.0  # about what a candle lights
 
 
+def check_occlusion(asset: BuiltAsset) -> list[Finding]:
+    """A building's top should carry an occlusion tag, so an engine can hide it to show the
+    player underneath."""
+    if "building" not in asset.tags:
+        return []
+    hidden = set(asset.hidden_parts())
+    tops = {}
+    for p in asset.parts:
+        b = p.grid.bounds()
+        if b is not None and p.name not in hidden:
+            tops[p.name] = b[1][1]
+    if not tops:
+        return []
+    highest = max(tops.values())
+    top_parts = sorted(n for n, y in tops.items() if y == highest)
+    if any(asset.occlusion_of(n) for n in top_parts):
+        return []
+    return [
+        Finding(
+            "occlusion",
+            "info",
+            f"building's highest part ({', '.join(top_parts)}) has no occlusion tag; give the roof "
+            'its own part with occlusion="roof" (upper storeys "upper") so an engine can hide '
+            "it when the player walks underneath",
+            {"parts": top_parts},
+        )
+    ]
+
+
 def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     """A light should reach at least MIN_LIGHT_RANGE_M, and on a grounded asset it should light
     the floor as far out as it is high (range >= sqrt(2) * height)."""

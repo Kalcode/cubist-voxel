@@ -58,6 +58,7 @@ can read it before exporting.
 | `parent` | The part it hangs from, or `null` |
 | `joint` | How it moves (below), or `null` for a part that doesn't move on its own |
 | `frames` | A flipbook's `{count, fps, vox_models}`, or `null`. In the `.glb` the part node has a child node `<part>@<k>` per frame, frames other than 0 at scale 0; `frame` tracks become `STEP` scale channels on those nodes. A flipbook no clip plays with a `frame` track loops at `fps` (exported as a `<part>_frames` animation); one that some clip plays rests on frame 0 elsewhere |
+| `occlusion` | `roof`, `upper` or `canopy`: hide this part when it is between the camera and the player. Resolved: a part's own tag, else its nearest tagged ancestor's, else `null` |
 | `hidden` | Starts hidden (a clip's `visible` track shows it); children of hidden parts are hidden too. In the `.glb` its node has scale 0, and `visible` tracks become `STEP` scale channels |
 | `voxels` | Voxel count |
 | `vox_model` | The model's name in the `.vox` scene graph |

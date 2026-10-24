@@ -173,6 +173,7 @@ class BuiltPart:
     hidden: bool = False
     frames: list[VoxelGrid] | None = None  # a flipbook's frames; grid is frames[0]
     fps: float | None = None
+    occlusion: str | None = None
 
 
 def voxel_sha256(grid: VoxelGrid) -> str:
@@ -226,6 +227,17 @@ class BuiltAsset:
         """Every part in one world-space grid (later parts win overlaps)."""
         return VoxelGrid.merge([p.grid for p in self.parts])
 
+    def occlusion_of(self, name: str) -> str | None:
+        """A part's occlusion tag: its own, else its nearest tagged ancestor's."""
+        by_name = {p.name: p for p in self.parts}
+        seen: set[str] = set()
+        while name in by_name and name not in seen:
+            seen.add(name)
+            if by_name[name].occlusion:
+                return by_name[name].occlusion
+            name = by_name[name].parent
+        return None
+
     def hidden_parts(self) -> list[str]:
         """Parts hidden at rest: hidden themselves or hanging from a hidden part."""
         parents = {p.name: p.parent for p in self.parts}
@@ -278,6 +290,7 @@ class BuiltAsset:
                 "hidden": p.hidden,
                 "frames": len(p.frames) if p.frames else None,
                 "fps": p.fps if p.frames else None,
+                "occlusion": p.occlusion,
                 "voxel_sha256": voxel_sha256(p.grid),
                 "frame_sha256": [voxel_sha256(f) for f in p.frames] if p.frames else None,
             }
@@ -328,6 +341,7 @@ class BuiltAsset:
                     meta.get("symmetric"),
                     Joint.from_dict(joint) if joint else None,
                     bool(meta.get("hidden", False)),
+                    occlusion=meta.get("occlusion"),
                 )
             )
             if meta.get("frames"):
@@ -432,6 +446,7 @@ class AssetDef:
                         bool(p.hidden),
                         frame_grids,
                         float(p.fps) if frame_grids else None,
+                        p.occlusion,
                     )
                 )
         return BuiltAsset(

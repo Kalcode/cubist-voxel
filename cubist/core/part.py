@@ -1,15 +1,18 @@
 """Named parts: a shape plus a pivot, an optional parent part, an optional symmetry axis that
 lint checks against the asset's center plane, an optional joint saying how it moves, and
-whether it starts hidden (shown by clips)."""
+whether it starts hidden (shown by clips), and an occlusion tag for engines that hide parts
+between the camera and the player."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from cubist.core.errors import ModelError
 from cubist.dsl.shape import Shape, ShapeError
 from cubist.motion.joints import Joint
 
 Vec3 = tuple[float, float, float]
+OCCLUSION = ("roof", "upper", "canopy")  # roofs, upper storeys, tree crowns
 
 
 def _swap_side(parent: str | None, old: str, new: str) -> str | None:
@@ -36,8 +39,14 @@ class Part:
     hidden: bool = False  # hidden at rest; a clip's visible(...) track shows it
     frames: tuple[Shape, ...] | list[Shape] | None = None  # a flipbook: one shape per frame
     fps: float = 8.0  # flipbook frames per second when it plays on its own
+    occlusion: str | None = None  # one of OCCLUSION: what an engine hides to show the player
 
     def __post_init__(self):
+        if self.occlusion is not None and self.occlusion not in OCCLUSION:
+            raise ModelError(
+                f"part {self.name!r}: occlusion must be one of {', '.join(OCCLUSION)} "
+                f"(got {self.occlusion!r})"
+            )
         if self.frames is not None and not isinstance(self.frames, (list, tuple)):
             object.__setattr__(self, "frames", tuple(self.frames))  # generators too
 

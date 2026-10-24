@@ -96,6 +96,7 @@ def build_manifest(
                 }
                 if p.frames
                 else None,
+                "occlusion": asset.occlusion_of(p.name),
                 "voxels": p.grid.count(),
                 "vox_model": p.name,
             }
