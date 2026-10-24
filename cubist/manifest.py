@@ -10,6 +10,7 @@ from pathlib import Path
 from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
 from cubist.io.gltf import glb_origin, nearest_part, used_colors
+from cubist.motion.pose import used_cycles
 
 MANIFEST_VERSION = 1
 SCHEMA_PATH = Path(__file__).parent / "schema" / "manifest-1.schema.json"
@@ -95,6 +96,15 @@ def build_manifest(
             for name, lt in asset.lights.items()
         },
         "clips": [c.to_dict() for c in asset.clips],
+        "cycles": [
+            {
+                "name": c.name,
+                "ramp": c.ramp,
+                "fps": c.fps,
+                "colors": [_color_name(asset, i) for i in c.indices],
+            }
+            for c in used_cycles(asset)
+        ],
         "glow": {
             _color_name(asset, i): s
             for i, s in sorted(asset.glow.items())

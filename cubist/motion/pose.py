@@ -205,9 +205,20 @@ def frame_indices(asset: BuiltAsset, clip: Clip | None, t: float) -> dict[str, i
     return {p.name: frame_index(asset, clip, p.name, t) for p in asset.parts if p.frames}
 
 
-def preview_clips(asset: BuiltAsset) -> list[Clip]:
+def used_cycles(asset: BuiltAsset) -> list:
+    """The style's color cycles whose colors this asset uses."""
+    used: set[int] = set()
+    for p in asset.parts:
+        for g in p.frames or [p.grid]:
+            used.update(g.colors_used())
+    return [c for c in asset.cycles if used & set(c.indices)]
+
+
+def preview_clips(asset: BuiltAsset, with_colors: bool = False) -> list[Clip]:
     """The clips worth previewing and exporting: the authored ones, plus a looping
-    ``<part>_frames`` clip for each flipbook that no clip drives (it plays on its own)."""
+    ``<part>_frames`` clip for each flipbook that no clip drives (it plays on its own). With
+    ``with_colors``, previews also get a ``colors`` clip (one full cycle) when color cycles
+    are in use and nothing else would show them; it has no tracks and isn't exported."""
     out = list(asset.clips)
     driven = {t.part for c in asset.clips for t in c.tracks if t.channel == "frame"}
     names = {c.name for c in out}
@@ -223,6 +234,10 @@ def preview_clips(asset: BuiltAsset) -> list[Clip]:
         )
         out.append(Clip(name, n / fps, (track,), loop=True, ease="step"))
         names.add(name)
+    cycles = used_cycles(asset)
+    if with_colors and cycles and not out:
+        c = cycles[0]
+        out.append(Clip("colors", len(c.indices) / c.fps, (), loop=True, ease="step"))
     return out
 
 

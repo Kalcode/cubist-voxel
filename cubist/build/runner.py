@@ -224,7 +224,7 @@ def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script:
 def _write_motion(built: BuiltAsset, asset_dir: Path) -> dict:
     """Filmstrip and GIFs for an asset with clips; clears stale ones either way."""
     motion_path = asset_dir / "motion.png"
-    clips = preview_clips(built)
+    clips = preview_clips(built, with_colors=True)
     keep = {f"{c.name}.gif" for c in clips}
     for old in asset_dir.glob("*.gif"):
         if old.name not in keep:

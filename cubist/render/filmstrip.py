@@ -16,7 +16,7 @@ from PIL import Image
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
-from cubist.core.style import glow_array
+from cubist.core.style import cycle_table, glow_array
 from cubist.io.gltf import nearest_part
 from cubist.motion.clips import Clip
 from cubist.motion.pose import dense_times, frame_indices, hidden_at, world_matrices
@@ -155,8 +155,9 @@ def filmstrip(
         for t in frame_times(c, frames):
             m, hide = world_matrices(asset, c, t), hidden_at(asset, c, t)
             marks, fr = light_markers(asset, m), frame_indices(asset, c, t)
-            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks, fr).rgb)
-            ortho = scene.render(m, v, scale, region, hide, marks, fr)
+            tab = cycle_table(table, asset.cycles, t)
+            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks, fr, tab).rgb)
+            ortho = scene.render(m, v, scale, region, hide, marks, fr, tab)
             rgb = _decorate(ortho, step, size_box.get(v) if size_box else None)
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
@@ -233,8 +234,8 @@ def clip_frames(
     images = []
     for t in times:
         m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
-        fr = frame_indices(asset, clip, t)
-        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m), fr)
+        fr, tab = frame_indices(asset, clip, t), cycle_table(table, asset.cycles, t)
+        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m), fr, tab)
         images.append(Image.fromarray(iso_framed(view.rgb)))
     if not clip.loop:
         durations.append(step_cs * 10 + GIF_HOLD_MS)

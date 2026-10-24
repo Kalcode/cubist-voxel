@@ -148,3 +148,60 @@ def test_glb_emissive_only_when_a_glowing_color_is_used(tmp_path):
 def test_manifest_lists_used_glowing_colors_by_name(tmp_path):
     a, _ = lit(tmp_path)
     assert build_manifest(a, voxel_size_m=1)["glow"] == {"eye.yellow": 2.5}
+
+
+# --- color cycles in previews and the manifest ------------------------------------
+
+from cubist.build.runner import build_script  # noqa: E402
+from cubist.motion.pose import preview_clips  # noqa: E402
+from cubist.render.filmstrip import clip_frames  # noqa: E402
+
+
+def pond(tmp_path):
+    s = style(tmp_path)
+
+    def fn(p):
+        return Model(
+            [
+                Part(
+                    "pond",
+                    box((4, 1, 4), color=p.water.dark).paint(
+                        p.water.light, where=box((2, 1, 2)).at(1, 0, 1)
+                    ),
+                )
+            ]
+        )
+
+    return asset(name="pond", size=(4, 1, 4))(fn).build(s.palette, cycles=s.cycles), s
+
+
+def test_cycling_asset_previews_a_colors_clip(tmp_path):
+    a, s = pond(tmp_path)
+    assert preview_clips(a) == []  # nothing to export to glTF
+    [c] = preview_clips(a, with_colors=True)
+    assert c.name == "colors" and c.loop and c.length == pytest.approx(1.0)  # 4 shades at 4 fps
+    frames, _ = clip_frames(a, s.palette.rgba_table(), c, fps=4)
+    a0, a1 = np.asarray(frames[0]), np.asarray(frames[1])
+    background = np.all(a0 == a0[0, 0], axis=-1)
+    assert np.array_equal(background, np.all(a1 == a1[0, 0], axis=-1))  # same shape
+    assert not np.array_equal(a0, a1)  # different colors
+
+
+def test_manifest_lists_used_cycles_by_color_name(tmp_path):
+    a, _ = pond(tmp_path)
+    assert build_manifest(a, voxel_size_m=1)["cycles"] == [
+        {"name": "shimmer", "ramp": "water", "fps": 4.0,
+         "colors": ["water.dark", "water.1", "water.mid", "water.light"]}
+    ]  # fmt: skip
+
+
+def test_build_of_cycling_asset_writes_colors_preview(tmp_path):
+    (tmp_path / "style.toml").write_text(STYLE)
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "pond.py").write_text(
+        "from cubist import *\n\n@asset(name='pond', size=(4, 1, 4))\n"
+        "def pond(p):\n    return box((4, 1, 4), color=p.water.mid)\n"
+    )
+    [r] = build_script(tmp_path / "assets" / "pond.py")
+    d = r.vox_path.parent
+    assert (d / "motion.png").exists() and (d / "colors.gif").exists()

@@ -25,6 +25,19 @@
     "sockets": {"type": "object", "additionalProperties": {"$ref": "#/$defs/socket"}},
     "lights": {"type": "object", "additionalProperties": {"$ref": "#/$defs/light"}},
     "clips": {"type": "array", "items": {"$ref": "#/$defs/clip"}},
+    "cycles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "ramp", "fps", "colors"],
+        "properties": {
+          "name": {"type": "string"},
+          "ramp": {"type": "string"},
+          "fps": {"type": "number", "exclusiveMinimum": 0},
+          "colors": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
     "glow": {"type": "object", "additionalProperties": {"type": "number", "exclusiveMinimum": 0}},
     "files": {"type": "object", "additionalProperties": {"type": "string"}}
   },

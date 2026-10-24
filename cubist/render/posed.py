@@ -88,6 +88,7 @@ class PosedScene:
         hidden: frozenset[str] = frozenset(),
         markers: list[tuple[tuple[float, float, float], tuple[int, int, int]]] = (),
         frames: dict[str, int] | None = None,
+        table: np.ndarray | None = None,
     ) -> ViewRender:
         lo = np.array(region[0], dtype=np.float64)
         hi = np.array(region[1], dtype=np.float64)
@@ -158,6 +159,7 @@ class PosedScene:
                 height,
                 rgb,
                 depth,
+                self.table if table is None else np.asarray(table),
             )
         rgb = rgb.reshape(height, width, 3)
         depth = depth.reshape(height, width)
@@ -184,7 +186,7 @@ class PosedScene:
 
     def _raster(
         self, corners, normals, colors, ao, project, toward, light_of, cue_depth,
-        width, height, rgb_out, depth_out,
+        width, height, rgb_out, depth_out, table,
     ) -> None:  # fmt: skip
         keep = normals @ toward > 1e-9  # faces turned toward the camera
         corners, normals, colors, ao = corners[keep], normals[keep], colors[keep], ao[keep]
@@ -202,7 +204,7 @@ class PosedScene:
         y1 = np.ceil(sy.max(axis=1)).astype(np.int64)
         ok &= (x1 > 0) & (y1 > 0) & (x0 < width) & (y0 < height)
         light = light_of(normals)
-        base = self.table[colors, :3].astype(np.float64) * light[:, None]
+        base = table[colors, :3].astype(np.float64) * light[:, None]
         glowing = None
         if self.glow is not None and np.any(self.glow[colors] > 0):
             glowing = np.minimum(1.0, self.glow[colors])
@@ -247,7 +249,7 @@ class PosedScene:
                 if cue_depth is not None:
                     f = f * (1.0 - DEPTH_CUE * d / cue_depth)
                 f = f + (1.0 - f) * glowing[k]
-                c = self.table[colors[k], :3] * f[:, None]
+                c = table[colors[k], :3] * f[:, None]
             pix.append(iy[q, r, 0] * width + ix[q, 0, cidx])
             dep.append(d)
             col.append(c)
