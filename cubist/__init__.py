@@ -3,6 +3,7 @@
 Asset scripts start with ``from cubist import *``.
 """
 
+from cubist.core.light import light
 from cubist.core.model import Model, ModelError, asset
 from cubist.core.part import Part
 from cubist.core.socket import socket
@@ -79,6 +80,7 @@ __all__ = [
     "inside",
     "lathe",
     "move",
+    "light",
     "line",
     "panel",
     "polyline",

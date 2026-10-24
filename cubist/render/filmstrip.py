@@ -17,6 +17,7 @@ from PIL import Image
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.core.style import glow_array
+from cubist.io.gltf import nearest_part
 from cubist.motion.clips import Clip
 from cubist.motion.pose import dense_times, hidden_at, world_matrices
 from cubist.render.contact_sheet import (
@@ -42,6 +43,16 @@ GIF_HOLD_MS = 600  # one-shot clips rest on their last frame this long before re
 GIF_MAX_ISO_PX = 420
 _ROTATE_VIEW = {0: "right", 1: "top", 2: "front"}  # looking along the rotation axis
 _SLIDE_VIEW = {0: "front", 1: "front", 2: "right"}  # looking across the slide
+
+
+def light_markers(asset: BuiltAsset, matrices: dict[str, np.ndarray]) -> list:
+    """Each light's posed position and color, for markers in posed views."""
+    out = []
+    for lt in asset.lights.values():
+        owner = lt.part or nearest_part(asset, lt.position)
+        m = matrices.get(owner, np.eye(4))
+        out.append((tuple(m[:3, :3] @ np.array(lt.position) + m[:3, 3]), lt.rgb))
+    return out
 
 
 def motion_view(asset: BuiltAsset, clip: Clip) -> str:
@@ -143,8 +154,9 @@ def filmstrip(
         cells = []
         for t in frame_times(c, frames):
             m, hide = world_matrices(asset, c, t), hidden_at(asset, c, t)
-            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide).rgb)
-            ortho = scene.render(m, v, scale, region, hide)
+            marks = light_markers(asset, m)
+            iso_rgb = iso_framed(scene.render(m, "iso", scale, region, hide, marks).rgb)
+            ortho = scene.render(m, v, scale, region, hide, marks)
             rgb = _decorate(ortho, step, size_box.get(v) if size_box else None)
             ruled, _ = _ruled(ortho, rgb, step)
             cells.append(_cell(iso_rgb, ruled, f"T={t:.2f}S"))
@@ -213,7 +225,8 @@ def clip_frames(
     images = []
     for t in times:
         m, hide = world_matrices(asset, clip, t), hidden_at(asset, clip, t)
-        images.append(Image.fromarray(iso_framed(scene.render(m, "iso", scale, region, hide).rgb)))
+        view = scene.render(m, "iso", scale, region, hide, light_markers(asset, m))
+        images.append(Image.fromarray(iso_framed(view.rgb)))
     if not clip.loop:
         durations.append(step_cs * 10 + GIF_HOLD_MS)
     return images, durations
@@ -241,7 +254,7 @@ def save_gif(frames: Sequence[Image.Image], durations: Sequence[int], path: str 
 def posed_sheet(
     asset: BuiltAsset,
     table: np.ndarray,
-    clip: Clip,
+    clip: Clip | None,
     t: float,
     names: dict[int, str] | None = None,
     views: Sequence[str] = DEFAULT_VIEWS,
@@ -256,7 +269,7 @@ def posed_sheet(
     region = _union(regions)
     grid = VoxelGrid.merge([p.grid for p in asset.parts if p.name not in hide])
     return sheet(
-        lambda view, s, r: scene.render(m, view, s, r, hide),
+        lambda view, s, r: scene.render(m, view, s, r, hide, light_markers(asset, m)),
         region,
         np.asarray(table),
         names or {},
@@ -266,7 +279,7 @@ def posed_sheet(
         bounds,
         size=asset.size,
         views=views,
-        note=f"CLIP {clip.name.upper()} T={t:.2f}S",
+        note=f"CLIP {clip.name.upper()} T={t:.2f}S" if clip is not None else None,
     )
 
 

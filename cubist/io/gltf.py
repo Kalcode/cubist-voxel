@@ -264,6 +264,22 @@ def _animation(
     }
 
 
+def _lights(asset, nodes, index_of, pivots, root, s) -> None:
+    """A node per light under the part it moves with (named, or the nearest)."""
+    for i, (name, lt) in enumerate(asset.lights.items()):
+        owner_name = lt.part or nearest_part(asset, lt.position)
+        offset = np.array(lt.position) - (pivots[owner_name] if owner_name in pivots else 0.0)
+        nodes.append(
+            {
+                "name": name,
+                "translation": [float(v) * s for v in offset],
+                "extensions": {"KHR_lights_punctual": {"light": i}},
+            }
+        )
+        owner = nodes[index_of[owner_name]] if owner_name in index_of else root
+        owner.setdefault("children", []).append(len(nodes) - 1)
+
+
 def used_colors(asset: BuiltAsset) -> set[int]:
     used: set[int] = set()
     for part in asset.parts:
@@ -389,6 +405,7 @@ def encode_glb(
         owner = nodes[index_of[owner_name]] if owner_name in index_of else root
         owner.setdefault("children", []).append(len(nodes) - 1)
 
+    _lights(asset, nodes, index_of, pivots, root, s)
     material: dict = {
         "name": "palette",
         "pbrMetallicRoughness": {"metallicFactor": 0.0, "roughnessFactor": 1.0},
@@ -413,6 +430,20 @@ def encode_glb(
         doc["textures"] = [{"sampler": 0, "source": 0}]
         material["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
         _emissive(asset, rgba, doc, binary, material)
+    if asset.lights:
+        doc.setdefault("extensions", {})["KHR_lights_punctual"] = {
+            "lights": [
+                {
+                    "name": name,
+                    "type": "point",
+                    "color": [float(c) for c in srgb_to_linear(np.array(lt.rgb))],
+                    "intensity": lt.intensity,
+                    "range": lt.range * s,
+                }
+                for name, lt in asset.lights.items()
+            ]
+        }
+        doc.setdefault("extensionsUsed", []).append("KHR_lights_punctual")
     if asset.clips:
         doc["animations"] = [_animation(asset, c, binary, index_of, s) for c in asset.clips]
     doc["extras"] = {

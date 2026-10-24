@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 
 from cubist.core.errors import ModelError
 from cubist.core.grid import VoxelGrid
+from cubist.core.light import Light
 from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
 from cubist.core.socket import Socket
@@ -51,10 +52,12 @@ class Model:
         parts: Sequence,
         sockets: dict[str, Vec3] | None = None,
         clips: Sequence[Clip] | None = None,
+        lights: dict[str, Light] | None = None,
     ):
         self.parts = _flatten(parts)
         self.sockets = {k: Socket.from_value(v, k) for k, v in (sockets or {}).items()}
         self.clips = list(clips or [])
+        self.lights = dict(lights or {})
         names = [p.name for p in self.parts]
         dupes = sorted({n for n in names if names.count(n) > 1})
         if dupes:
@@ -70,6 +73,11 @@ class Model:
         for name, value in self.sockets.items():
             if value.part is not None and value.part not in names:
                 raise ModelError(f"socket {name!r} names unknown part {value.part!r}")
+        for name, value in self.lights.items():
+            if not isinstance(value, Light):
+                raise ModelError(f"light {name!r} must be made with light(...), got {value!r}")
+            if value.part is not None and value.part not in names:
+                raise ModelError(f"light {name!r} names unknown part {value.part!r}")
         self._check_clips()
         parents = {p.name: p.parent for p in self.parts}
         for name in names:
@@ -148,6 +156,7 @@ class BuiltAsset:
     ops_used: set[str] = field(default_factory=set)
     clips: list[Clip] = field(default_factory=list)
     glow: dict[int, float] = field(default_factory=dict)  # palette index -> strength
+    lights: dict[str, Light] = field(default_factory=dict)
     cycles: list[Cycle] = field(default_factory=list)
 
     def is_animated(self) -> bool:
@@ -238,6 +247,7 @@ class BuiltAsset:
             "ops_used": sorted(self.ops_used),
             "clips": [c.to_dict() for c in self.clips],
             "glow": {str(i): s for i, s in sorted(self.glow.items())},
+            "lights": {k: v.to_summary() for k, v in self.lights.items()},
             "cycles": [c.to_dict() for c in self.cycles],
         }
 
@@ -279,6 +289,7 @@ class BuiltAsset:
             clips=_surviving_clips(summary.get("clips", ()), parts),
             glow={int(k): float(v) for k, v in summary.get("glow", {}).items()},
             cycles=[Cycle.from_dict(c) for c in summary.get("cycles", ())],
+            lights={k: Light.from_summary(v) for k, v in summary.get("lights", {}).items()},
         )
 
 
@@ -356,6 +367,7 @@ class AssetDef:
             clips=list(result.clips),
             glow=dict(glow or {}),
             cycles=list(cycles or []),
+            lights=dict(result.lights),
         )
 
     def __repr__(self) -> str:

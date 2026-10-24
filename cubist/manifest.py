@@ -75,6 +75,18 @@ def build_manifest(
             for p in parents_first(asset)
         ],
         "sockets": sockets,
+        "lights": {
+            name: {
+                "position": list(lt.position),
+                "part": lt.part or nearest_part(asset, lt.position),
+                "color": _color_name(asset, lt.color),
+                "rgb": "#" + "".join(f"{v:02x}" for v in lt.rgb),
+                "range": lt.range,
+                "intensity": lt.intensity,
+                "flicker": lt.flicker,
+            }
+            for name, lt in asset.lights.items()
+        },
         "clips": [c.to_dict() for c in asset.clips],
         "glow": {
             _color_name(asset, i): s

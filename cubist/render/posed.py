@@ -86,6 +86,7 @@ class PosedScene:
         scale: int,
         region: Region,
         hidden: frozenset[str] = frozenset(),
+        markers: list[tuple[tuple[float, float, float], tuple[int, int, int]]] = (),
     ) -> ViewRender:
         lo = np.array(region[0], dtype=np.float64)
         hi = np.array(region[1], dtype=np.float64)
@@ -160,8 +161,18 @@ class PosedScene:
         depth = depth.reshape(height, width)
         if view == "iso" and np.isfinite(depth).any():
             depth = depth - np.min(depth)
+        out = _finish(rgb, depth, step)
+        for point, color in markers:  # lights: a dot in their color, ringed dark
+            sx, sy, _ = project(np.asarray(point, dtype=np.float64))
+            cx, cy = int(np.floor(sx)), int(np.floor(sy))
+            for dy in range(-2, 3):
+                for dx in range(-2, 3):
+                    x, y = cx + dx, cy + dy
+                    if 0 <= x < width and 0 <= y < height:
+                        ring = max(abs(dx), abs(dy)) == 2
+                        out[y, x] = (38, 36, 40) if ring else color
         return ViewRender(
-            rgb=_finish(rgb, depth, step),
+            rgb=out,
             mask=np.isfinite(depth),
             depth=depth,
             scale=scale,
