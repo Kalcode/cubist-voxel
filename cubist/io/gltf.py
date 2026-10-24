@@ -9,6 +9,9 @@
   vertex colors, which glTF multiplies with the texture.
 * Y-up and +Z front, like the DSL; metres from ``voxel_size_m``. By default the root node
   shifts the asset so its footprint is centered on the origin with its base at y = 0.
+* Clips become animations on the part nodes, sampled from the same pose evaluator the
+  previews use: 30 samples a second (more where a part turns fast, so no step between keys
+  turns 60 degrees or more), linear; tracks that are all ``step`` keep just their keys.
 
 Written by hand (JSON + binary chunks) so output is byte-for-byte deterministic.
 """
@@ -26,6 +29,8 @@ from PIL import Image
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.io.mesh import Quad, greedy_mesh
+from cubist.motion.clips import Clip
+from cubist.motion.pose import local_motion, sample_times, track_value
 
 AO_LEVELS = (0.5, 0.7, 0.85, 1.0)
 _FLOAT, _UINT, _USHORT = 5126, 5125, 5123
@@ -68,7 +73,7 @@ class _Binary:
         array: np.ndarray,
         kind: str,
         component: int,
-        target: int,
+        target: int | None,
         normalized: bool = False,
         bounds: bool = False,
     ) -> int:
@@ -128,6 +133,120 @@ def _nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str |
         if d < best_d:
             best, best_d = part.name, d
     return best
+
+
+SAMPLE_RATE = 30.0
+MAX_TURN_PER_KEY = 60.0  # degrees; slerp between keys must never take the short way round
+
+
+def _quat(rot: np.ndarray) -> np.ndarray:
+    """A 3x3 rotation as an (x, y, z, w) unit quaternion."""
+    m = rot
+    tr = m[0, 0] + m[1, 1] + m[2, 2]
+    if tr > 0:
+        k = 2.0 * np.sqrt(tr + 1.0)
+        q = [(m[2, 1] - m[1, 2]) / k, (m[0, 2] - m[2, 0]) / k, (m[1, 0] - m[0, 1]) / k, k / 4]
+    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
+        k = 2.0 * np.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2])
+        q = [k / 4, (m[0, 1] + m[1, 0]) / k, (m[0, 2] + m[2, 0]) / k, (m[2, 1] - m[1, 2]) / k]
+    elif m[1, 1] > m[2, 2]:
+        k = 2.0 * np.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2])
+        q = [(m[0, 1] + m[1, 0]) / k, k / 4, (m[1, 2] + m[2, 1]) / k, (m[0, 2] - m[2, 0]) / k]
+    else:
+        k = 2.0 * np.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1])
+        q = [(m[0, 2] + m[2, 0]) / k, (m[1, 2] + m[2, 1]) / k, k / 4, (m[1, 0] - m[0, 1]) / k]
+    q = np.array(q)
+    return q / np.linalg.norm(q)
+
+
+def _turn(asset: BuiltAsset, clip: Clip, part: str, t0: float, t1: float) -> float:
+    """Degrees a part's own rotating tracks travel between two times."""
+    total = 0.0
+    for track in clip.tracks:
+        joint = asset.part(track.part).joint
+        if track.part != part or joint is None or joint.kind == "slide":
+            continue
+        dv = abs(track_value(track, t1, clip) - track_value(track, t0, clip))
+        total += dv * (360.0 if joint.kind == "spin" else 1.0)
+    return total
+
+
+def animation_samples(asset: BuiltAsset, clip: Clip, voxel_size_m: float = 0.0625) -> dict:
+    """Per driven part: ``times``, node ``translation`` (n, 3) in metres, ``rotation`` (n, 4)
+    xyzw, and the glTF ``interpolation``."""
+    pivots = {p.name: np.array(p.pivot, dtype=np.float64) for p in asset.parts}
+    out = {}
+    for name in dict.fromkeys(t.part for t in clip.tracks):
+        tracks = [t for t in clip.tracks if t.part == name]
+        part = asset.part(name)
+        if all(clip.track_ease(t) == "step" for t in tracks):
+            times = sorted({t for tr in tracks for t in tr.times})
+            interpolation = "STEP"
+        else:
+            base = sample_times(clip, SAMPLE_RATE).tolist()
+            times = [base[0]]
+            for t0, t1 in zip(base, base[1:], strict=False):
+                pieces = int(np.ceil(_turn(asset, clip, name, t0, t1) / (MAX_TURN_PER_KEY * 0.75)))
+                times.extend(t0 + (t1 - t0) * k / max(1, pieces) for k in range(1, max(1, pieces)))
+                times.append(t1)
+            interpolation = "LINEAR"
+        offset = pivots[name] - (pivots[part.parent] if part.parent in pivots else 0.0)
+        trans, rots = [], []
+        for t in times:
+            tr, rot = local_motion(asset, clip, float(t))[name]
+            trans.append((offset + tr) * voxel_size_m)
+            q = _quat(rot)
+            if rots and np.dot(q, rots[-1]) < 0:
+                q = -q
+            rots.append(q)
+        out[name] = {
+            "times": np.array(times, dtype=np.float64),
+            "translation": np.array(trans),
+            "rotation": np.array(rots),
+            "rest_translation": offset * voxel_size_m,
+            "interpolation": interpolation,
+        }
+    return out
+
+
+def _animation(
+    asset: BuiltAsset, clip: Clip, binary: _Binary, index_of: dict[str, int], s: float
+) -> dict:
+    samples = animation_samples(asset, clip, s)
+    channels: list[dict] = []
+    samplers: list[dict] = []
+    inputs: dict[tuple[str, bytes], int] = {}
+
+    def add(name: str, path: str, values: np.ndarray, sample: dict) -> None:
+        times = sample["times"].astype(np.float32).reshape(-1, 1)
+        key = (sample["interpolation"], times.tobytes())
+        if key not in inputs:
+            inputs[key] = binary.accessor(times, "SCALAR", _FLOAT, None, bounds=True)
+        kind = "VEC3" if path == "translation" else "VEC4"
+        output = binary.accessor(values.astype(np.float32), kind, _FLOAT, None)
+        samplers.append(
+            {"input": inputs[key], "output": output, "interpolation": sample["interpolation"]}
+        )
+        channels.append(
+            {"sampler": len(samplers) - 1, "target": {"node": index_of[name], "path": path}}
+        )
+
+    identity = np.array([0.0, 0.0, 0.0, 1.0])
+    for name, sample in samples.items():
+        if np.abs(sample["translation"] - sample["rest_translation"]).max() > 1e-9:
+            add(name, "translation", sample["translation"], sample)
+        if np.abs(np.abs(sample["rotation"] @ identity) - 1.0).max() > 1e-12:
+            add(name, "rotation", sample["rotation"], sample)
+    if not channels and samples:
+        # A clip that moves nothing still exists, so engines can find it by name.
+        name, sample = next(iter(samples.items()))
+        add(name, "rotation", sample["rotation"], sample)
+    return {
+        "name": clip.name,
+        "channels": channels,
+        "samplers": samplers,
+        "extras": {"loop": clip.loop, "length": clip.length},
+    }
 
 
 def encode_glb(
@@ -239,6 +358,8 @@ def encode_glb(
         ]
         doc["textures"] = [{"sampler": 0, "source": 0}]
         material["pbrMetallicRoughness"]["baseColorTexture"] = {"index": 0}
+    if asset.clips:
+        doc["animations"] = [_animation(asset, c, binary, index_of, s) for c in asset.clips]
     doc["extras"] = {
         "cubist": {"voxel_size_m": s, "size": list(asset.size) if asset.size else None}
     }
