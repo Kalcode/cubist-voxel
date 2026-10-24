@@ -291,6 +291,13 @@ no_pure_black = true
 dither = "allowed"           # or "forbidden"
 symmetry_tolerance = 0       # voxels allowed to differ from the mirror
 notes = "Chunky silhouettes, oversized heads and hands, light comes from top-left."
+
+[glow]                       # colors that give off light (a ramp, a shade, or a table entry)
+fire = 1.5                   # strength: previews lift shading by 1 - e^-strength; the .glb
+"eye.yellow" = 0.5           #   gets an emissive texture (KHR_materials_emissive_strength > 1)
+
+[cycles]                     # list ramps whose voxels step one shade along each tick
+water = { ramp = "water", fps = 6 }
 ```
 
 Every section is optional; unknown sections and keys are errors with a suggestion, so a typo
@@ -515,7 +522,16 @@ moves and what it looks like; the engine decides when it happens and how it is s
    crashes on renamed parts, fast spins under-sampled, false collisions for rigidly attached
    parts, GIF timing, ...), all fixed with regression tests in `tests/test_motion_edges.py`.
    Plan: `docs/superpowers/plans/2026-10-24-m8-characters.md`.
-9. **Flipbooks, color cycles, glow, lights.**
+9. **Flipbooks, color cycles, glow, lights** — done. `Part(frames=[...], fps=)` flipbooks
+   (frame 0 is the rest look; later frames ride in the `.vox` as hidden `<part>@<k>` models and
+   in the `.glb` as child nodes switched by STEP scale channels), looping on their own as
+   `<part>_frames` clips or driven by `frames(...)` tracks; `[glow]` and `[cycles]` in the style
+   bible (glow lifts preview shading by 1 - e^-strength and exports as an emissive palette
+   texture; cycles are previewed and listed in the manifest); `light(...)` point lights as
+   `KHR_lights_punctual` with flicker in the manifest. Every lint check that matters runs on
+   every frame. Demo: the torch and a campfire flicker and glow, a pond's water flows, the
+   blaster's flash plays two frames. Godot imports the moving demo assets with their animations,
+   lights and emission. Plan: `docs/superpowers/plans/2026-10-24-m9-flipbooks-glow.md`.
 10. **Effects** — fracture, baked bursts, particle models and emitters.
 11. **Evaluation** — twelve motion briefs built by fresh agents, scored from their GIFs.
 

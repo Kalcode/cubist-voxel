@@ -169,6 +169,47 @@ fire = clip(
 - **`travel`** is `(x, y, z)` voxels per second, for clips that walk in place.
 - A clip needs at least one track and one joint track per part.
 
+### Flipbooks
+
+```python
+Part(name, frames=[shape, shape, ...], fps=8, ...)   # instead of a shape
+frames(part, keys)                                   # a clip track picking frames, stepped
+```
+
+A flipbook part swaps whole shapes over time: flames, splashes, a muzzle flash. Frames share
+the part's pivot, parent, joint and visibility; frame 0 is the rest look the contact sheet
+shows. Without a `frames` track a flipbook loops on its own at `fps` (the build previews it as a
+`<part>_frames` clip and exports that as a glTF animation); a clip's `frames(...)` track plays
+chosen frames instead, like a two-frame flash played once:
+
+```python
+flame = Part("flame", frames=[flame_shape(p, k) for k in range(6)], fps=10, parent="torch")
+flash = Part("flash", frames=[small_star, big_star], parent="frame", hidden=True)
+fire = clip(
+    "fire", 0.35, [visible("flash", [(0, 1), (0.06, 0)]), frames("flash", [(0, 0), (0.03, 1)])]
+)
+```
+
+Make frames from one function with a seed or a parameter per frame, so they stay the same
+flame. Lint checks palette, bounds and floating pieces on every frame, and notes frames that
+change most of their voxels (`frame_pop`): small changes per frame read as motion.
+
+### Glow, color cycles and lights
+
+Glow and color cycles are set per project in `style.toml` (`[glow]`, `[cycles]`; see
+`cubist style`), so every asset using those colors gets them. Glowing colors render nearly
+unshaded in previews and export as emissive; a cycling ramp's voxels step one shade along it
+each tick (water, lava), shown in previews and listed in the manifest for the engine.
+
+```python
+light(position, color, range=8, intensity=1.0, flicker=0.0, part=None)
+Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=10, flicker=0.35)})
+```
+
+A point light in a palette color, moving with `part` (default: the part with the nearest voxel).
+It becomes a `KHR_lights_punctual` light in the `.glb`; `flicker` (0 steady to 1 wild) goes in
+the manifest for the engine. Posed previews mark it with a dot.
+
 ### Oriented sockets
 
 ```python

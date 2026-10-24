@@ -57,6 +57,7 @@ can read it before exporting.
 | `pivot` | Where the part turns, in asset space. In the `.glb` this is the part node's origin. |
 | `parent` | The part it hangs from, or `null` |
 | `joint` | How it moves (below), or `null` for a part that doesn't move on its own |
+| `frames` | A flipbook's `{count, fps, vox_models}`, or `null`. In the `.glb` the part node has a child node `<part>@<k>` per frame, frames other than 0 at scale 0; `frame` tracks become `STEP` scale channels on those nodes. Without a `frame` track it loops at `fps` (exported as a `<part>_frames` animation) |
 | `hidden` | Starts hidden (a clip's `visible` track shows it); children of hidden parts are hidden too. In the `.glb` its node has scale 0, and `visible` tracks become `STEP` scale channels |
 | `voxels` | Voxel count |
 | `vox_model` | The model's name in the `.vox` scene graph |
@@ -83,6 +84,25 @@ A part at joint value `v` has the local transform
 
 An engine can drive joints directly, such as a door the player pushes, using the limits.
 
+## Glow, color cycles, lights
+
+```json
+"glow": {"fire.light": 1.5},
+"cycles": [{"name": "water", "ramp": "water", "fps": 6,
+            "colors": ["water.dark", "water.1", "water.mid", "water.light"]}],
+"lights": {"flame": {"position": [3.5, 14, 3.5], "part": "torch", "color": "fire.light",
+                     "rgb": "#ffe066", "range": 10, "intensity": 1, "flicker": 0.35}}
+```
+
+- **`glow`**: the glowing colors this asset uses, with strengths. The `.glb` material has an
+  emissive palette texture (glowing cells colored, others black), `emissiveFactor` 1 and, when a
+  strength is above 1, `KHR_materials_emissive_strength`.
+- **`cycles`**: each tick (`1/fps` s) every voxel of a listed color shows the next color in the
+  list, wrapping around. Not in the `.glb`: with a 256×1 palette texture an engine can rotate
+  those texels.
+- **`lights`**: point lights in asset space; `range` in voxels; `flicker` 0..1 for the engine.
+  The `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`.
+
 ## Sockets
 
 ```json
@@ -108,7 +128,8 @@ node under that part.
   - `joint`: the part's joint value, at most one per part;
   - `rotate_x|y|z`: degrees about the pivot along the parent's axes;
   - `move_x|y|z`: voxels along the parent's axes;
-  - `visible`: 1 shown, 0 hidden, always stepped.
+  - `visible`: 1 shown, 0 hidden, always stepped;
+  - `frame`: which frame of a flipbook part shows, always stepped.
 
   Free tracks on the same channel add up. A part's local transform is
   `T(pivot - parent.pivot) · T(slide + moves) · R_joint · R_z · R_y · R_x`.
