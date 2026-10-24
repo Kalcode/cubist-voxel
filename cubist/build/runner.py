@@ -281,7 +281,7 @@ def _build_in_process(script: Path, style_path: Path, out: Path, seed: int) -> l
     results = []
     for a in assets:
         try:
-            built = a.build(style.palette, seed=seed)
+            built = a.build(style.palette, seed=seed, glow=style.glow, cycles=style.cycles)
         except Exception as e:
             message = f"{script.name}: asset {a.name!r} failed:\n{_script_traceback(e, script)}"
             _append_history(out / a.name, script, ok=False, error=message, seed=seed)

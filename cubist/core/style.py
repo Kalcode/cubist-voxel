@@ -1,4 +1,5 @@
-"""The per-project style bible, ``style.toml``: palette, scale, budgets, and rules.
+"""The per-project style bible, ``style.toml``: palette, scale, budgets, rules, which colors
+glow, and which ramps cycle.
 
 Every section is optional. Unknown sections and keys are errors, so a typo never silently
 turns a budget off.
@@ -41,6 +42,49 @@ class Rules:
     notes: str = ""
 
 
+@dataclass(frozen=True)
+class Cycle:
+    """A list ramp whose voxels step one shade along it ``fps`` times a second (water, lava)."""
+
+    name: str
+    ramp: str
+    indices: tuple[int, ...]
+    fps: float
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "ramp": self.ramp,
+            "indices": list(self.indices),
+            "fps": self.fps,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> Cycle:
+        return cls(d["name"], d["ramp"], tuple(int(i) for i in d["indices"]), float(d["fps"]))
+
+
+def cycle_table(table: np.ndarray, cycles, t: float) -> np.ndarray:
+    """The palette table at time ``t``: each cycle's colors shifted ``floor(t * fps)`` shades
+    along their ramp, wrapping around."""
+    out = np.array(table, copy=True)
+    for c in cycles:
+        n = len(c.indices)
+        ticks = int(np.floor(t * c.fps + 1e-9)) % n
+        if ticks:
+            for k, index in enumerate(c.indices):
+                out[index] = table[c.indices[(k + ticks) % n]]
+    return out
+
+
+def glow_array(glow: dict[int, float] | None) -> np.ndarray:
+    """Glow strength per palette index (0: not glowing), for the renderers."""
+    out = np.zeros(256)
+    for index, strength in (glow or {}).items():
+        out[int(index)] = strength
+    return out
+
+
 @dataclass
 class StyleBible:
     path: Path
@@ -50,6 +94,8 @@ class StyleBible:
     scale: dict[str, float] = field(default_factory=dict)
     budgets: Budgets = field(default_factory=Budgets)
     rules: Rules = field(default_factory=Rules)
+    glow: dict[int, float] = field(default_factory=dict)
+    cycles: list[Cycle] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         def hex_of(rgba):
@@ -68,6 +114,8 @@ class StyleBible:
             "scale": self.scale,
             "budgets": asdict(self.budgets),
             "rules": asdict(self.rules),
+            "glow": {self.palette.name_of(i): s for i, s in sorted(self.glow.items())},
+            "cycles": [{"name": c.name, "ramp": c.ramp, "fps": c.fps} for c in self.cycles],
         }
 
 
@@ -77,7 +125,49 @@ _SECTIONS = {
     "scale": None,  # free-form numbers
     "budgets": {k: int for k in Budgets.__dataclass_fields__},
     "rules": {"no_pure_black": bool, "dither": str, "symmetry_tolerance": int, "notes": str},
+    "glow": None,  # palette name -> strength
+    "cycles": None,  # name -> {ramp, fps}
 }
+
+
+def _colors_named(palette: Palette, name: str, section: str) -> list[int]:
+    """Indices for a palette name: a ramp or table (all its colors) or one shade."""
+    obj = palette
+    try:
+        for piece in str(name).split("."):
+            obj = obj[int(piece)] if piece.isdigit() else getattr(obj, piece)
+    except (PaletteError, IndexError, TypeError) as e:
+        raise StyleError(f"[{section}] {name!r}: {e}") from None
+    if hasattr(obj, "index"):
+        return [obj.index]
+    return [c.index for c in obj]
+
+
+def _glow(palette: Palette, table: dict) -> dict[int, float]:
+    out: dict[int, float] = {}
+    for name, strength in table.items():
+        if isinstance(strength, bool) or not isinstance(strength, (int, float)) or strength <= 0:
+            raise StyleError(f"[glow] {name} must be a strength > 0, got {strength!r}")
+        for index in _colors_named(palette, name, "glow"):
+            out[index] = float(strength)
+    return out
+
+
+def _cycles(palette: Palette, table: dict) -> list[Cycle]:
+    out = []
+    for name, spec in table.items():
+        if not isinstance(spec, dict) or set(spec) != {"ramp", "fps"}:
+            raise StyleError(f'[cycles] {name} must be {{ ramp = "<ramp>", fps = <number> }}')
+        ramp, fps = spec["ramp"], spec["fps"]
+        if ramp not in palette.list_ramps():
+            raise StyleError(
+                f"[cycles] {name}: cycles step along a list ramp; {ramp!r} is not one (list "
+                f"ramps: {', '.join(palette.list_ramps())})"
+            )
+        if isinstance(fps, bool) or not isinstance(fps, (int, float)) or fps <= 0:
+            raise StyleError(f"[cycles] {name}: fps must be a number > 0, got {fps!r}")
+        out.append(Cycle(name, ramp, tuple(c.index for c in getattr(palette, ramp)), float(fps)))
+    return out
 
 
 def _unknown(kind: str, name: str, known) -> StyleError:
@@ -177,4 +267,6 @@ def load_style(path: str | os.PathLike) -> StyleBible:
         scale=dict(scale),
         budgets=budgets,
         rules=rules,
+        glow=_glow(palette, data.get("glow", {})),
+        cycles=_cycles(palette, data.get("cycles", {})),
     )

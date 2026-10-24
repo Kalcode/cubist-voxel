@@ -11,6 +11,7 @@ from cubist.core.grid import VoxelGrid
 from cubist.core.palette import Palette
 from cubist.core.part import Part, Vec3
 from cubist.core.socket import Socket
+from cubist.core.style import Cycle
 from cubist.dsl.context import building
 from cubist.dsl.shape import Shape, ShapeError
 from cubist.motion.clips import Clip
@@ -146,6 +147,8 @@ class BuiltAsset:
     seed: int = 0
     ops_used: set[str] = field(default_factory=set)
     clips: list[Clip] = field(default_factory=list)
+    glow: dict[int, float] = field(default_factory=dict)  # palette index -> strength
+    cycles: list[Cycle] = field(default_factory=list)
 
     def is_animated(self) -> bool:
         return bool(self.clips) or any(p.joint is not None for p in self.parts)
@@ -234,6 +237,8 @@ class BuiltAsset:
             "palette_names": {str(i): n for i, n in self.palette_names().items()},
             "ops_used": sorted(self.ops_used),
             "clips": [c.to_dict() for c in self.clips],
+            "glow": {str(i): s for i, s in sorted(self.glow.items())},
+            "cycles": [c.to_dict() for c in self.cycles],
         }
 
     @classmethod
@@ -272,6 +277,8 @@ class BuiltAsset:
             seed=int(summary.get("seed", 0)),
             ops_used=set(summary.get("ops_used", ())),
             clips=_surviving_clips(summary.get("clips", ()), parts),
+            glow={int(k): float(v) for k, v in summary.get("glow", {}).items()},
+            cycles=[Cycle.from_dict(c) for c in summary.get("cycles", ())],
         )
 
 
@@ -307,7 +314,13 @@ class AssetDef:
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
         self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
 
-    def build(self, palette: Palette, seed: int = 0) -> BuiltAsset:
+    def build(
+        self,
+        palette: Palette,
+        seed: int = 0,
+        glow: dict[int, float] | None = None,
+        cycles: Sequence[Cycle] | None = None,
+    ) -> BuiltAsset:
         with building(palette, seed) as ctx:
             result = self.fn(palette)
             if isinstance(result, Shape):
@@ -341,6 +354,8 @@ class AssetDef:
             seed=int(seed),
             ops_used=set(ctx.ops_used),
             clips=list(result.clips),
+            glow=dict(glow or {}),
+            cycles=list(cycles or []),
         )
 
     def __repr__(self) -> str:
