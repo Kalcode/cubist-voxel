@@ -47,8 +47,13 @@ def motion_view(asset: BuiltAsset, clip: Clip) -> str:
     """The orthographic view that shows a clip's motion best."""
     votes: list[str] = []
     for track in clip.tracks:
+        if track.channel.startswith(("rotate_", "move_")):
+            kind, axis_name = track.channel.split("_")
+            table = _ROTATE_VIEW if kind == "rotate" else _SLIDE_VIEW
+            votes.append(table["xyz".index(axis_name)])
+            continue
         joint = asset.part(track.part).joint
-        if joint is None:
+        if track.channel != "joint" or joint is None:
             continue
         axis = int(np.argmax(np.abs(joint.axis)))
         votes.append((_SLIDE_VIEW if joint.kind == "slide" else _ROTATE_VIEW)[axis])

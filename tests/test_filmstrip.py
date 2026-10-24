@@ -68,6 +68,20 @@ def test_motion_view_follows_the_joint_axis():
     assert motion_view(a, a.clips[0]) == "right"
 
 
+def test_motion_view_counts_free_tracks():
+    from cubist import bob, swing
+
+    def walker(p):
+        body = Part("body", box((4, 6, 2), color=p.wood.mid))
+        leg = Part("leg", box((1, 4, 1), color=p.wood.dark), parent="body")
+        return Model(
+            [body, leg], clips=[clip("walk", 1, [swing("leg", "x", 20), bob("body", 1)], loop=True)]
+        )
+
+    a = build(walker)
+    assert motion_view(a, a.clips[0]) == "right"
+
+
 def test_loop_frame_times_repeat_the_first_pose_at_the_end():
     c = clip("w", 0.8, {"p": [0, 1, 0]}, loop=True)
     assert frame_times(c, 4) == pytest.approx([0, 0.2, 0.4, 0.6, 0.8])

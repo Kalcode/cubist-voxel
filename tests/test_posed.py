@@ -43,14 +43,15 @@ def demo():
 def test_rest_pose_matches_static_renderer(view, demo):
     assets, table = demo
     for a in assets:
-        grid = a.merged_grid()
+        grid = a.visible_grid()  # what contact sheets show: parts hidden at rest left out
         region = asset_region(grid, a.size)
         scale = choose_scale([h - lo for lo, h in zip(*region, strict=True)])
         if view == "iso":
             want = raster.iso(grid, table, scale, region)
         else:
             want = raster.ortho(grid, table, view, scale, region)
-        got = PosedScene(a, table).render({}, view, scale, region)
+        hidden = frozenset(a.hidden_parts())
+        got = PosedScene(a, table).render({}, view, scale, region, hidden)
         assert got.rgb.shape == want.rgb.shape, a.name
         agree = np.mean(got.mask == want.mask)
         assert agree >= 0.99, (a.name, agree)

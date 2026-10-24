@@ -24,5 +24,34 @@ def goblin(p):
             Part("leg_r", leg, parent="torso", pivot=(6, 9, 6)).mirrored("leg_l", about_x=8),
             Part("arm_r", arm, parent="torso", pivot=(4, 15, 6)).mirrored("arm_l", about_x=8),
         ],
-        sockets={"hand_r": (4, 8, 6)},
+        sockets={"hand_r": socket((4, 8, 6), part="arm_r", forward="+z")},
+        clips=[
+            # Legs and arms swing in opposite phases; the torso dips as the legs spread, so the
+            # feet stay planted; the engine moves the goblin forward at `travel`.
+            clip(
+                "walk",
+                0.8,
+                [
+                    swing("leg_r", "x", 25),
+                    swing("leg_l", "x", 25, phase=0.5),
+                    swing("arm_r", "x", 20, phase=0.5),
+                    swing("arm_l", "x", 20),
+                    bob("torso", -0.4),
+                ],
+                loop=True,
+                events=[(0.2, "footstep"), (0.6, "footstep")],
+                travel=(0, 0, 19),
+            ),
+            # Looking around, arms drifting.
+            clip(
+                "idle",
+                2.4,
+                [
+                    swing("head", "y", 12),
+                    swing("arm_r", "x", 4, cycles=2),
+                    swing("arm_l", "x", 4, cycles=2, phase=0.5),
+                ],
+                loop=True,
+            ),
+        ],
     )
