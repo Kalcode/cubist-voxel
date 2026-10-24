@@ -254,7 +254,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
 | Scale | An asset tagged `<tag>` more than 20% under or 25% over `[scale]` `<tag>_height` (`door`, `table`, `humanoid`), or a `building` shorter than `door_height` | Warning |
-| Occlusion | A `building` whose highest visible part has no occlusion tag (`roof`, `upper`) | Info |
+| Occlusion | A `building` with no part tagged `roof` or `upper` | Info |
 | Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |

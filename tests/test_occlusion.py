@@ -72,11 +72,25 @@ def lint_info(a):
     return [f for f in lint(a, style).findings if f.check == "occlusion"]
 
 
-def test_building_whose_top_has_no_occlusion_tag_gets_an_info():
+def test_building_with_no_roof_or_upper_tag_gets_an_info():
     [f] = lint_info(built(lambda p: house(p, roof_tag=None)))
-    assert f.severity == "info" and "chimney" in f.message and "occlusion=" in f.message
+    assert f.severity == "info" and "occlusion=" in f.message
 
 
 def test_tagged_roof_or_non_building_is_quiet():
     assert lint_info(built()) == []
     assert lint_info(built(lambda p: house(p, roof_tag=None), tags=("prop",))) == []
+
+
+def test_untagged_chimney_above_a_tagged_roof_is_quiet():
+    # The smithy: its chimney rises from the hearth, not the roof, and is the highest part.
+    def smithy(p):
+        m = house(p)
+        stack = Part("stack", box((2, 6, 2), color=p.stone.light).at(0, 6, 0), parent="walls")
+        roof = Part(
+            "roof", box((8, 3, 8), color=p.wood.dark).at(0, 6, 0) - box((2, 3, 2)).at(0, 6, 0),
+            parent="walls", occlusion="roof",
+        )  # fmt: skip
+        return Model([m.parts[0], roof, stack])
+
+    assert lint_info(built(smithy)) == []

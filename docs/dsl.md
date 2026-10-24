@@ -64,7 +64,7 @@ Part(...).mirrored(name, about_x=None, about_y=None, about_z=None)  # -> (part, 
 - `occlusion`: `"roof"`, `"upper"` (an upper storey) or `"canopy"` (a tree's crown), for
   engines that hide what's between the camera and the player. Parts hanging from a tagged part
   share its tag unless they have their own, so parent the chimney to the roof. Give a building's
-  roof its own part; lint notes a building whose highest part has no tag.
+  roof its own part; lint notes a building with no `roof` or `upper` part.
 - Each voxel should belong to one part; lint warns when parts overlap (they double up in exports
   and poke through when a part moves). Subtract one part's shape from the other.
 

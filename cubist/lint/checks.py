@@ -296,30 +296,18 @@ MIN_LIGHT_RANGE_M = 2.0  # about what a candle lights
 
 
 def check_occlusion(asset: BuiltAsset) -> list[Finding]:
-    """A building's top should carry an occlusion tag, so an engine can hide it to show the
-    player underneath."""
+    """A building should tag its roof or upper storey, so an engine can hide it to show the
+    player underneath. Untagged parts above it (a chimney from the hearth) are fine."""
     if "building" not in asset.tags:
         return []
-    hidden = set(asset.hidden_parts())
-    tops = {}
-    for p in asset.parts:
-        b = p.grid.bounds()
-        if b is not None and p.name not in hidden:
-            tops[p.name] = b[1][1]
-    if not tops:
-        return []
-    highest = max(tops.values())
-    top_parts = sorted(n for n, y in tops.items() if y == highest)
-    if any(asset.occlusion_of(n) for n in top_parts):
+    if any(asset.occlusion_of(p.name) in ("roof", "upper") for p in asset.parts):
         return []
     return [
         Finding(
             "occlusion",
             "info",
-            f"building's highest part ({', '.join(top_parts)}) has no occlusion tag; give the roof "
-            'its own part with occlusion="roof" (upper storeys "upper") so an engine can hide '
-            "it when the player walks underneath",
-            {"parts": top_parts},
+            'building has no part tagged occlusion="roof" or "upper"; give the roof its own part '
+            "with that tag so an engine can hide it when the player walks underneath",
         )
     ]
 
