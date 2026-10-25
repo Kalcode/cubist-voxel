@@ -164,9 +164,9 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 
 Milestones 1–11 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
 characters; 9: flipbooks, glow and lights; 10: fracture, bursts and emitters; 11: the motion
-evaluation), with human scores for both evaluations still to come. Next up: the engine, designed
-around the manifest
-([the plan](docs/superpowers/specs/2026-10-24-motion-and-effects-design.md)).
+evaluation), with human scores for both evaluations still to come. Cubist is the asset pipeline
+for Kiln, a voxel engine built around the [manifest](docs/manifest.md); its requests are on this
+repo's issue board.
 
 Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
 `uv run ruff check . && uv run ruff format .`.

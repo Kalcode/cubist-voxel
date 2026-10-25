@@ -593,8 +593,12 @@ creatures above about 32 voxels tall will need better primitives or human touch-
   as the source?
 - [x] Animation: rigid parts with joints and clips, plus flipbooks for voxels that change
   shape (fire, water); no skinning. See Motion and effects.
-- [x] Target engine: David's own engine, still to be designed around Cubist. Godot and Blender
-  stay as `.glb` checkers only; the manifest is the engine contract.
+- [x] Target engine: Kiln, David's own C# voxel engine, in the game repo
+  `kalcode/mmo-yet-another-sanbox-game` (its formats: `docs/engine/formats.md`). Cubist is its
+  asset pipeline: Kiln loads the `.vox` (glow from `MATL`) and the manifest (parts, joints,
+  clips, lights, colors, occlusion), and needs no style bible. Kiln's requests go on this repo's
+  issue board (label `kiln`). Godot and Blender stay as `.glb` checkers only; the manifest is
+  the engine contract.
 - [x] Project name: Cubist (`cubist`).
 
 ### Prior art
