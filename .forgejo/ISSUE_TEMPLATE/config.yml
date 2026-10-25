@@ -1,0 +1,3 @@
+# The main repository's own issue board (Forgejo reads this before .github/): blank issues stay
+# on for the maintainer. The discussions-first rules in .github/ are for the public GitHub mirror.
+blank_issues_enabled: true

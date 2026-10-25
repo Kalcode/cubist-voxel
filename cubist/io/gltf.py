@@ -18,13 +18,12 @@ Written by hand (JSON + binary chunks) so output is byte-for-byte deterministic.
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import struct
+import zlib
 
 import numpy as np
-from PIL import Image
 
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
@@ -318,6 +317,27 @@ def _lights(asset, nodes, index_of, pivots, root, s) -> None:
         owner.setdefault("children", []).append(len(nodes) - 1)
 
 
+def png_rgba(rgba: np.ndarray) -> bytes:
+    """A one-row RGBA PNG of ``rgba`` (n, 4), in stored (uncompressed) deflate blocks. No
+    compressor is involved, so the bytes are the same on every machine (zlib builds differ, and
+    zlib-ng picks code paths per CPU). A 256-color palette is 1 KB either way."""
+    raw = b"\x00" + np.ascontiguousarray(rgba, dtype=np.uint8).tobytes()  # filter 0: none
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        crc = struct.pack(">I", zlib.crc32(kind + body))
+        return struct.pack(">I", len(body)) + kind + body + crc
+
+    blocks = []
+    for start in range(0, len(raw), 0xFFFF):
+        piece = raw[start : start + 0xFFFF]
+        final = 1 if start + 0xFFFF >= len(raw) else 0
+        blocks.append(bytes([final]) + struct.pack("<HH", len(piece), len(piece) ^ 0xFFFF) + piece)
+    stream = b"\x78\x01" + b"".join(blocks) + struct.pack(">I", zlib.adler32(raw))
+    header = struct.pack(">IIBBBBB", len(rgba), 1, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    signature = b"\x89PNG\r\n\x1a\n"
+    return signature + chunk(b"IHDR", header) + chunk(b"IDAT", stream) + chunk(b"IEND", b"")
+
+
 def used_colors(asset: BuiltAsset) -> set[int]:
     used: set[int] = set()
     for part in asset.parts:
@@ -338,10 +358,8 @@ def _emissive(asset: BuiltAsset, rgba: np.ndarray, doc: dict, binary, material: 
     table[:, 3] = 255
     for index, strength in glow.items():
         table[index, :3] = np.rint(rgba[index, :3].astype(np.float64) * min(1.0, strength / scale))
-    png = io.BytesIO()
-    Image.fromarray(table[None, :, :], "RGBA").save(png, format="PNG")
     doc["images"].append(
-        {"name": "glow", "mimeType": "image/png", "bufferView": binary.view(png.getvalue())}
+        {"name": "glow", "mimeType": "image/png", "bufferView": binary.view(png_rgba(table))}
     )
     doc["textures"].append({"sampler": 0, "source": len(doc["images"]) - 1})
     material["emissiveTexture"] = {"index": len(doc["textures"]) - 1}
@@ -494,10 +512,8 @@ def encode_glb(
         "materials": [material],
     }
     if use_texture:
-        png = io.BytesIO()
-        Image.fromarray(rgba[None, :, :], "RGBA").save(png, format="PNG")
         doc["images"] = [
-            {"name": "palette", "mimeType": "image/png", "bufferView": binary.view(png.getvalue())}
+            {"name": "palette", "mimeType": "image/png", "bufferView": binary.view(png_rgba(rgba))}
         ]
         doc["samplers"] = [
             {"magFilter": _NEAREST, "minFilter": _NEAREST, "wrapS": _CLAMP, "wrapT": _CLAMP}

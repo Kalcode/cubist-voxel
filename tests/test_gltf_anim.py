@@ -205,5 +205,7 @@ def test_sampled_rate_is_30_per_second(ease):
     assert len(s["times"]) == 31
 
 
-# encode_glb of the static model above, recorded before animations existed
-STATIC_SHA256 = "4d2f8e91ea5844acaf936046be204cfee7a06b81c37b61731be922be5e4ba81b"
+# encode_glb of the static model above. Recorded before animations existed; re-recorded when the
+# palette PNG switched to stored deflate blocks so it's the same on every machine (same pixels,
+# and every other byte unchanged).
+STATIC_SHA256 = "af2f4e1c17c50083ab8bb22243d4d93d9bc22a3b08ce26af7e709f21b9e5dd58"

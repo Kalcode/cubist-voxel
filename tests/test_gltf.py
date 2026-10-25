@@ -194,3 +194,26 @@ def test_encoding_is_deterministic():
 def test_bad_voxel_size_is_an_error():
     with pytest.raises(ValueError, match="voxel_size_m"):
         encode_glb(build(), P.rgba_table(), voxel_size_m=0)
+
+
+def _png_chunks(data: bytes) -> dict[bytes, bytes]:
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    out, pos = {}, 8
+    while pos < len(data):
+        (n,) = struct.unpack_from(">I", data, pos)
+        out[data[pos + 4 : pos + 8]] = data[pos + 8 : pos + 8 + n]
+        pos += 12 + n
+    return out
+
+
+def test_palette_png_bytes_do_not_depend_on_a_compressor():
+    # zlib builds (zlib-ng picks code paths per CPU) compress differently, so the palette is
+    # stored uncompressed and the .glb is byte-identical on every machine.
+    from cubist.io.gltf import png_rgba
+
+    rgba = np.arange(256 * 4, dtype=np.uint32).reshape(256, 4).astype(np.uint8)
+    data = png_rgba(rgba)
+    idat = _png_chunks(data)[b"IDAT"]
+    assert idat[2] & 0b110 == 0  # the first deflate block is stored (BTYPE 00)
+    decoded = np.asarray(Image.open(io.BytesIO(data)).convert("RGBA"))
+    assert decoded.shape == (1, 256, 4) and np.array_equal(decoded[0], rgba)

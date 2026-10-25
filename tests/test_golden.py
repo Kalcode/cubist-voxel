@@ -23,6 +23,10 @@ DEMO = ROOT / "projects" / "demo"
 GOLDEN = Path(__file__).parent / "golden"
 SCRIPTS = sorted((DEMO / "assets").glob("*.py"))
 UPDATE = os.environ.get("CUBIST_UPDATE_GOLDEN") == "1"
+# Math libraries differ in the last bit of sin and cos, so on another platform an edge that lands
+# exactly on a pixel center can flip (3 pixels on Linux x86 vs macOS arm64). Recoloring a single
+# voxel changes at least 33 pixels in these images, so a real change still fails.
+EDGE_PIXELS = 16
 
 
 def _compare(image, path: Path) -> None:
@@ -34,8 +38,8 @@ def _compare(image, path: Path) -> None:
     expected = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     actual = np.asarray(image, dtype=np.int16)
     assert actual.shape == expected.shape
-    diff = np.abs(actual - expected)
-    assert diff.max() <= 2, f"{(diff > 2).any(axis=-1).sum()} pixels differ from {path.name}"
+    differ = (np.abs(actual - expected) > 2).any(axis=-1).sum()
+    assert differ <= EDGE_PIXELS, f"{differ} pixels differ from {path.name}"
 
 
 def _built(script):
@@ -80,5 +84,5 @@ def test_contact_sheet_matches_golden(script):
     expected = np.asarray(Image.open(path).convert("RGB"), dtype=np.int16)
     actual = np.asarray(sheet, dtype=np.int16)
     assert actual.shape == expected.shape
-    diff = np.abs(actual - expected)
-    assert diff.max() <= 2, f"{(diff > 2).any(axis=-1).sum()} pixels differ from {path.name}"
+    differ = (np.abs(actual - expected) > 2).any(axis=-1).sum()
+    assert differ <= EDGE_PIXELS, f"{differ} pixels differ from {path.name}"
