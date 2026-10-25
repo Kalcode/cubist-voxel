@@ -513,16 +513,15 @@ CLAUDE.md
 
 ### Motion and effects (M7–M11)
 
-The design is `docs/superpowers/specs/2026-10-24-motion-and-effects-design.md`: Cubist says what
-moves and what it looks like; the engine decides when it happens and how it is simulated.
+Cubist says what moves and what it looks like; the engine decides when it happens and how it is
+simulated.
 
 7. **Hinges, slides, spins** — done. Joints (`hinge`, `slide`, `spin`) and clips with smooth,
    linear or step keys; one pose evaluator shared by previews, lint and export; a posed renderer
    that draws moving parts as rotated blocks (rest frames match the static renderer pixel for
    pixel except at part seams); filmstrips (`motion.png`), GIFs, and posed contact sheets
    (`cubist render --clip NAME [--at T]`); motion lint; glTF animations checked in Blender; the
-   manifest. Demo: chest, door, window, desk, biplane. Plan:
-   `docs/superpowers/plans/2026-10-24-m7-hinges-slides-spins.md`.
+   manifest. Demo: chest, door, window, desk, biplane.
 8. **Characters** — done. Free `turn`/`move` tracks on any part (composed `R_joint · R_z · R_y ·
    R_x`, same-channel tracks add up); generators (`swing`, `bob`, `shake`, `spin_track`)
    resolved against the clip length into plain keys; hidden parts and `visible` tracks (left out
@@ -532,7 +531,6 @@ moves and what it looks like; the engine decides when it happens and how it is s
    An independent review of M7 found 11 edge-case bugs (step-only clips cut short in glTF,
    crashes on renamed parts, fast spins under-sampled, false collisions for rigidly attached
    parts, GIF timing, ...), all fixed with regression tests in `tests/test_motion_edges.py`.
-   Plan: `docs/superpowers/plans/2026-10-24-m8-characters.md`.
 9. **Flipbooks, color cycles, glow, lights** — done. `Part(frames=[...], fps=)` flipbooks
    (frame 0 is the rest look; later frames ride in the `.vox` as hidden `<part>@<k>` models and
    in the `.glb` as child nodes switched by STEP scale channels), looping on their own as
@@ -542,7 +540,7 @@ moves and what it looks like; the engine decides when it happens and how it is s
    `KHR_lights_punctual` with flicker in the manifest. Every lint check that matters runs on
    every frame. Demo: the torch and a campfire flicker and glow, a pond's water flows, the
    blaster's flash plays two frames. Godot imports the moving demo assets with their animations,
-   lights and emission. Plan: `docs/superpowers/plans/2026-10-24-m9-flipbooks-glow.md`.
+   lights and emission.
 10. **Effects** — done. `fracture`/`chunks` (seeded farthest-point seeds, jittered cuts,
    strays and slivers merged so every chunk is one connected piece); `burst` (a baked ballistic
    clip of plain keys: chunks roll up off the floor while rising and rest where they touch
@@ -551,7 +549,7 @@ moves and what it looks like; the engine decides when it happens and how it is s
    `out/` (stand-in cubes and a lint warning when unbuilt), oriented empty nodes in the `.glb`,
    emitters and particle dependencies in the manifest. Demo: the barrel explodes with smoke,
    the campfire smokes, the blaster and wand throw sparks; new `smoke_puff` and `spark`
-   particle assets. Plan: `docs/superpowers/plans/2026-10-24-m10-effects.md`.
+   particle assets.
 11. **Evaluation** — run; human scores pending. Twelve briefs, one per moment of David's
    (torch, chest, door, window, drawer, walk, explosion, gun, wand, water, propellers, fire with
    smoke), on objects distinct from the demo, built by four fresh agents from the docs alone:

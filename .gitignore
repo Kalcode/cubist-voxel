@@ -6,3 +6,6 @@ __pycache__/
 dist/
 out/
 export/
+
+# Planning notes stay on the maintainer's machine
+docs/superpowers/
