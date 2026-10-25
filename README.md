@@ -67,14 +67,17 @@ def barrel(p):
 Python 3.11+ and [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone ssh://git@192.168.50.249/kalcode/voxel-auther-system.git
-cd voxel-auther-system
+git clone https://github.com/Kalcode/cubist.git
+cd cubist
 uv sync
 ```
 
 Optional: [MagicaVoxel](https://ephtracy.github.io/) or [Goxel](https://goxel.xyz/) to view and
 edit `.vox` (`brew install --cask magicavoxel goxel`), [Godot 4](https://godotengine.org/) for the
 `.glb`, and [vengi](https://vengi-voxel.github.io/vengi/) for other formats.
+
+Asset scripts are Python, and building one runs it with your permissions, so only build scripts
+you trust. [SECURITY.md](SECURITY.md) has the details.
 
 ## Run it
 
@@ -165,8 +168,15 @@ tests/             the test suite; golden/ holds reviewed contact sheets
 Milestones 1–11 of the [design](docs/design.md) are done (7: hinges, slides and spins; 8:
 characters; 9: flipbooks, glow and lights; 10: fracture, bursts and emitters; 11: the motion
 evaluation), with human scores for both evaluations still to come. Cubist is the asset pipeline
-for Kiln, a voxel engine built around the [manifest](docs/manifest.md); its requests are on this
-repo's issue board.
+for Kiln, a voxel engine built around the [manifest](docs/manifest.md).
 
-Development: `uv run pytest` (Godot on PATH enables the GLB import test) and
-`uv run ruff check . && uv run ruff format .`.
+## Contributing
+
+Contributions start as a [discussion](https://github.com/Kalcode/cubist/discussions). Open a
+pull request once the change has been agreed there. AI-assisted work is welcome on the same
+terms. [CONTRIBUTING.md](CONTRIBUTING.md) explains why and how, including the development
+setup. Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+[MIT](LICENSE).

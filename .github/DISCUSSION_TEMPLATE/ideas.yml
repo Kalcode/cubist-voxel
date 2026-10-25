@@ -1,0 +1,33 @@
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Ideas are agreed here before anyone writes a pull request, so nobody spends time on a
+        change that can't be merged. Lead with the problem; the fix can change once we've talked.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to make or do, and what got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd change
+      description: The change you have in mind, and what it would look like in a script or the manifest.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other ways around it, including what you do today.
+  - type: dropdown
+    id: pr
+    attributes:
+      label: Would you like to open the pull request once it's agreed?
+      options:
+        - "Yes"
+        - "Maybe, with some pointers"
+        - "No, just suggesting it"

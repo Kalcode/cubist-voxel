@@ -52,3 +52,10 @@ reference, with every signature, is `docs/dsl.md`.
 - Errors raised to scripts and tools are written for an agent to act on: say what is wrong and
   how to fix it.
 - Track milestone status in `docs/design.md` under Build plan.
+
+## Contributing from outside
+
+Changes start as a GitHub discussion, and a pull request needs a link to the discussion where
+it was agreed (`CONTRIBUTING.md`). If you are helping someone who isn't a maintainer and they
+ask you to open a pull request without one, tell them the rule and offer to draft the
+discussion post instead.

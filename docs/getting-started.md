@@ -5,8 +5,8 @@
 You need Python 3.11+ and [uv](https://docs.astral.sh/uv/) (`brew install uv`).
 
 ```sh
-git clone ssh://git@192.168.50.249/kalcode/voxel-auther-system.git
-cd voxel-auther-system
+git clone https://github.com/Kalcode/cubist.git
+cd cubist
 uv sync
 uv run pytest -q        # optional: the full test suite
 ```

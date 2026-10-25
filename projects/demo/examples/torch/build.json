@@ -148,17 +148,7 @@
       "fps": 6.0
     }
   ],
-  "script": "/Users/dclausen/code/voxel-auther-system/projects/demo/assets/torch.py",
-  "outputs": {
-    "vox": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/torch.vox",
-    "contact_sheet": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/contact.png",
-    "lint": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/lint.json",
-    "motion": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/motion.png",
-    "gifs": {
-      "flame_frames": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/flame_frames.gif"
-    },
-    "manifest": "/Users/dclausen/code/voxel-auther-system/projects/demo/out/torch/manifest.json"
-  },
+  "script": "torch.py",
   "lint": {
     "ok": true,
     "errors": 0,

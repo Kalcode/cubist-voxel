@@ -584,7 +584,7 @@ creatures above about 32 voxels tall will need better primitives or human touch-
 | Agent declares victory too early | Fixed critique checklist; iteration cap with an honest shortfall report; optional render-only reviewer agent |
 | Image tokens get expensive | One contact sheet per build, modest resolution, ASCII slices for detail work |
 | Style drifts across assets | Style bible, named palette ramps, palette lint, few-shot examples |
-| Untrusted script execution | Subprocess sandbox, no file or network access, timeout |
+| Untrusted script execution | Planned: a subprocess sandbox with no file or network access. Today scripts run in a subprocess with a timeout but no isolation, so `SECURITY.md` says to build only scripts you trust |
 
 ### Open questions
 
@@ -593,12 +593,11 @@ creatures above about 32 voxels tall will need better primitives or human touch-
   as the source?
 - [x] Animation: rigid parts with joints and clips, plus flipbooks for voxels that change
   shape (fire, water); no skinning. See Motion and effects.
-- [x] Target engine: Kiln, David's own C# voxel engine, in the game repo
-  `kalcode/mmo-yet-another-sanbox-game` (its formats: `docs/engine/formats.md`). Cubist is its
-  asset pipeline: Kiln loads the `.vox` (glow from `MATL`) and the manifest (parts, joints,
-  clips, lights, colors, occlusion), and needs no style bible. Kiln's requests go on this repo's
-  issue board (label `kiln`). Godot and Blender stay as `.glb` checkers only; the manifest is
-  the engine contract.
+- [x] Target engine: Kiln, David's own C# voxel engine, which lives in its own repository.
+  Cubist is its asset pipeline: Kiln loads the `.vox` (glow from `MATL`) and the manifest
+  (parts, joints, clips, lights, colors, occlusion), and needs no style bible. Kiln's requests
+  are tracked as issues labeled `kiln`. Godot and Blender stay as `.glb` checkers only; the
+  manifest is the engine contract.
 - [x] Project name: Cubist (`cubist`).
 
 ### Prior art

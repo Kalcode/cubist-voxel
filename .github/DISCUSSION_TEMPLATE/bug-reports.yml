@@ -1,0 +1,34 @@
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for reporting this. The smallest script that shows the problem is the most
+        useful thing you can add. For a security problem, use the private form in SECURITY.md
+        instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got (paste the output or error).
+    validations:
+      required: true
+  - type: textarea
+    id: script
+    attributes:
+      label: Script to reproduce it
+      description: The asset script, plus the parts of style.toml it depends on.
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Cubist version
+      description: The output of `git rev-parse --short HEAD`, or the release.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Python
+      placeholder: macOS 15, Python 3.13

@@ -1,0 +1,23 @@
+name: Tracked work (maintainers)
+description: Work agreed in a discussion. Everyone else, please start a discussion instead.
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Issues track work that was agreed in a discussion. To report a bug or suggest a change,
+        start a [discussion](https://github.com/Kalcode/cubist/discussions) instead; see
+        [CONTRIBUTING.md](https://github.com/Kalcode/cubist/blob/main/CONTRIBUTING.md).
+  - type: input
+    id: discussion
+    attributes:
+      label: Discussion
+      description: Link to the discussion where this was agreed.
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: The change
+      description: What changes, and how we'll know it's done.
+    validations:
+      required: true

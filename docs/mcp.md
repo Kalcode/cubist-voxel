@@ -19,7 +19,7 @@ flowchart LR
 Claude Code:
 
 ```sh
-claude mcp add cubist -- uv run --directory /path/to/voxel-auther-system cubist mcp --project projects/demo
+claude mcp add cubist -- uv run --directory /path/to/cubist cubist mcp --project projects/demo
 ```
 
 Any client that takes a JSON config:
@@ -29,7 +29,7 @@ Any client that takes a JSON config:
   "mcpServers": {
     "cubist": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/voxel-auther-system",
+      "args": ["run", "--directory", "/path/to/cubist",
                "cubist", "mcp", "--project", "projects/demo"]
     }
   }
