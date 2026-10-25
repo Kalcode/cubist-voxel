@@ -33,6 +33,12 @@ contributions are welcome. They follow the same process, plus:
 
 If you point an agent at this repo, it will find these rules in `CLAUDE.md` and `AGENTS.md`.
 
+With Claude Code, the project turns on the [superpowers](https://github.com/obra/superpowers)
+plugin (`.claude/settings.json`). It brainstorms a change with you, writes a plan, and builds
+it test-first, which suits how changes are made here, and its brainstorming fits the discussion
+step. The specs and plans it writes go in `docs/superpowers/`, which git ignores, so they stay
+on your machine.
+
 ## Setting up
 
 You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).

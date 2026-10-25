@@ -7,5 +7,5 @@ dist/
 out/
 export/
 
-# Planning notes stay on the maintainer's machine
+# Specs and plans from the superpowers plugin stay on your machine
 docs/superpowers/
