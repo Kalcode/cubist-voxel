@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Kalcode/cubist"
-Documentation = "https://github.com/Kalcode/cubist/tree/main/docs"
-Discussions = "https://github.com/Kalcode/cubist/discussions"
+Homepage = "https://github.com/Kalcode/cubist-voxel"
+Documentation = "https://github.com/Kalcode/cubist-voxel/tree/main/docs"
+Discussions = "https://github.com/Kalcode/cubist-voxel/discussions"
 
 [project.scripts]
 cubist = "cubist.cli:main"

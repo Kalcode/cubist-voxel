@@ -5,8 +5,8 @@ body:
     attributes:
       value: >
         Issues track work that was agreed in a discussion. To report a bug or suggest a change,
-        start a [discussion](https://github.com/Kalcode/cubist/discussions) instead; see
-        [CONTRIBUTING.md](https://github.com/Kalcode/cubist/blob/main/CONTRIBUTING.md).
+        start a [discussion](https://github.com/Kalcode/cubist-voxel/discussions) instead; see
+        [CONTRIBUTING.md](https://github.com/Kalcode/cubist-voxel/blob/main/CONTRIBUTING.md).
   - type: input
     id: discussion
     attributes:

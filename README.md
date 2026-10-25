@@ -69,8 +69,8 @@ def barrel(p):
 Python 3.11+ and [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone https://github.com/Kalcode/cubist.git
-cd cubist
+git clone https://github.com/Kalcode/cubist-voxel.git
+cd cubist-voxel
 uv sync
 ```
 
@@ -174,7 +174,7 @@ for Kiln, a voxel engine built around the [manifest](docs/manifest.md).
 
 ## Contributing
 
-Contributions start as a [discussion](https://github.com/Kalcode/cubist/discussions). Open a
+Contributions start as a [discussion](https://github.com/Kalcode/cubist-voxel/discussions). Open a
 pull request once the change has been agreed there. AI-assisted work is welcome on the same
 terms. [CONTRIBUTING.md](CONTRIBUTING.md) explains why and how, including the development
 setup. Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md).

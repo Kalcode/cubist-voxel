@@ -1,14 +1,14 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a bug
-    url: https://github.com/Kalcode/cubist/discussions/new?category=bug-reports
+    url: https://github.com/Kalcode/cubist-voxel/discussions/new?category=bug-reports
     about: Bugs start as a discussion. Once one is confirmed, the maintainer opens the issue.
   - name: Suggest a feature or change
-    url: https://github.com/Kalcode/cubist/discussions/new?category=ideas
+    url: https://github.com/Kalcode/cubist-voxel/discussions/new?category=ideas
     about: Agree on the change in a discussion before writing a pull request.
   - name: Ask a question
-    url: https://github.com/Kalcode/cubist/discussions/new?category=q-a
+    url: https://github.com/Kalcode/cubist-voxel/discussions/new?category=q-a
     about: How to make something, why a build or lint result looks wrong, anything else.
   - name: Report a security problem
-    url: https://github.com/Kalcode/cubist/security/advisories/new
+    url: https://github.com/Kalcode/cubist-voxel/security/advisories/new
     about: Privately, please. See SECURITY.md.

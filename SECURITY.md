@@ -21,7 +21,7 @@ Reading `.vox` files, lint, rendering and export only parse data; they don't run
 ## Reporting a vulnerability
 
 Report it privately through
-[GitHub's vulnerability reporting](https://github.com/Kalcode/cubist/security/advisories/new),
+[GitHub's vulnerability reporting](https://github.com/Kalcode/cubist-voxel/security/advisories/new),
 not in a public discussion or issue. Say what is affected, how to reproduce it, and what an
 attacker could do. The maintainer aims to reply within a week.
 
@@ -32,7 +32,7 @@ Things worth reporting include:
 - anything that runs code without a build being asked for.
 
 Scripts doing what they're written to do, as described above, aren't a vulnerability. A way to
-isolate them is welcome as a [discussion](https://github.com/Kalcode/cubist/discussions).
+isolate them is welcome as a [discussion](https://github.com/Kalcode/cubist-voxel/discussions).
 
 ## Supported versions
 

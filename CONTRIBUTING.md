@@ -5,7 +5,7 @@ conversation: first a discussion, then a pull request if the change is wanted.
 
 ## How a change gets in
 
-1. **Start a [discussion](https://github.com/Kalcode/cubist/discussions).** Bugs, ideas,
+1. **Start a [discussion](https://github.com/Kalcode/cubist-voxel/discussions).** Bugs, ideas,
    questions and proposed changes all begin there. Describe the problem before the fix: what
    you were trying to make, what happened, and the smallest script that shows it.
 2. **Agree on the change.** When the maintainer agrees something should change, the
@@ -44,8 +44,8 @@ on your machine.
 You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
-git clone https://github.com/Kalcode/cubist.git
-cd cubist
+git clone https://github.com/Kalcode/cubist-voxel.git
+cd cubist-voxel
 uv sync
 uv run pytest
 ```
