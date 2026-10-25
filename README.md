@@ -60,7 +60,9 @@ def barrel(p):
   Everything else goes through vengi.
 - **Agent integration.** A `CLAUDE.md` workflow and Claude Code skills, an MCP server for other
   clients, a library of approved examples for few-shot references, and an evaluation harness.
-- **Deterministic.** The same script and seed give the same bytes, every time, on any machine.
+- **Deterministic.** The same script and seed give the same bytes every time. Across
+  platforms, `sin` and `cos` can differ in their last bit, which can flip an edge pixel in a
+  preview or the last digit of an animated rotation; static `.vox` and `.glb` files match.
 
 ## Install
 
