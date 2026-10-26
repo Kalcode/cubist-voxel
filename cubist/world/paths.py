@@ -141,10 +141,18 @@ class _PathDistance(Field):
         i, j = i.astype(np.int64), j.astype(np.int64)
         ti, tj = np.floor_divide(i, _TILE), np.floor_divide(j, _TILE)
         li, lj = i - ti * _TILE, j - tj * _TILE
-        tiles, which = np.unique(np.stack([ti, tj], axis=1), axis=0, return_inverse=True)
         c00, c10, c01, c11 = (np.empty(u.shape) for _ in range(4))
-        for k, (a, b) in enumerate(tiles):
-            m = which.ravel() == k
+        tiles = [
+            (a, b) for a in range(ti.min(), ti.max() + 1) for b in range(tj.min(), tj.max() + 1)
+        ]
+        if len(tiles) > 16:  # scattered queries: only the tiles they touch
+            width = int(tj.max() - tj.min()) + 1
+            touched = np.unique((ti - ti.min()) * width + (tj - tj.min())).tolist()
+            tiles = [(int(ti.min()) + k // width, int(tj.min()) + k % width) for k in touched]
+        for a, b in tiles:
+            m = (ti == a) & (tj == b)
+            if not m.any():
+                continue
             grid = self._tile(int(a), int(b))
             gi, gj = li[m], lj[m]
             c00[m], c10[m] = grid[gj, gi], grid[gj, gi + 1]

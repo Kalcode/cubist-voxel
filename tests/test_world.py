@@ -311,6 +311,29 @@ def test_ground_steps_snap_baked_heights():
         ramp(-1)
 
 
+def test_coarse_levels_sample_fields_every_two_cells():
+    from cubist.world.bake import sample_columns
+    from cubist.world.field import Custom
+
+    sizes = []
+
+    def ramp_field(x, z, s):
+        sizes.append(np.size(x))
+        return 10 + np.asarray(x) * 0.3 + np.asarray(z) * 0.1
+
+    @world(name="ramp", size_m=(512, 512))
+    def ramp(p):
+        return World(ground=Custom(ramp_field, "ramp"), surface=[p.leaf.mid])
+
+    loaded = load_world(ramp, _demo_palette())
+    h = sample_columns(loaded, 3, 0, 0, 64, 32)[0]  # cells of 0.5 m
+    assert max(sizes) < (64 + 2) * (32 + 2) / 3  # a lattice every 1 m, not every cell
+    centers = (np.arange(64) + 0.5) * 0.5
+    rows = (np.arange(32) + 0.5) * 0.5
+    expected = (10 + centers[None, :] * 0.3 + rows[:, None] * 0.1) * 16
+    assert np.allclose(h, expected)  # interpolation keeps a ramp exact
+
+
 def test_region_bakes_redo_only_the_tiles_over_the_area(tmp_path):
     from cubist.world.bake import bake_world
 

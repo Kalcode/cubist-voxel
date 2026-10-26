@@ -31,6 +31,9 @@ N = 32  # cells per chunk side
 TILE_COLUMNS = 64
 VOXELS_PER_M = 16
 LATTICE_M = 0.5  # fields are sampled this far apart and interpolated per column (levels 0–2)
+COARSE_LEVEL = (
+    3  # from this level on, fields are sampled every two cells (seen from 128 m and more)
+)
 FAR_LEVELS, FAR_CELLS, FAR_FIRST_SPACING = 6, 128, 128
 DEFLATE_LEVEL = 6
 MAP_FORMAT = 1
@@ -170,13 +173,14 @@ def sample_columns(loaded: LoadedWorld, level: int, x0: int, z0: int, nx: int, n
 
     Returns heights (level-0 voxels), slopes (degrees), surface palette indices, and the water
     surface (level-0 voxels, -inf for none) with its color, each [nz, nx]. Levels whose cells are
-    finer than ``LATTICE_M`` interpolate fields sampled on that lattice.
+    finer than ``LATTICE_M`` interpolate fields sampled on that lattice; from ``COARSE_LEVEL`` on,
+    fields are sampled every two cells (the noise is most of a coarse tile's time).
     """
     cell_m = (1 << level) / VOXELS_PER_M
     cx = (x0 + np.arange(nx) + 0.5) * cell_m
     cz = (z0 + np.arange(nz) + 0.5) * cell_m
-    step = max(LATTICE_M, cell_m)
-    if cell_m < LATTICE_M:
+    step = max(LATTICE_M, cell_m * (2 if level >= COARSE_LEVEL else 1))
+    if cell_m < step:
         lx0, lz0 = math.floor(cx[0] / step) - 1, math.floor(cz[0] / step) - 1
         lnx, lnz = math.ceil(cx[-1] / step) + 2 - lx0, math.ceil(cz[-1] / step) + 2 - lz0
         gx, gz = np.meshgrid((lx0 + np.arange(lnx)) * step, (lz0 + np.arange(lnz)) * step)
