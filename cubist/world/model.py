@@ -72,7 +72,7 @@ class World:
     ending in a plain color (the default); the surface is the top ``surface_depth_m`` of ground.
     ``subsoil`` is ``(depth_m, color)`` layers under it, ending in the color that fills the rest.
     ``rivers`` and ``roads`` cut and level the ground along paths (rivers first); ``caves`` hollow
-    it out. ``landmarks`` names points (x, z) for the engine.
+    it out. ``props`` places built assets. ``landmarks`` names points (x, z) for the engine.
     """
 
     ground: Field
@@ -82,6 +82,7 @@ class World:
     rivers: Sequence = ()
     roads: Sequence = ()
     caves: Sequence = ()
+    props: Sequence = ()
     landmarks: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
@@ -201,18 +202,18 @@ def load_world(
         )
     from cubist.world.caves import Carver
     from cubist.world.paths import EditedGround, River, Road
+    from cubist.world.props import Place, Scatter
 
     kinds = (
-        ("rivers", result.rivers, River),
-        ("roads", result.roads, Road),
-        ("caves", result.caves, Carver),
+        ("rivers", result.rivers, (River,), "river(...)"),
+        ("roads", result.roads, (Road,), "road(...)"),
+        ("caves", result.caves, (Carver,), "tunnel, cavern or worms"),
+        ("props", result.props, (Place, Scatter), "place(...) or scatter(...)"),
     )
-    for kind, items, cls in kinds:
+    for kind, items, classes, wanted in kinds:
         for item in items:
-            if not isinstance(item, cls):
-                raise WorldError(
-                    f"world {defn.name}: {kind} take {cls.__name__.lower()}(...), got {item!r}"
-                )
+            if not isinstance(item, classes):
+                raise WorldError(f"world {defn.name}: {kind} take {wanted}, got {item!r}")
     edits = [*result.rivers, *result.roads]
     ground = EditedGround(result.ground, edits) if edits else result.ground
     loaded = LoadedWorld(defn, result, palette, mix_seed(defn.seed, seed), directory, ground)

@@ -48,6 +48,16 @@ def load_script(script: str | Path, seed: int = 0, style: str | Path | None = No
     return load_world(defs[0], palette, seed, script)
 
 
+def _prop_counts(loaded: LoadedWorld) -> dict[str, int]:
+    from cubist.world.props import Place, scatter_points
+
+    counts: dict[str, int] = {}
+    for prop in loaded.world.props:
+        n = 1 if isinstance(prop, Place) else len(scatter_points(loaded, prop)[0])
+        counts[prop.asset] = counts.get(prop.asset, 0) + n
+    return counts
+
+
 def stats_of(loaded: LoadedWorld, m: WorldMap) -> dict:
     slopes = m.slopes
     return {
@@ -70,6 +80,7 @@ def stats_of(loaded: LoadedWorld, m: WorldMap) -> dict:
             k: round(float(v), 2) for k, v in surface_shares(loaded, m.surface).items()
         },
         "landmarks": {k: list(v) for k, v in loaded.world.landmarks.items()},
+        "props": _prop_counts(loaded),
     }
 
 

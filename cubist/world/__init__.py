@@ -27,6 +27,7 @@ from cubist.world.model import (
     world,
 )
 from cubist.world.paths import Path, path, river, road
+from cubist.world.props import place, scatter
 
 __all__ = [
     "Field",
@@ -49,10 +50,12 @@ __all__ = [
     "noise",
     "Path",
     "path",
+    "place",
     "rect",
     "ridges",
     "river",
     "road",
+    "scatter",
     "slope_over",
     "tunnel",
     "where",

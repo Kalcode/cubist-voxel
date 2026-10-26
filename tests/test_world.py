@@ -391,3 +391,104 @@ def test_baked_caves_are_hollow_below_the_surface(tmp_path):
     assert (column[(y > 25 * 16 - 50) & (y < 25 * 16 + 50)] == 0).all()  # hollow around 25 m
     assert (column[(y > 25 * 16 + 120) & (y < 40 * 16)] != 0).all()  # solid rock over it
     assert y[-1] == 40 * 16 - 1 and column[-1] != 0  # the column ends with the ground's top voxel
+
+
+def _project(tmp_path):
+    """A scratch project: the demo style, and an 'oak' export 4 × 4 m (64 × 96 × 64 voxels)."""
+    import json
+    import shutil
+
+    shutil.copy(DEMO / "style.toml", tmp_path / "style.toml")
+    (tmp_path / "export").mkdir()
+    (tmp_path / "export" / "oak.cubist.json").write_text(
+        json.dumps(
+            {"cubist_manifest": 1, "name": "oak", "size": [64, 96, 64], "glb_origin": [32, 0, 32]}
+        )
+    )
+    (tmp_path / "export" / "oak.vox").write_bytes(b"")
+    return tmp_path
+
+
+def _hill(x, z, s):
+    return 10 + np.asarray(x) * 0.1  # rises 1 m per 10 m east
+
+
+def test_props_stand_on_the_ground_and_scatter_by_the_rules(tmp_path):
+    from cubist.world import place, scatter
+    from cubist.world.field import Custom
+    from cubist.world.props import placements, scatter_points
+
+    project = _project(tmp_path)
+
+    @world(name="woods", size_m=(200, 200), seed=4)
+    def woods(p):
+        return World(
+            ground=Custom(_hill),
+            surface=[p.leaf.mid],
+            props=[
+                place("oak", at=(50, 50), name="old_oak"),
+                place("oak", at=(80, 30, 120), rotate_y=90),
+                scatter(
+                    "oak",
+                    ((0, 0), (200, 200)),
+                    per_ha=40,
+                    height_m=(0, 25),
+                    avoid=circle((100, 100), 30, 0),
+                ),
+            ],
+        )
+
+    loaded = load_world(woods, _demo_palette(), seed=0)
+    props = placements(loaded, project / "export")
+    old = props[0]
+    assert old.name == "old_oak" and old.at[0] == 50 * 16
+    assert old.at[1] == pytest.approx(
+        (10 + 52 * 0.1) * 16
+    )  # the footprint's high (east) edge, 2 m out
+    assert props[1].at == (80 * 16, 30 * 16, 120 * 16) and props[1].rotate_y == 90
+    x, z, turn = scatter_points(loaded, loaded.world.props[2])
+    assert len(x) == len(props) - 2
+    assert np.all(10 + x * 0.1 <= 25)  # height_m keeps them under 25 m: x under 150
+    assert np.all(np.hypot(x - 100, z - 100) > 30)  # avoided the clearing
+    area_ha = (150 * 200 - np.pi * 30**2) / 10000
+    assert 0.7 * 40 * area_ha < len(x) < 1.3 * 40 * area_ha
+    assert set(np.unique(turn)) <= {0, 90, 180, 270}
+    again = scatter_points(load_world(woods, _demo_palette(), seed=0), loaded.world.props[2])
+    assert np.array_equal(x, again[0])
+
+    @world(name="missing", size_m=(64, 64))
+    def missing(p):
+        return World(ground=flat(1), surface=[p.leaf.mid], props=[place("barrel", at=(5, 5))])
+
+    with pytest.raises(WorldError, match="isn't exported"):
+        placements(load_world(missing, _demo_palette()), project / "export")
+
+
+def test_bake_writes_props_into_world_json(tmp_path):
+    import json
+
+    from cubist.world.bake import bake_world
+
+    project = _project(tmp_path)
+    (project / "worlds").mkdir()
+    script = project / "worlds" / "grove.py"
+    script.write_text(
+        "from cubist.world import *\n\n"
+        "@world(name='grove', size_m=(128, 128))\n"
+        "def grove(p):\n"
+        "    trees = scatter('oak', ((0, 0), (128, 128)), per_ha=20)\n"
+        "    return World(ground=flat(5), surface=[p.leaf.mid],\n"
+        "                 props=[place('oak', at=(64, 64)), trees])\n"
+    )
+    bake_world(script, levels=1, workers=1)
+    out = project / "export" / "worlds" / "grove"
+    world_json = json.loads((out / "world.json").read_text())
+    assert world_json["props"][0] == {
+        "asset": "../../oak.vox",
+        "at": [1024.0, 80.0, 1024.0],
+        "rotate_y": 0,
+    }
+    assert len(world_json["props"]) > 10
+    assert all(
+        p["at"][1] == 80 - 0.25 * 16 for p in world_json["props"][1:]
+    )  # scattered ones sink 0.25 m

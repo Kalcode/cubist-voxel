@@ -604,7 +604,11 @@ def bake_world(script, out_dir=None, levels: int = 7, workers: int | None = None
     for name, (x, z) in loaded.world.landmarks.items():
         y = float(heights(loaded, np.array([x]), np.array([z]))[0])
         landmarks[name] = [x * VOXELS_PER_M, y * VOXELS_PER_M, z * VOXELS_PER_M]
-    world_json = {"voxel_size_m": 1 / VOXELS_PER_M, "landmarks": landmarks, "props": []}
+    from cubist.world.props import placements
+
+    export = style_path.parent / "export"
+    props = [p.json(out, export) for p in placements(loaded, export)]
+    world_json = {"voxel_size_m": 1 / VOXELS_PER_M, "landmarks": landmarks, "props": props}
     (out / "world.json").write_text(json.dumps(world_json, indent=2) + "\n")
     disk = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     level0 = sum(s.packed for s in stats if s.level == 0)

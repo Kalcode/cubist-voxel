@@ -667,7 +667,15 @@ simulated.
      - **In Kiln:** the 1 km² world streams with 0 holes; main-thread p99 0.74 ms at 8 m/s; validation
        clean.
      - **Not yet:** incremental bakes (each tile's input hash); props; caves.
-   - **12c. Features.** Rivers and roads, caves, props and scatter, landmarks.
+   - **12c. Features** — done. Rivers (water levels that only fall downstream, water as voxels), roads
+     (levelled, painted), caves (tunnels, caverns, noise worms), props (`place`, `scatter`) written to
+     `world.json` for Kiln to stamp, landmarks.
+     - **Caves cost bake time:** a 1 km² world with 5% of it over worms took 183 s, then 88 s once the worm
+       noise was sampled every metre and per row of columns (a worm tile: 144 → 66 s), against 55 s without
+       caves.
+     - **In Kiln:** 2,981 scattered oaks stamp in 98 ms. Distant chunks under props are generated and
+       stamped with coarse copies of the prefabs (Kiln's `WorldStore.CoarseStamps`) instead of downsampling
+       eight finer chunks recursively: settling a view went from 25.5 s to 0.7 s.
    - **12d. Lint and region renders.**
    - **12e. The 4 × 4 km world**, authored with the build and critique loop, baked, and walked in Kiln.
 

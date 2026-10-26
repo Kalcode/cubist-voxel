@@ -80,6 +80,7 @@ def render_map(loaded: LoadedWorld) -> WorldMap:
 
     canvas = _frame(loaded, body, mpp, contour, hm, surf)
     _caves(canvas, loaded, mpp)
+    _props(canvas, loaded, mpp)
     _landmarks(canvas, loaded, mpp)
     return WorldMap(Image.fromarray(canvas), mpp, hm, slope, surf, contour)
 
@@ -191,6 +192,25 @@ def _caves(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:
             xs = np.array([cave.x0, cave.x1, cave.x1, cave.x0, cave.x0])
             zs = np.array([cave.z0, cave.z0, cave.z1, cave.z1, cave.z0])
             _plot(canvas, xs, zs, mpp, dashed=True)
+
+
+_TREE = np.array([22, 34, 20], dtype=np.uint8)
+
+
+def _props(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:
+    """Scattered props as dark dots, placed ones as small light squares."""
+    from cubist.world.props import Place, Scatter, scatter_points
+
+    for prop in loaded.world.props:
+        if isinstance(prop, Scatter):
+            x, z, _ = scatter_points(loaded, prop)
+            px = (MARGIN_LEFT + x / mpp).astype(int)
+            py = (MARGIN_TOP + z / mpp).astype(int)
+            canvas[py, px] = _TREE
+        elif isinstance(prop, Place):
+            px, py = MARGIN_LEFT + int(prop.at[0] / mpp), MARGIN_TOP + int(prop.at[-1] / mpp)
+            canvas[py - 2 : py + 3, px - 2 : px + 3] = 20
+            canvas[py - 1 : py + 2, px - 1 : px + 2] = _INK
 
 
 def _landmarks(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:

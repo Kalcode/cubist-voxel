@@ -3,8 +3,8 @@
 Worlds are terrain for premade game worlds; [design.md](design.md), "Worlds", says why and how they fit
 in. A world script lives in `worlds/<name>.py` of a project and starts with `from cubist.world import *`.
 Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a,
-12b and most of 12c (ground, surface rules, rivers, roads, caves, the map, the bake); props and lint come
-next.
+12b and 12c (ground, surface rules, rivers, roads, caves, props, the map, the bake); lint and region
+renders come next.
 
 ```python
 from cubist.world import *
@@ -96,6 +96,24 @@ chunks down to the caves under it.
 Tunnels and caverns carve up to level of detail 2, so a mouth shows from a distance; worms only at level
 0. The map draws caves over the ground: tunnels as lines, caverns as outlines, worm regions dashed.
 Caves cost bake time: a 1 km² world with 5% of it over worms bakes in about 90 s instead of 55.
+
+## Props
+
+`World(props=[...])` places built assets. They stay placements: the bake writes them into `world.json` and
+Kiln stamps the exported assets (`export/<asset>.vox` and its manifest), so moving one doesn't re-bake the
+terrain. Export an asset before baking a world that uses it (`cubist export out/<asset>`).
+
+- `place(asset, at, rotate_y=0, name=None, sink_m=0)`: `at` is `(x, z)` to stand it on the ground (the
+  highest point under its footprint) or `(x, y, z)` for its base. `name` is how game code finds it.
+- `scatter(asset, region, per_ha, seed=0, spacing_m=None, rotate=True, slope_max=None, height_m=None,
+  avoid=None, sink_m=0.25)`: about `per_ha` per hectare over `region` (a mask, or `((x0, z0), (x1, z1))`),
+  on a jittered grid at least `spacing_m` apart (default from the density), turned by random quarter turns.
+  Points steeper than `slope_max`, outside `height_m` (low, high) or where `avoid` is over 0.5 are skipped.
+  Each sinks `sink_m` into the ground so trunks on slopes don't float.
+
+The map draws scattered props as dark dots and placed ones as small squares; the stats count them per
+asset. Kiln stamps 3,000 scattered oaks in about 0.1 s, and draws distant ones from coarse copies of each
+asset.
 
 ## Surface rules
 
