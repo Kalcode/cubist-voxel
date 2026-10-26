@@ -16,6 +16,8 @@ from cubist.core.palette import Color
 from cubist.world.field import Field, WorldError
 
 _BLOCK = 64  # grids are searched in blocks this many columns on a side (each block culls segments)
+_BUCKET_M = 64.0  # scattered points are searched in buckets of this many metres on a side
+_TILE = 64  # a coarse distance grid is measured, and kept, in tiles of this many points a side
 
 
 def _smoothstep(t: np.ndarray) -> np.ndarray:
@@ -57,7 +59,8 @@ class Path:
 
     def nearest(self, x, z, reach: float) -> tuple[np.ndarray, np.ndarray]:
         """(distance, arc length of the nearest point) to the path, per (x, z); distance is inf past
-        ``reach``. Grids are searched block by block, each against the segments near it."""
+        ``reach``. Grids are searched block by block, scattered points bucket by bucket, each
+        against the segments near it."""
         x, z = np.asarray(x, dtype=np.float64), np.asarray(z, dtype=np.float64)
         d = np.full(x.shape, np.inf)
         t = np.zeros(x.shape)
@@ -66,6 +69,14 @@ class Path:
                 for i in range(0, x.shape[1], _BLOCK):
                     block = (slice(j, j + _BLOCK), slice(i, i + _BLOCK))
                     d[block], t[block] = self._nearest(x[block], z[block], reach)
+        elif x.size > _BLOCK * _BLOCK:
+            fx, fz = x.ravel(), z.ravel()
+            key = np.floor(fx / _BUCKET_M) * 1e6 + np.floor(fz / _BUCKET_M)
+            order = np.argsort(key, kind="stable")
+            edges = np.flatnonzero(np.diff(key[order])) + 1
+            fd, ft = d.reshape(-1), t.reshape(-1)
+            for idx in np.split(order, edges):
+                fd[idx], ft[idx] = self._nearest(fx[idx], fz[idx], reach)
         else:
             d[...], t[...] = self._nearest(x, z, reach)
         return d, t
@@ -101,10 +112,21 @@ class _PathDistance(Field):
 
     def __init__(self, line: Path, cap: float, step: float | None):
         self.path, self.cap, self.step = line, cap, step
+        self._tiles: dict[tuple[int, int], np.ndarray] = {}
 
     def _exact(self, x, z):
         d, _ = self.path.nearest(x, z, self.cap)
         return np.minimum(d, self.cap)
+
+    def _tile(self, ti: int, tj: int) -> np.ndarray:
+        """Distances at grid points ``[ti·T, ti·T + T] × [tj·T, tj·T + T]`` ([z, x]); one point past
+        the tile, so every cell's corners are in one tile. Measured once, then kept."""
+        grid = self._tiles.get((ti, tj))
+        if grid is None:
+            span = np.arange(_TILE + 1)
+            gx, gz = np.meshgrid((ti * _TILE + span) * self.step, (tj * _TILE + span) * self.step)
+            grid = self._tiles[(ti, tj)] = self._exact(gx, gz)
+        return grid
 
     def sample(self, x, z, seed):
         x, z = np.asarray(x, dtype=np.float64), np.asarray(z, dtype=np.float64)
@@ -113,24 +135,23 @@ class _PathDistance(Field):
             return self._exact(x, z)
         # Bilinear between the distances at the corners of a fixed step_m grid: the same value
         # for a point however it's batched (props stand on what the bake carves).
-        u, v = x / s, z / s
+        u, v = x.ravel() / s, z.ravel() / s
         i, j = np.floor(u), np.floor(v)
         fu, fv = u - i, v - j
-        i0, j0 = int(i.min()), int(j.min())
-        ni, nj = int(i.max()) - i0 + 2, int(j.max()) - j0 + 2
-        if ni * nj <= 4 * x.size:  # dense queries: measure the grid over them
-            gx, gz = np.meshgrid((i0 + np.arange(ni)) * s, (j0 + np.arange(nj)) * s)
-            grid = self._exact(gx, gz)
-            ii, jj = (i - i0).astype(int), (j - j0).astype(int)
-            c00, c10 = grid[jj, ii], grid[jj, ii + 1]
-            c01, c11 = grid[jj + 1, ii], grid[jj + 1, ii + 1]
-        else:  # sparse queries: measure each one's four corners
-            cx = np.stack([i, i + 1, i, i + 1]) * s
-            cz = np.stack([j, j, j + 1, j + 1]) * s
-            c00, c10, c01, c11 = self._exact(cx, cz)
+        i, j = i.astype(np.int64), j.astype(np.int64)
+        ti, tj = np.floor_divide(i, _TILE), np.floor_divide(j, _TILE)
+        li, lj = i - ti * _TILE, j - tj * _TILE
+        tiles, which = np.unique(np.stack([ti, tj], axis=1), axis=0, return_inverse=True)
+        c00, c10, c01, c11 = (np.empty(u.shape) for _ in range(4))
+        for k, (a, b) in enumerate(tiles):
+            m = which.ravel() == k
+            grid = self._tile(int(a), int(b))
+            gi, gj = li[m], lj[m]
+            c00[m], c10[m] = grid[gj, gi], grid[gj, gi + 1]
+            c01[m], c11[m] = grid[gj + 1, gi], grid[gj + 1, gi + 1]
         top = c00 * (1 - fu) + c10 * fu
         bottom = c01 * (1 - fu) + c11 * fu
-        return top * (1 - fv) + bottom * fv
+        return (top * (1 - fv) + bottom * fv).reshape(x.shape)
 
 
 def _catmull_rom(pts: np.ndarray, spacing: float) -> np.ndarray:

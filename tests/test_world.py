@@ -538,6 +538,8 @@ def test_props_stand_on_the_ground_and_scatter_by_the_rules(tmp_path):
     assert set(np.unique(turn)) <= {0, 90, 180, 270}
     again = scatter_points(load_world(woods, _demo_palette(), seed=0), loaded.world.props[2])
     assert np.array_equal(x, again[0])
+    # Worked out once per loaded world: the map, lint and stats share it.
+    assert scatter_points(loaded, loaded.world.props[2])[0] is x and not x.flags.writeable
 
     @world(name="missing", size_m=(64, 64))
     def missing(p):
@@ -700,6 +702,18 @@ def test_region_renders_draw_props_where_kiln_stamps_them(tmp_path):
     # A quarter turn maps (x, y, z) to (z, y, -x - 1), as Kiln stamps it: along -z from 159.
     assert at(320, 80, 159) == at(320, 111, 158) == 5 and at(321, 80, 159) == at(320, 80, 160) == 0
     assert at(200, 79, 200) != 0 and at(200, 80, 200) == 0  # the ground below them
+
+
+def test_scattered_points_find_the_same_nearest_point_in_buckets():
+    from cubist.world import path
+
+    line = path([(0, 0), (900, 300), (1800, -200), (2600, 400)])
+    rng = np.random.default_rng(3)
+    x, z = rng.uniform(-100, 2700, 5000), rng.uniform(-600, 800, 5000)
+    for reach in (40.0, 2000.0):
+        d, t = line.nearest(x, z, reach)  # bucketed by area
+        d0, t0 = line._nearest(x, z, reach)  # every point against every segment near them all
+        assert np.array_equal(d, d0) and np.allclose(t[np.isfinite(d)], t0[np.isfinite(d0)])
 
 
 def test_path_distance_fields_cap_far_away():

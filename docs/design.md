@@ -695,7 +695,10 @@ simulated.
        alchemist's stall. A landmark can now be a named prop (`"cavern": "cavern_torch"`), so a start
        point can be underground.
      - **Iteration speed:** `--region` re-bakes only the tiles over an area (the cave's 11 tiles: 3
-       minutes); `distance(step_m=8)` cuts the valley's distance field, the biggest cost per tile.
+       minutes); `distance(step_m=8)` cut the full bake from 38 to 19.6 minutes. `cubist world build`
+       (map, stats, lint) went from 68 s to 11 s: scatters are worked out once per build (they were
+       three times), scattered points meet only the path segments near them, and a coarse distance
+       grid is measured once per 64-point tile and kept. Tiles bake byte-identical.
      - **Open:** slopes at 1/16 m are terraces of one-voxel steps, and on the hills they cost ~300k
        quads at Kiln's level 0 (its gate is 350k for a whole view); the two-tone grass reads as blobs
        from above. Both are look decisions for the next round.

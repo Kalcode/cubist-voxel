@@ -148,7 +148,19 @@ def _stand(loaded, xs, zs, half_w, half_d) -> np.ndarray:
 
 def scatter_points(loaded, s: Scatter) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(x, z, rotate_y) of a scatter: a jittered grid ``spacing_m`` apart, kept with probability
-    ``per_ha`` × cell area, then filtered by region and rules. Deterministic for a seed."""
+    ``per_ha`` × cell area, then filtered by region and rules. Deterministic for a seed; worked out
+    once per loaded world (the arrays are read-only)."""
+    if loaded._scatters is None:
+        loaded._scatters = {}
+    if id(s) not in loaded._scatters:
+        points = _scatter_points(loaded, s)
+        for a in points:
+            a.setflags(write=False)
+        loaded._scatters[id(s)] = (s, points)  # the scatter too, so its id stays its own
+    return loaded._scatters[id(s)][1]
+
+
+def _scatter_points(loaded, s: Scatter) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     from cubist.world.sample import heights, slopes, world_context
 
     sx, sz = loaded.size_m

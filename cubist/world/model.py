@@ -134,6 +134,7 @@ class LoadedWorld:
     script_dir: Path | None
     ground: Field = None  # type: ignore[assignment]  # the ground with rivers and roads applied
     _caves: list | None = None
+    _scatters: dict | None = None  # each scatter's points, worked out once (props.scatter_points)
 
     @property
     def name(self) -> str:
