@@ -180,7 +180,8 @@ the world in Kiln's
 map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<name>/`:
 
 - **Tiles** `L{k}/{tx}_{tz}.tile`: 64 × 64 columns of level k (cells of 2^k voxels, 128·2^k m a tile).
-  Heights are sampled every 0.5 m and interpolated per column.
+  Heights are sampled every 0.5 m and interpolated per column; from level 3 (seen from 128 m), every two
+  cells.
 - **Far-field grids** `far-L{k}.bin`, reaching past the world (the ground's fields go on beyond it).
 - **`map.json`:** the tiles' extent, compression (deflate) and the material registry (palette index →
   name, color, glow).
