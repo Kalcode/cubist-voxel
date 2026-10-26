@@ -341,8 +341,10 @@ def cmd_world_bake(args: argparse.Namespace) -> int:
     def progress(done: int, total: int, seconds: float) -> None:
         print(f"  {done}/{total} tiles ({100 * done // total}%) in {seconds:.0f} s", flush=True)
 
+    region = None if args.region is None else (args.region[:2], args.region[2:])
     summary = bake_world(args.script, out_dir=args.out, levels=args.levels, workers=args.workers,
-                         seed=args.seed, style=args.style, progress=progress)  # fmt: skip
+                         seed=args.seed, style=args.style, progress=progress,
+                         region=region)  # fmt: skip
     print(summary.line())
     print(f"  {summary.out}")
     return 0
@@ -510,6 +512,13 @@ def parser() -> argparse.ArgumentParser:
     wk.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
     wk.add_argument("--levels", type=int, default=7, help="levels of detail to bake (default 7)")
     wk.add_argument("--workers", type=int, help="processes (default: cores − 1)")
+    wk.add_argument(
+        "--region",
+        type=float,
+        nargs=4,
+        metavar=("X0", "Z0", "X1", "Z1"),
+        help="re-bake only the tiles over this area (metres) into an existing bake",
+    )
     wk.set_defaults(fn=cmd_world_bake)
 
     s = sub.add_parser("style", help="print the parsed style bible with palette names")

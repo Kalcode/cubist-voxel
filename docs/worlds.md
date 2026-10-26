@@ -41,7 +41,9 @@ The world covers `[0, size_m)` on both axes. Its seed mixes with the build's (`-
 - `surface`: rules, first match wins, ending in a plain color (the default). The surface material is
   the top `surface_depth_m` of the ground.
 - `subsoil`: `(depth_m, color)` bands under the surface, ending in the color that fills the rest.
-- `landmarks`: named points `(x, z)` for the engine (spawn, towns, cave mouths); drawn on the map.
+- `landmarks`: named points for the engine (spawn, towns, cave mouths); drawn on the map. `(x, z)` sits
+  on the ground; the name of a `place(..., name=...)` sits at that prop's base, so a landmark can be on a
+  cave floor (`"cavern": "cavern_torch"`).
 
 ## Fields
 
@@ -98,9 +100,12 @@ chunks down to the caves under it.
 - `cavern(center, radius_m, roughness_m=0, seed=0, below_ground=False)`: an ellipsoid (one radius, or
   `(x, y, z)` radii) whose walls wobble by up to `roughness_m`; `below_ground` makes the center's y a
   depth.
-- `worms(region, depth_m=(4, 30), scale_m=24, thickness=0.08, seed=0)`: winding noise tunnels under
-  `region` (`(x0, z0), (x1, z1)`), between `depth_m` metres under the ground. `scale_m` spaces them;
-  `thickness` widens them. Their noise is sampled every metre and interpolated.
+- `worms(region, depth_m=(4, 30), scale_m=24, thickness=0.08, seed=0, floors=True)`: winding noise
+  tunnels under `region` (`(x0, z0), (x1, z1)`), between `depth_m` metres under the ground. `scale_m`
+  spaces them; `thickness` widens them. Their noise is sampled every metre and interpolated. They open
+  into the world's tunnels and caverns through walls and ceilings but leave 2 m of rock under their
+  floors, so the way through has no pits (a worm under a tunnel once left a 1.3 m drop the character
+  couldn't climb out of); `floors=False` cuts those too.
 
 Tunnels and caverns carve up to level of detail 2, so a mouth shows from a distance; worms only at level
 0. The map draws caves over the ground: tunnels as lines, caverns as outlines, worm regions dashed.
@@ -165,7 +170,8 @@ drawn in it yet.
 
 ## Baking for Kiln
 
-`cubist world bake worlds/<name>.py [--levels 7] [--workers N] [--out DIR]` writes the world in Kiln's
+`cubist world bake worlds/<name>.py [--levels 7] [--workers N] [--out DIR] [--region X0 Z0 X1 Z1]` writes
+the world in Kiln's
 map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<name>/`:
 
 - **Tiles** `L{k}/{tx}_{tz}.tile`: 64 × 64 columns of level k (cells of 2^k voxels, 128·2^k m a tile).
@@ -173,9 +179,12 @@ map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<na
 - **Far-field grids** `far-L{k}.bin`, reaching past the world (the ground's fields go on beyond it).
 - **`map.json`:** the tiles' extent, compression (deflate) and the material registry (palette index →
   name, color, glow).
-- **`world.json`:** landmarks in voxels, with their ground height.
+- **`world.json`:** landmarks in voxels, with their ground height (or their prop's base), and props.
 
-The bake prints its progress every 5% of tiles. Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
+The bake prints its progress every 5% of tiles. `--region` re-bakes only the tiles over that area (metres)
+into an existing bake, plus the far grids and the JSON: a minute instead of half an hour while working on
+one part of a big world. Tiles elsewhere keep what they had, so bake everything again once a change reaches
+past the region. Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
 (or `spawn`). Expect about a minute per km² on a 10-core laptop, and 150–200 MiB per km²; bakes stay out
 of git.
 

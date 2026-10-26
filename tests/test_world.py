@@ -290,6 +290,32 @@ def test_rivers_cut_a_channel_that_holds_water_and_roads_level_a_strip():
     assert surface_names(loaded, names) == ["cork", "leaf.mid"]
 
 
+def test_region_bakes_redo_only_the_tiles_over_the_area(tmp_path):
+    from cubist.world.bake import bake_world
+
+    script = tmp_path / "pair.py"
+    script.write_text(
+        "from cubist.world import *\n\n"
+        "@world(name='pair', size_m=(256, 256), seed=2)\n"
+        "def pair(p):\n"
+        "    return World(ground=flat(20) + noise(scale_m=40, amplitude_m=8, octaves=3),\n"
+        "                 surface=[p.leaf.mid])\n"
+    )
+    style, out = DEMO / "style.toml", tmp_path / "out"
+    region = ((10, 10), (100, 60))  # inside level 0's tile (0, 0) and level 1's only tile
+    with pytest.raises(WorldError, match="existing bake"):
+        bake_world(script, out_dir=out, levels=2, workers=1, style=style, region=region)
+    bake_world(script, out_dir=out, levels=2, workers=1, style=style)
+    tiles = {p: p.read_bytes() for p in out.rglob("*.tile")}
+    for p in tiles:
+        p.write_bytes(b"stale")
+    part = bake_world(script, out_dir=out, levels=2, workers=1, style=style, region=region)
+    assert part.tiles == 2 and abs(part.km2 - 128 * 128 / 1e6) < 1e-9  # per level-0 tile baked
+    redone = {p for p in tiles if p.read_bytes() != b"stale"}
+    assert redone == {out / "L0" / "0_0.tile", out / "L1" / "0_0.tile"}
+    assert all(p.read_bytes() == tiles[p] for p in redone)  # the same bytes as the whole bake
+
+
 def test_baked_rivers_hold_water_voxels(tmp_path):
     import struct
     import zlib
@@ -351,6 +377,42 @@ def test_carvers_say_where_the_air_is():
     depth = 30.0 - ys[hollow]
     assert depth.min() >= 4 and depth.max() <= 20  # only in the band under the ground
     assert np.array_equal(hollow, w.carve(xs, ys, zs, 30.0, seed=0))
+
+
+def test_worms_leave_the_floors_of_tunnels_and_caverns():
+    from cubist.world import cavern, tunnel, worms
+
+    @world(name="floors", size_m=(100, 100))
+    def floors(p):
+        return World(
+            ground=flat(40),
+            surface=[p.leaf.mid],
+            caves=[
+                tunnel([(10, 20, 50), (90, 20, 50)], radius_m=2.5, smooth=False),
+                cavern((50, 15, 20), radius_m=(8, 4, 8)),
+                worms(((0, 0), (100, 100)), depth_m=(4, 36), scale_m=12, thickness=0.5),
+            ],
+        )
+
+    loaded = load_world(floors, _demo_palette(), seed=0)
+    w = loaded.world.caves[2]
+    # Under the tunnel's floor, 2 m of rock stay (measured out from the tunnel's wall)...
+    x, angle, out = np.meshgrid(
+        np.linspace(12, 88, 60), np.linspace(-1, 1, 9), np.linspace(0.1, 1.9, 7)
+    )
+    r = 2.5 + out
+    y, z = 20 - r * np.cos(angle), 50 + r * np.sin(angle)
+    assert not w.carve(x, y, z, 40.0, 0).any()
+    # ...and worms carve plenty elsewhere, opening into its walls over it.
+    x, z = np.meshgrid(np.linspace(12, 88, 60), np.linspace(44, 56, 13))
+    assert w.carve(x, np.full_like(x, 25.0), z, 40.0, 0).any()
+    cx, cz = np.meshgrid(np.linspace(44, 56, 13), np.linspace(14, 26, 13))
+    under = np.hypot(cx - 50, cz - 20) <= 7  # under the cavern's floor
+    assert not w.carve(cx, np.full_like(cx, 10.5), cz, 40.0, 0)[under].any()
+    # Opting out cuts the floors.
+    loose = worms(((0, 0), (100, 100)), depth_m=(4, 36), scale_m=12, thickness=0.5, floors=False)
+    loose.keep_floors(loaded.world.caves)
+    assert loose.carve(x, np.full_like(x, 16.5), z, 40.0, 0)[np.abs(z - 50) <= 2].any()
 
 
 def test_baked_caves_are_hollow_below_the_surface(tmp_path):
@@ -478,11 +540,15 @@ def test_bake_writes_props_into_world_json(tmp_path):
         "def grove(p):\n"
         "    trees = scatter('oak', ((0, 0), (128, 128)), per_ha=20)\n"
         "    return World(ground=flat(5), surface=[p.leaf.mid],\n"
-        "                 props=[place('oak', at=(64, 64)), trees])\n"
+        "                 props=[place('oak', at=(64, 64)), trees,\n"
+        "                        place('oak', at=(20, 30), below_ground_m=3, name='deep')],\n"
+        "                 landmarks={'grove': (64, 64), 'cellar': 'deep'})\n"
     )
     bake_world(script, levels=1, workers=1)
     out = project / "export" / "worlds" / "grove"
     world_json = json.loads((out / "world.json").read_text())
+    # A landmark at a named prop sits at its base: here 3 m under the ground.
+    assert world_json["landmarks"] == {"grove": [1024, 80, 1024], "cellar": [320, 32, 480]}
     assert world_json["props"][0] == {
         "asset": "../../oak.vox",
         "at": [1024.0, 80.0, 1024.0],
@@ -490,8 +556,15 @@ def test_bake_writes_props_into_world_json(tmp_path):
     }
     assert len(world_json["props"]) > 10
     assert all(
-        p["at"][1] == 80 - 0.25 * 16 for p in world_json["props"][1:]
+        p["at"][1] == 80 - 0.25 * 16 for p in world_json["props"][1:-1]
     )  # scattered ones sink 0.25 m
+    with pytest.raises(WorldError, match="no prop named"):
+        load_world(
+            world(name="lost", size_m=(64, 64))(
+                lambda p: World(ground=flat(5), surface=[p.leaf.mid], landmarks={"x": "nowhere"})
+            ),
+            _demo_palette(),
+        )
 
 
 def test_world_lint_finds_edges_slopes_props_and_closed_caves(tmp_path):

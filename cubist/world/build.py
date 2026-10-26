@@ -82,7 +82,7 @@ def stats_of(loaded: LoadedWorld, m: WorldMap) -> dict:
         "surface_pct": {
             k: round(float(v), 2) for k, v in surface_shares(loaded, m.surface).items()
         },
-        "landmarks": {k: list(v) for k, v in loaded.world.landmarks.items()},
+        "landmarks": {k: [x, z] for k, (x, z, _) in loaded.landmark_points().items()},
         "props": _prop_counts(loaded),
     }
 

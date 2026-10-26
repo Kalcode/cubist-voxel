@@ -38,7 +38,7 @@ def lint_world(loaded: LoadedWorld, slope_map: np.ndarray, export: Path | None) 
 
     # Bounds and edges.
     big = min(sx, sz) >= 2 * EDGE_M
-    for name, (x, z) in loaded.world.landmarks.items():
+    for name, (x, z, _) in loaded.landmark_points().items():
         if not inside(x, z):
             out.append(
                 _f("bounds", "error", f"landmark {name} at ({x:g}, {z:g}) is outside the world")
@@ -88,7 +88,7 @@ def lint_world(loaded: LoadedWorld, slope_map: np.ndarray, export: Path | None) 
     )
     ring = np.linspace(-20, 20, 9)
     gx, gz = np.meshgrid(ring, ring)
-    for name, (x, z) in loaded.world.landmarks.items():
+    for name, (x, z, _) in loaded.landmark_points().items():
         if not inside(x, z):
             continue
         worst = float(slopes(loaded, x + gx, z + gz).max())

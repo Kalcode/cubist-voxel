@@ -687,6 +687,18 @@ simulated.
        the ground's own height, since a script can't know the height.
      - **Scripts can't know the ground's height** (it depends on the seed), so caves and props also take
        depths below the ground (`below_ground`), resolved when the world loads.
+     - **Baked and walked (Oct 26):** 1,366 tiles in 38 minutes on an M1 Max (142 s/km²), 3.8 GB, 181
+       MiB/km² at level 0. Kiln streams it with no holes; a character walks from the town through the
+       cave mouth to the cavern's torch. (Kiln's `world-streaming.md` has its numbers.)
+     - **What walking found:** a worm under the tunnel left a 1.3 m pit the character couldn't climb
+       out of, so worms now leave 2 m of rock under tunnel and cavern floors. The spawn stood in the
+       alchemist's stall. A landmark can now be a named prop (`"cavern": "cavern_torch"`), so a start
+       point can be underground.
+     - **Iteration speed:** `--region` re-bakes only the tiles over an area (the cave's 11 tiles: 3
+       minutes); `distance(step_m=8)` cuts the valley's distance field, the biggest cost per tile.
+     - **Open:** slopes at 1/16 m are terraces of one-voxel steps, and on the hills they cost ~300k
+       quads at Kiln's level 0 (its gate is 350k for a whole view); the two-tone grass reads as blobs
+       from above. Both are look decisions for the next round.
 
 ### v1 acceptance targets
 

@@ -216,7 +216,7 @@ def _props(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:
 
 
 def _landmarks(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:
-    for name, (lx, lz) in loaded.world.landmarks.items():
+    for name, (lx, lz, _) in loaded.landmark_points().items():
         px, py = MARGIN_LEFT + int(lx / mpp), MARGIN_TOP + int(lz / mpp)
         for d in range(-3, 4):
             for yy, xx in ((py, px + d), (py + d, px)):

@@ -72,7 +72,8 @@ class World:
     ending in a plain color (the default); the surface is the top ``surface_depth_m`` of ground.
     ``subsoil`` is ``(depth_m, color)`` layers under it, ending in the color that fills the rest.
     ``rivers`` and ``roads`` cut and level the ground along paths (rivers first); ``caves`` hollow
-    it out. ``props`` places built assets. ``landmarks`` names points (x, z) for the engine.
+    it out. ``props`` places built assets. ``landmarks`` names points for the engine: (x, z) on
+    the ground, or the name of a placed prop to sit at its base (on a cave floor, say).
     """
 
     ground: Field
@@ -83,7 +84,7 @@ class World:
     roads: Sequence = ()
     caves: Sequence = ()
     props: Sequence = ()
-    landmarks: dict[str, tuple[float, float]] = field(default_factory=dict)
+    landmarks: dict[str, tuple[float, float] | str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,27 @@ class LoadedWorld:
             rest = layers[-1][1] if layers else self.default_surface()
         return layers, rest
 
+    def landmark_points(self) -> dict[str, tuple[float, float, float | None]]:
+        """Each landmark's (x, z, y) in metres; y is None for one on the ground."""
+        from cubist.world.props import Place
+
+        named = {p.name: p for p in self.world.props if isinstance(p, Place) and p.name}
+        out = {}
+        for name, at in self.world.landmarks.items():
+            if not isinstance(at, str):
+                out[name] = (float(at[0]), float(at[-1]), None)
+                continue
+            prop = named[at]
+            x, z = prop.at[0], prop.at[-1]
+            if prop.below_ground_m is not None:
+                from cubist.world.sample import heights
+
+                y = float(heights(self, [x], [z])[0]) - prop.below_ground_m - prop.sink_m
+            else:
+                y = prop.at[1] - prop.sink_m if len(prop.at) == 3 else None
+            out[name] = (x, z, y)
+        return out
+
     def default_surface(self) -> Color:
         last = self.world.surface[-1] if self.world.surface else None
         if not isinstance(last, Color):
@@ -200,7 +222,7 @@ def load_world(
             f"world {defn.name}: ground must be a field (noise, flat, height_map, ...), "
             f"got {result.ground!r}"
         )
-    from cubist.world.caves import Carver
+    from cubist.world.caves import Carver, Worms
     from cubist.world.paths import EditedGround, River, Road
     from cubist.world.props import Place, Scatter
 
@@ -221,6 +243,16 @@ def load_world(
 
     for cave in result.caves:
         cave.resolve(lambda x, z: heights(loaded, x, z))
+    for cave in result.caves:
+        if isinstance(cave, Worms):
+            cave.keep_floors(result.caves)
+    named = {p.name for p in result.props if isinstance(p, Place) and p.name}
+    for name, at in result.landmarks.items():
+        if isinstance(at, str) and at not in named:
+            raise WorldError(
+                f"world {defn.name}: landmark {name} names {at!r}, but there's no prop named "
+                f"that; give a place(...) name={at!r}, or the landmark (x, z)"
+            )
     loaded.default_surface()
     for rule in result.surface[:-1]:
         if not isinstance(rule, Rule):

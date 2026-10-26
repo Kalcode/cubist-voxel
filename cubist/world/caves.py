@@ -3,7 +3,8 @@
 A carver says which points (x, y, z in metres, y up) are air. Tunnels follow a 3D path, caverns are
 ellipsoids with optionally rough walls, and worms are noise tunnels in a depth band under a region.
 Carvers only remove ground; they apply up to their ``max_level`` of detail (tunnels and caverns to
-level 2, so a cave mouth shows from a distance; worms at level 0 only).
+level 2, so a cave mouth shows from a distance; worms at level 0 only). Worms leave the rock under
+tunnels' and caverns' floors, so the way through stays walkable.
 """
 
 from __future__ import annotations
@@ -13,6 +14,8 @@ import numpy as np
 from cubist.dsl.noise import fbm, mix_seed
 from cubist.world.field import WorldError
 from cubist.world.paths import _catmull_rom
+
+FLOOR_M = 2.0  # rock worms leave under a tunnel's or cavern's floor
 
 
 class Carver:
@@ -73,10 +76,18 @@ class Tunnel(Carver):
         return (lo[0], lo[1], lo[2], hi[0], hi[1], hi[2])
 
     def carve(self, x, y, z, ground, seed):
+        return self._near(x, y, z, self.radius, under=False)
+
+    def under_floor(self, x, y, z, margin_m: float) -> np.ndarray:
+        """Where (x, y, z) is rock under this tunnel's floor, within ``margin_m`` of it."""
+        return self._near(x, y, z, self.radius + margin_m, under=True)
+
+    def _near(self, x, y, z, reach: float, under: bool) -> np.ndarray:
+        # Within `reach` of the centerline; with `under`, only below its lower half.
         p = np.stack(np.broadcast_arrays(x, y, z), axis=-1)
         shape = p.shape[:-1]
         p = p.reshape(-1, 3)
-        lo, hi = p.min(axis=0) - self.radius, p.max(axis=0) + self.radius
+        lo, hi = p.min(axis=0) - reach, p.max(axis=0) + reach
         seg_lo = np.minimum(self.a, self.a + self.ab)
         seg_hi = np.maximum(self.a, self.a + self.ab)
         near = np.flatnonzero(((seg_lo <= hi) & (seg_hi >= lo)).all(axis=1))
@@ -84,8 +95,11 @@ class Tunnel(Carver):
         for k in near:  # usually a handful of segments per chunk
             ap = p - self.a[k]
             u = np.clip(ap @ self.ab[k] / self.len2[k], 0.0, 1.0)
-            d2 = ((ap - u[:, None] * self.ab[k]) ** 2).sum(axis=1)
-            out |= d2 <= self.radius**2
+            off = ap - u[:, None] * self.ab[k]
+            hit = (off**2).sum(axis=1) <= reach**2
+            if under:
+                hit &= off[:, 1] < -0.5 * self.radius
+            out |= hit
         return out.reshape(shape)
 
 
@@ -113,6 +127,18 @@ class Cavern(Carver):
         lo, hi = self.c - self.r - self.rough, self.c + self.r + self.rough
         return (lo[0], lo[1], lo[2], hi[0], hi[1], hi[2])
 
+    def under_floor(self, x, y, z, margin_m: float) -> np.ndarray:
+        """Where (x, y, z) is rock under this cavern's floor, within ``margin_m`` of it."""
+        x, y, z = np.broadcast_arrays(x, y, z)
+        r = self.r + self.rough
+        q = (
+            ((x - self.c[0]) / r[0]) ** 2
+            + ((y - self.c[1]) / r[1]) ** 2
+            + ((z - self.c[2]) / r[2]) ** 2
+        )
+        # The ellipsoid grown by the margin over its shortest radius: at least margin_m everywhere.
+        return (q <= (1 + margin_m / r.min()) ** 2) & (y < self.c[1] - 0.5 * self.r[1])
+
     def carve(self, x, y, z, ground, seed):
         x, y, z = np.broadcast_arrays(x, y, z)
         q = (
@@ -133,7 +159,9 @@ class Worms(Carver):
     name = "worms"
     max_level = 0
 
-    def __init__(self, region, depth_m, scale_m: float, thickness: float, seed: int):
+    def __init__(
+        self, region, depth_m, scale_m: float, thickness: float, seed: int, floors: bool = True
+    ):
         (x0, z0), (x1, z1) = region
         self.x0, self.z0, self.x1, self.z1 = min(x0, x1), min(z0, z1), max(x0, x1), max(z0, z1)
         self.dmin, self.dmax = (float(depth_m[0]), float(depth_m[1]))
@@ -146,6 +174,26 @@ class Worms(Carver):
                 f"worms need scale_m > 0 and 0 < thickness < 1, got {scale_m}, {thickness}"
             )
         self.scale, self.thickness, self.seed = float(scale_m), float(thickness), int(seed)
+        self.keeps_floors = floors
+        self.floors: tuple = ()  # tunnels and caverns whose floors it leaves (set by load_world)
+
+    def keep_floors(self, caves) -> None:
+        """Leaves FLOOR_M of rock under these caves' tunnels' and caverns' floors."""
+        if self.keeps_floors:
+            self.floors = tuple(c for c in caves if isinstance(c, (Tunnel, Cavern)))
+
+    def floor_rock(self, x, y, z) -> np.ndarray:
+        """Where (x, y, z) is rock it leaves under a floor."""
+        x, y, z = np.broadcast_arrays(x, y, z)
+        out = np.zeros(x.shape, dtype=bool)
+        for cave in self.floors:
+            x0, y0, z0, x1, y1, z1 = cave.bounds(None)
+            m = FLOOR_M
+            if (x.max() < x0 - m or x.min() > x1 + m or y.max() < y0 - m or y.min() > y1
+                    or z.max() < z0 - m or z.min() > z1 + m):  # fmt: skip
+                continue
+            out |= cave.under_floor(x, y, z, m)
+        return out
 
     def bounds(self, ground_range):
         lo, hi = ground_range(self.x0, self.z0, self.x1, self.z1)
@@ -178,7 +226,8 @@ class Worms(Carver):
         )
 
     def carve(self, x, y, z, ground, seed):
-        return self.inside(x, y, z, ground) & (self.value(x, y, z, seed) < self.thickness)
+        hollow = self.inside(x, y, z, ground) & (self.value(x, y, z, seed) < self.thickness)
+        return hollow & ~self.floor_rock(x, y, z) if self.floors and hollow.any() else hollow
 
 
 def tunnel(
@@ -202,8 +251,17 @@ def cavern(
 
 
 def worms(
-    region, depth_m=(4.0, 30.0), scale_m: float = 24.0, thickness: float = 0.08, seed: int = 0
+    region,
+    depth_m=(4.0, 30.0),
+    scale_m: float = 24.0,
+    thickness: float = 0.08,
+    seed: int = 0,
+    floors: bool = True,
 ) -> Worms:
     """Winding noise tunnels under ``region`` ((x0, z0), (x1, z1) metres), ``depth_m`` (shallowest,
-    deepest) under the ground. ``scale_m`` spaces them; ``thickness`` (0–1) widens them."""
-    return Worms(region, depth_m, scale_m, thickness, seed)
+    deepest) under the ground. ``scale_m`` spaces them; ``thickness`` (0–1) widens them.
+
+    They open into the world's tunnels and caverns through walls and ceilings, but leave 2 m of
+    rock under their floors (no pits in the way through); ``floors=False`` cuts those too.
+    """
+    return Worms(region, depth_m, scale_m, thickness, seed, floors)

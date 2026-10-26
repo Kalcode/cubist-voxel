@@ -355,6 +355,8 @@ def carve_column(
                 coarse = carver.value(lx, ly, lz, seed)
             value = _upsample(coarse, N, WORM_STEP)
             hollow = inside & (value < carver.thickness)
+            if carver.floors and hollow.any():
+                hollow &= ~carver.floor_rock(x, y, z)
         else:
             hollow = carver.carve(x, y, z, ground, seed)
         block = cells[sub]
@@ -488,14 +490,24 @@ def _bake_task(task: tuple[int, int, int]) -> TileStats:
     return bake_tile(loaded, out, *task, layers)
 
 
-def tiles_for(loaded: LoadedWorld, levels: int) -> list[tuple[int, int, int]]:
-    """Every (level, tx, tz) covering the world."""
+def tiles_for(loaded: LoadedWorld, levels: int, region=None) -> list[tuple[int, int, int]]:
+    """Every (level, tx, tz) covering the world, or only those over ``region`` ((x0, z0), (x1, z1)
+    metres)."""
     tasks = []
     for k in range(levels):
         span = TILE_COLUMNS * N << k  # voxels
         nx = math.ceil(loaded.size_m[0] * VOXELS_PER_M / span)
         nz = math.ceil(loaded.size_m[1] * VOXELS_PER_M / span)
         tasks += [(k, tx, tz) for tz in range(nz) for tx in range(nx)]
+    if region is not None:
+        (x0, z0), (x1, z1) = region
+
+        def over(task) -> bool:
+            k, tx, tz = task
+            m = (TILE_COLUMNS * N << k) / VOXELS_PER_M
+            return tx * m < x1 and (tx + 1) * m > x0 and tz * m < z1 and (tz + 1) * m > z0
+
+        tasks = [t for t in tasks if over(t)]
     return tasks
 
 
@@ -597,10 +609,14 @@ def bake_world(
     seed: int = 0,
     style=None,
     progress=None,
+    region=None,
 ) -> BakeSummary:
     """Bakes every tile of every level, the far grids, ``map.json`` and ``world.json``.
 
-    ``progress(done, total, seconds)`` is called as tiles finish (about every 5%).
+    ``progress(done, total, seconds)`` is called as tiles finish (about every 5%). ``region``
+    ((x0, z0), (x1, z1) metres) re-bakes only the tiles over it into an existing bake (and the far
+    grids and JSON): quick while working on one part of a big world, but tiles elsewhere keep what
+    they had, so re-bake everything once the change reaches past it.
     """
     from cubist.world.build import load_script
 
@@ -609,8 +625,26 @@ def bake_world(
     style_path = Path(style) if style else find_style(script)
     loaded = load_script(script, seed, style_path)
     out = Path(out_dir) if out_dir else style_path.parent / "export" / "worlds" / loaded.name
+    km2 = loaded.size_m[0] * loaded.size_m[1] / 1e6
+    if region is not None:
+        if not (out / "map.json").is_file():
+            raise WorldError(f"--region re-bakes part of an existing bake; {out} has none yet")
+        baked = json.loads((out / "map.json").read_text())["levels"]
+        if baked != levels:
+            raise WorldError(f"{out} was baked with {baked} levels; bake the region with as many")
     out.mkdir(parents=True, exist_ok=True)
-    tasks = tiles_for(loaded, levels)
+    tasks = tiles_for(loaded, levels, region)
+    if region is not None:  # per km² of the level-0 tiles baked
+        m = TILE_COLUMNS * N / VOXELS_PER_M
+        km2 = (
+            sum(
+                max(0.0, min((tx + 1) * m, loaded.size_m[0]) - tx * m)
+                * max(0.0, min((tz + 1) * m, loaded.size_m[1]) - tz * m)
+                for k, tx, tz in tasks
+                if k == 0
+            )
+            / 1e6
+        )
     workers = workers or max(1, (os.cpu_count() or 2) - 1)
     stats: list[TileStats] = []
     step = max(1, len(tasks) // 20)
@@ -650,8 +684,9 @@ def bake_world(
     }
     (out / "map.json").write_text(json.dumps(info, indent=2) + "\n")
     landmarks = {}
-    for name, (x, z) in loaded.world.landmarks.items():
-        y = float(heights(loaded, np.array([x]), np.array([z]))[0])
+    for name, (x, z, y) in loaded.landmark_points().items():
+        if y is None:
+            y = float(heights(loaded, np.array([x]), np.array([z]))[0])
         landmarks[name] = [x * VOXELS_PER_M, y * VOXELS_PER_M, z * VOXELS_PER_M]
     from cubist.world.props import placements
 
@@ -661,7 +696,6 @@ def bake_world(
     (out / "world.json").write_text(json.dumps(world_json, indent=2) + "\n")
     disk = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     level0 = sum(s.packed for s in stats if s.level == 0)
-    km2 = loaded.size_m[0] * loaded.size_m[1] / 1e6
     chunks, raw = sum(s.chunks for s in stats), sum(s.raw for s in stats)
     seconds = time.perf_counter() - started
     return BakeSummary(loaded.name, out, seconds, len(tasks), chunks, raw, disk, level0, km2)
