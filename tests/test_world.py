@@ -661,6 +661,23 @@ def test_world_lint_finds_edges_slopes_props_and_closed_caves(tmp_path):
     assert "scattered oak grow into cottage" in text
     assert "(200, -20, 200) has no way in" in text
     assert "(700, 25, 700)" not in text  # its tunnel opens at the surface
+    # The tunnel's floor (2 m under its line) meets the cavern's (6 m under its center): a drop.
+    assert "floor of the tunnel from (700, 41, 640) drops" in text and "near (700, 69" in text
+
+
+def test_world_lint_passes_walkable_tunnels():
+    from cubist.world import tunnel
+    from cubist.world.lint import lint_world
+    from cubist.world.sample import slopes
+
+    @world(name="ramp", size_m=(400, 400))
+    def ramp(p):
+        line = [(100, 41, 200), (200, 30, 200), (300, 30, 260)]
+        return World(ground=flat(40), surface=[p.leaf.mid], caves=[tunnel(line, radius_m=2.5)])
+
+    loaded = load_world(ramp, _demo_palette(), seed=0)
+    x, z = np.meshgrid(np.arange(0, 400, 10.0), np.arange(0, 400, 10.0))
+    assert "floor of the tunnel" not in lint_world(loaded, slopes(loaded, x, z), None).summary()
 
 
 def test_region_renders_build_the_area_like_the_bake():

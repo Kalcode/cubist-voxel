@@ -2,7 +2,8 @@
 
 Errors for things outside the world; warnings for landmarks near its edge (the engine shows the
 world's end from about 400 m), steep ground around landmarks, props on uneven ground or growing into
-each other, and caves with no way in; information on how much ground is too steep to walk.
+each other, caves with no way in, and tunnel floors with a step no one climbs; information on how
+much ground is too steep to walk.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from cubist.world.sample import heights, slopes
 EDGE_M = 400.0  # how far the engine's levels of detail reach: closer than this, the edge shows
 WALK_SLOPE_DEG = 45.0
 UNEVEN_M = 1.0  # a placed prop's footprint may fall this much before it visibly floats
+CLIMB_M = 1.0  # a tunnel's floor may rise or fall this much per metre along it and still be walked
+FLOOR_SEARCH_M = 12.0  # how far under a tunnel's bottom its floor is looked for
 
 
 def _f(check: str, severity: str, message: str, **details) -> Finding:
@@ -104,6 +107,7 @@ def lint_world(loaded: LoadedWorld, slope_map: np.ndarray, export: Path | None) 
 
     out += _props(loaded, export)
     out += _caves(loaded)
+    out += _tunnel_floors(loaded)
     return LintReport(out)
 
 
@@ -246,6 +250,53 @@ def _caves(loaded: LoadedWorld) -> list[Finding]:
                     f"surface or a cave that does",
                 )
             )
+    return out
+
+
+def _tunnel_floors(loaded: LoadedWorld) -> list[Finding]:
+    """Walks each tunnel's line a metre at a time and finds the floor under it (the ground, less
+    every cave); a floor that rises or drops more than ``CLIMB_M`` in a metre is a step a character
+    doesn't climb (a worm under the floor once left such a pit)."""
+    caves = list(loaded.world.caves)
+    out = []
+    for t in (c for c in caves if isinstance(c, Tunnel)):
+        pts = t.points
+        seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+        along = np.r_[0.0, np.cumsum(seg)]
+        s = np.arange(0.0, along[-1], 1.0)
+        line = np.stack([np.interp(s, along, pts[:, k]) for k in range(3)], axis=-1)
+        # Down from the line in 1/16 m steps, to FLOOR_SEARCH_M under the tunnel's bottom.
+        dy = np.arange(0.0, t.radius + FLOOR_SEARCH_M, 1 / 16)
+        x = line[:, 0:1] + 0 * dy
+        z = line[:, 2:3] + 0 * dy
+        y = line[:, 1:2] - dy
+        ground = heights(loaded, line[:, 0], line[:, 2])[:, None] + 0 * dy
+        air = y >= ground
+        for c in caves:
+            air |= c.carve(x, y, z, ground, loaded.seed)
+        solid = ~air
+        found = solid.any(axis=1)
+        floor = np.where(found, y[np.arange(len(y)), solid.argmax(axis=1)], np.nan)
+        steps = np.abs(np.diff(floor))
+        bad = np.flatnonzero(~(steps <= CLIMB_M))  # a missing floor (nan) counts too
+        if len(bad) == 0:
+            continue
+        i = bad[np.argmax(np.nan_to_num(steps[bad], nan=np.inf))]
+        x0, y0, z0 = t.points[0]
+        px, pz = line[i + 1, 0], line[i + 1, 2]
+        if np.isnan(steps[i]):
+            what = f"falls away (none within {t.radius + FLOOR_SEARCH_M:g} m of the line)"
+        else:
+            change = floor[i + 1] - floor[i]
+            what = f"{'rises' if change > 0 else 'drops'} {abs(change):.1f} m"
+        out.append(
+            _f(
+                "cave",
+                "warning",
+                f"the floor of the tunnel from ({x0:.0f}, {y0:.0f}, {z0:.0f}) {what} near "
+                f"({px:.0f}, {pz:.0f}): a character doesn't climb that",
+            )
+        )
     return out
 
 

@@ -163,7 +163,7 @@ asset.
 | slope | Ground within 20 m of a landmark steeper than 45°; the share of all ground that steep (info) | Warning |
 | uneven | A placed prop whose footprint's ground falls more than 1 m (it floats on the low side) | Warning |
 | overlap | Placed props overlapping, and scattered props growing into a placed one | Warning |
-| cave | A cavern or tunnel with no way in from the surface | Warning |
+| cave | A cavern or tunnel with no way in from the surface; a tunnel whose floor rises or drops more than 1 m in a metre (a step no one climbs: vale's worm pit showed as "rises 3.7 m") | Warning |
 
 Props are checked against their exported manifests; until they're exported, lint says so and skips them.
 
