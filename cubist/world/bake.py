@@ -471,12 +471,16 @@ def bake_tile(
             chunks += len(payloads)
     path = out / f"L{level}" / f"{tx}_{tz}.tile"
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as f:
+    # Written aside, then renamed over the old tile: a running Kiln that reloads the map never
+    # sees half a tile.
+    part = path.with_suffix(".tile.part")
+    with open(part, "wb") as f:
         f.write(_HEADER.pack(b"KTIL", 1, level, 0, tx, tz))
         for e in entries:
             f.write(_ENTRY.pack(*e))
         for blob in blobs:
             f.write(blob)
+    os.replace(part, path)
     return TileStats(level, raw_total, offset, chunks, time.perf_counter() - started)
 
 

@@ -190,7 +190,8 @@ map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<na
 The bake prints its progress every 5% of tiles. `--region` re-bakes only the tiles over that area (metres)
 into an existing bake, plus the far grids and the JSON: a minute instead of half an hour while working on
 one part of a big world. Tiles elsewhere keep what they had, so bake everything again once a change reaches
-past the region. Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
+past the region. Tiles are written aside and renamed into place, so a running Kiln can reload them (its
+panel's "reload map") without reading half a tile. Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
 (or `spawn`). Expect about a minute per km² on a 10-core laptop, and 150–200 MiB per km²; bakes stay out
 of git.
 
