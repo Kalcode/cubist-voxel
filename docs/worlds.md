@@ -2,8 +2,9 @@
 
 Worlds are terrain for premade game worlds; [design.md](design.md), "Worlds", says why and how they fit
 in. A world script lives in `worlds/<name>.py` of a project and starts with `from cubist.world import *`.
-Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a
-and 12b (ground, surface rules, the map, the bake); caves, props and lint come next.
+Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a,
+12b and part of 12c (ground, surface rules, rivers and roads, the map, the bake); caves, props and lint
+come next.
 
 ```python
 from cubist.world import *
@@ -62,6 +63,22 @@ Combine fields with `+ - *` (with fields or numbers), and:
 - `a.flatten(mask, at_m)`: level the ground to `at_m` under the mask (a town, a quarry).
 - `a.max(b)`, `a.min(b)`.
 - `a.terrace(step_m, softness=0.3)`: steps every `step_m`.
+
+## Rivers and roads
+
+`path(points, smooth=True)` is a line through `(x, z)` points in metres; `smooth` makes it a curve through
+them. Rivers and roads follow paths, in `World(rivers=[...], roads=[...])` (rivers are cut first):
+
+- `river(path, width_m, depth_m=1.5, bank_m=None, bed=None, water=None)`: list the path from the source.
+  The water level follows the ground along it but never rises downstream. The channel is cut `depth_m`
+  under it, the banks ease into the ground over `bank_m` (default: the width), the bed is painted `bed`,
+  and the channel fills with `water`. Water is solid voxels of that color for now.
+- `road(path, width_m, color, bank_m=None, smooth_m=30)`: the strip is levelled to the road's own height
+  profile (averaged over `smooth_m` of road), cut and filled into the ground over `bank_m`, and painted
+  `color`. Where a road crosses a river it fills the channel (a ford).
+
+The map draws water in its own color, a little darker where it's deep; the bake fills it as voxels and
+shows it in the far field.
 
 ## Surface rules
 

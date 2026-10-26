@@ -28,7 +28,7 @@ def world_context(loaded: LoadedWorld) -> Iterator[None]:
 def heights(loaded: LoadedWorld, x, z) -> np.ndarray:
     """Ground heights in metres at (x, z)."""
     with world_context(loaded):
-        return loaded.world.ground.sample(
+        return loaded.ground.sample(
             np.asarray(x, dtype=np.float64), np.asarray(z, dtype=np.float64), loaded.seed
         )
 
@@ -52,7 +52,31 @@ def surface(loaded: LoadedWorld, x, z, h: np.ndarray, s: np.ndarray) -> np.ndarr
             hit = rule.matches(h, s, x, z, loaded.seed) & ~decided
             out[hit] = rule.color.index
             decided |= hit
+    paint(loaded, x, z, out)
     return out
+
+
+def paint(loaded: LoadedWorld, x, z, out: np.ndarray) -> None:
+    """River beds, then roads, over the surface colors in ``out``."""
+    for edit in (*loaded.world.rivers, *loaded.world.roads):
+        color = getattr(edit, "bed", None) or getattr(edit, "color", None)
+        if color is not None:
+            out[edit.strip(x, z)] = color.index
+
+
+def water(loaded: LoadedWorld, x, z) -> tuple[np.ndarray, np.ndarray]:
+    """(water surface in metres or -inf; palette index of its color or 0) per column."""
+    level = np.full(np.shape(x), -np.inf)
+    color = np.zeros(np.shape(x), dtype=np.int16)
+    with world_context(loaded):
+        for r in loaded.world.rivers:
+            if r.water is None:
+                continue
+            w = r.water_level(x, z, loaded.seed, loaded.world.ground)
+            higher = w > level
+            level[higher] = w[higher]
+            color[higher] = r.water.index
+    return level, color
 
 
 def columns(loaded: LoadedWorld, x, z, slope: np.ndarray | None = None):

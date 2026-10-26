@@ -230,3 +230,95 @@ def test_bake_writes_kiln_tiles_matching_the_ground(tmp_path):
     again = bake_world(script, out_dir=tmp_path / "b", levels=2, workers=1, style=style)
     assert (tmp_path / "b" / "L0" / "0_0.tile").read_bytes() == tile
     assert again.chunks == summary.chunks
+
+
+def test_paths_measure_distance_and_arc_length():
+    from cubist.world import path
+
+    line = path([(0, 0), (100, 0)], smooth=False)
+    d, t = line.nearest(
+        np.array([50.0, 50.0, 150.0, -5.0]), np.array([0.0, 7.0, 0.0, 3.0]), reach=10
+    )
+    assert d[:2].tolist() == [0.0, 7.0] and np.isinf(d[2])
+    assert t[0] == 50 and t[3] == 0 and d[3] == pytest.approx(np.hypot(5, 3))
+    curve = path([(0, 0), (50, 40), (100, 0)])
+    assert len(curve.points) > 3 and curve.length > 128  # smoothed through the middle point
+
+
+def _river_world(p):
+    from cubist.world import path, river, road
+    from cubist.world.field import Custom
+
+    ground = flat(30) + Custom(
+        lambda x, z, s: -np.asarray(x) * 0.05, "tilt"
+    )  # falls 5 m per 100 m east
+    return World(
+        ground=ground,
+        surface=[p.leaf.mid],
+        subsoil=[p.stone.dark],
+        rivers=[
+            river(
+                path([(10, 60), (240, 60)], smooth=False),
+                width_m=8,
+                depth_m=2,
+                bed=p.stone.light,
+                water=p.water.mid,
+            )
+        ],  # fmt: skip
+        roads=[road(path([(60, 0), (60, 50)], smooth=False), width_m=4, color=p.cork)],
+    )
+
+
+def test_rivers_cut_a_channel_that_holds_water_and_roads_level_a_strip():
+    from cubist.world.sample import heights, surface_names, water
+
+    w = world(name="river", size_m=(256, 128))(_river_world)
+    p = _demo_palette()
+    loaded = load_world(w, p, seed=0)
+    xs = np.array([50.0, 150.0, 230.0])
+    centre = heights(loaded, xs, np.full(3, 60.0))
+    bank_far = heights(loaded, xs, np.full(3, 90.0))
+    assert np.all(centre < bank_far - 1.5)  # the channel is cut
+    level, color = water(loaded, xs, np.full(3, 60.0))
+    assert np.all(level > centre) and np.all(np.diff(level) <= 0)  # water in it, flowing downhill
+    assert (color == p.water.mid.index).all()
+    assert np.isinf(water(loaded, np.array([50.0]), np.array([90.0]))[0]).all()
+    # The road is level across its width and painted.
+    across = heights(loaded, np.array([58.5, 60.0, 61.5]), np.full(3, 25.0))
+    assert np.ptp(across) < 0.05
+    _, _, names = columns(loaded, np.array([60.0, 100.0]), np.array([25.0, 25.0]))
+    assert surface_names(loaded, names) == ["cork", "leaf.mid"]
+
+
+def test_baked_rivers_hold_water_voxels(tmp_path):
+    import struct
+    import zlib
+
+    from cubist.world.bake import N, bake_tile, decode_chunk, layers_of
+
+    p = _demo_palette()
+    loaded = load_world(world(name="river", size_m=(256, 128))(_river_world), p, seed=0)
+    bake_tile(loaded, tmp_path, 0, 0, 0, layers_of(loaded))
+    tile = (tmp_path / "L0" / "0_0.tile").read_bytes()
+    cx, cz = (
+        int(150 * 16) // N % 64,
+        int(60 * 16) // N % 64,
+    )  # the chunk column over the river at x 150
+    min_cy, max_cy, _, _, off, length, _ = struct.unpack_from(
+        "<iiHHIII", tile, 16 + 24 * (cx + 64 * cz)
+    )
+    raw = zlib.decompress(tile[off : off + length])
+    cells, at = [], 0
+    for _ in range(min_cy, max_cy):
+        n = struct.unpack_from("<I", raw, at)[0]
+        cells.append(decode_chunk(raw[at + 4 : at + 4 + n]))
+        at += 4 + n
+    column = np.concatenate(cells, axis=1)
+    assert (column == p.water.mid.index).any()
+    assert (column == p.stone.light.index).any()  # the bed under it
+
+
+def _demo_palette() -> Palette:
+    from cubist.build.runner import load_project_style
+
+    return load_project_style(DEMO / "style.toml").palette

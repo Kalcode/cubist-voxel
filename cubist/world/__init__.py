@@ -25,6 +25,7 @@ from cubist.world.model import (
     where,
     world,
 )
+from cubist.world.paths import Path, path, river, road
 
 __all__ = [
     "Field",
@@ -44,8 +45,12 @@ __all__ = [
     "load_world",
     "mask_map",
     "noise",
+    "Path",
+    "path",
     "rect",
     "ridges",
+    "river",
+    "road",
     "slope_over",
     "where",
     "world",

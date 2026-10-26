@@ -70,8 +70,8 @@ class World:
 
     ``ground`` is the height field in metres. ``surface`` is a list of rules, first match wins,
     ending in a plain color (the default); the surface is the top ``surface_depth_m`` of ground.
-    ``subsoil``
-    is ``(depth_m, color)`` layers under it, ending in the color that fills the rest. ``landmarks``
+    ``subsoil`` is ``(depth_m, color)`` layers under it, ending in the color that fills the rest.
+    ``rivers`` and ``roads`` cut and level the ground along paths (rivers first). ``landmarks``
     names points (x, z) for the engine.
     """
 
@@ -79,6 +79,8 @@ class World:
     surface: Sequence[Rule | Color]
     subsoil: Sequence[tuple[float, Color] | Color] = ()
     surface_depth_m: float = 0.25
+    rivers: Sequence = ()
+    roads: Sequence = ()
     landmarks: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
@@ -124,6 +126,7 @@ class LoadedWorld:
     palette: Palette
     seed: int
     script_dir: Path | None
+    ground: Field = None  # type: ignore[assignment]  # the ground with rivers and roads applied
 
     @property
     def name(self) -> str:
@@ -177,7 +180,17 @@ def load_world(
             f"world {defn.name}: ground must be a field (noise, flat, height_map, ...), "
             f"got {result.ground!r}"
         )
-    loaded = LoadedWorld(defn, result, palette, mix_seed(defn.seed, seed), directory)
+    from cubist.world.paths import EditedGround, River, Road
+
+    for kind, items, cls in (("rivers", result.rivers, River), ("roads", result.roads, Road)):
+        for item in items:
+            if not isinstance(item, cls):
+                raise WorldError(
+                    f"world {defn.name}: {kind} take {cls.__name__.lower()}(...), got {item!r}"
+                )
+    edits = [*result.rivers, *result.roads]
+    ground = EditedGround(result.ground, edits) if edits else result.ground
+    loaded = LoadedWorld(defn, result, palette, mix_seed(defn.seed, seed), directory, ground)
     loaded.default_surface()
     for rule in result.surface[:-1]:
         if not isinstance(rule, Rule):

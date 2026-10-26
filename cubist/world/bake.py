@@ -24,7 +24,7 @@ import numpy as np
 from cubist.build.runner import find_style, load_project_style
 from cubist.world.field import WorldError
 from cubist.world.model import LoadedWorld, Rule
-from cubist.world.sample import heights, world_context
+from cubist.world.sample import heights, paint, water, world_context
 
 N = 32  # cells per chunk side
 TILE_COLUMNS = 64
@@ -167,8 +167,9 @@ def _bilinear(grid: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
 def sample_columns(loaded: LoadedWorld, level: int, x0: int, z0: int, nx: int, nz: int):
     """Ground at the centers of cells ``[x0, x0 + nx) × [z0, z0 + nz)`` of level ``level``.
 
-    Returns heights (level-0 voxels), slopes (degrees) and surface palette indices, each [nz, nx].
-    Levels whose cells are finer than ``LATTICE_M`` interpolate fields sampled on that lattice.
+    Returns heights (level-0 voxels), slopes (degrees), surface palette indices, and the water
+    surface (level-0 voxels, -inf for none) with its color, each [nz, nx]. Levels whose cells are
+    finer than ``LATTICE_M`` interpolate fields sampled on that lattice.
     """
     cell_m = (1 << level) / VOXELS_PER_M
     cx = (x0 + np.arange(nx) + 0.5) * cell_m
@@ -203,7 +204,13 @@ def sample_columns(loaded: LoadedWorld, level: int, x0: int, z0: int, nx: int, n
             hit &= ~decided
             out[hit] = rule.color.index
             decided |= hit
-    return h * VOXELS_PER_M, s, out
+    if loaded.world.rivers or loaded.world.roads:
+        px, pz = np.meshgrid(cx, cz)
+        paint(loaded, px, pz, out)
+        level, color = water(loaded, px, pz)
+    else:
+        level, color = np.full((nz, nx), -np.inf), np.zeros((nz, nx), dtype=np.int16)
+    return h * VOXELS_PER_M, s, out, level * VOXELS_PER_M, color
 
 
 def chunk_cells(
@@ -213,11 +220,14 @@ def chunk_cells(
     return column_cells(top, surface, cy, cy + 1, level, layers)[0]
 
 
-def column_cells(top, surface, min_cy: int, max_cy: int, level: int, layers: Layers) -> np.ndarray:
+def column_cells(
+    top, surface, min_cy: int, max_cy: int, level: int, layers: Layers, water=None, water_color=None
+) -> np.ndarray:
     """Chunks ``[min_cy, max_cy)`` of a chunk column as ``[chunk, z, y, x]``.
 
     From its 32 × 32 columns' heights (level-0 voxels) and surface colors: a cell is solid when its
-    center lies below the ground, and its depth picks the band.
+    center lies below the ground, and its depth picks the band. Air under a column's water surface
+    is water.
     """
     size = 1 << level
     count = max_cy - min_cy
@@ -232,6 +242,9 @@ def column_cells(top, surface, min_cy: int, max_cy: int, level: int, layers: Lay
         out[(depth > above) & (depth <= bottom + shift)] = color
         above = bottom + shift
     out[depth > above] = layers.rest
+    if water is not None:
+        wet = (depth <= 0) & (y[None, :, None] < water[:, None, :])
+        out[wet] = np.broadcast_to(water_color[:, None, :], out.shape)[wet]
     return out.reshape(N, count, N, N).transpose(1, 0, 2, 3)
 
 
@@ -261,7 +274,7 @@ def bake_tile(
             entries.extend([(0, 0, 0, 0, 0, 0, 0)] * TILE_COLUMNS)
             continue
         x0 = tx * TILE_COLUMNS * N
-        h, _, surf = sample_columns(loaded, level, x0, cz0, TILE_COLUMNS * N, N)
+        h, _, surf, wet, wet_color = sample_columns(loaded, level, x0, cz0, TILE_COLUMNS * N, N)
         for col in range(TILE_COLUMNS):
             cx0 = x0 + col * N
             if cx0 >= size_cells[0] or cx0 < 0:
@@ -269,18 +282,21 @@ def bake_tile(
                 continue
             top = h[:, col * N : (col + 1) * N].copy()
             colors = surf[:, col * N : (col + 1) * N]
+            water_top = wet[:, col * N : (col + 1) * N]
+            water_color = wet_color[:, col * N : (col + 1) * N]
             # Columns past the world's edge (a chunk column straddling it) are air.
             outside_x = cx0 + np.arange(N) >= size_cells[0]
             outside_z = cz0 + np.arange(N) >= size_cells[1]
             top[outside_z[:, None] | outside_x[None, :]] = -1e9
             inside = top > -1e8
             cell = 1 << level
-            hi = top[inside].max() / cell
+            hi = max(top[inside].max(), water_top[inside].max()) / cell
             lo = (top[inside].min() - layers.deepest - cell) / cell
             # Below min_cy every cell is deeper than the last band (one cell of slack for ties).
             min_cy = math.floor((lo - 1) / N)
             max_cy = max(math.ceil(hi / N), min_cy + 1)
-            payloads = encode_chunks(column_cells(top, colors, min_cy, max_cy, level, layers))
+            cells = column_cells(top, colors, min_cy, max_cy, level, layers, water_top, water_color)
+            payloads = encode_chunks(cells)
             raw = b"".join(struct.pack("<I", len(p)) + p for p in payloads)
             blob = zlib.compress(raw, DEFLATE_LEVEL)
             entries.append((min_cy, max_cy, layers.rest, 0, offset, len(blob), len(raw)))
@@ -339,8 +355,15 @@ def far_grids(loaded: LoadedWorld, out: Path) -> list[dict]:
         z0 = x0
         count_x = int((sx + margin - x0) // spacing) + 2
         count_z = int((sz + margin - z0) // spacing) + 2
-        # Heights at the grid points (in voxels) and the surface color there by the world's rules.
+        # Heights at the grid points (in voxels) and the surface color there by the world's rules;
+        # water shows as its surface.
         h, _, surf = sample_columns_at(loaded, x0, z0, spacing, count_x, count_z)
+        gx, gz = np.meshgrid((x0 + np.arange(count_x) * spacing) / VOXELS_PER_M,
+                             (z0 + np.arange(count_z) * spacing) / VOXELS_PER_M)  # fmt: skip
+        level, color = water(loaded, gx, gz)
+        wet = level * VOXELS_PER_M > h
+        h = np.where(wet, level * VOXELS_PER_M, h)
+        surf = np.where(wet, color, surf)
         payload = h.astype("<f4").tobytes() + surf.astype("<u2").tobytes()
         name = f"far-L{k}.bin"
         (out / name).write_bytes(

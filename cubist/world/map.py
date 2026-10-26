@@ -15,7 +15,7 @@ from PIL import Image
 
 from cubist.render.font import draw_text, text_height, text_width
 from cubist.world.model import LoadedWorld
-from cubist.world.sample import columns, heights
+from cubist.world.sample import columns, heights, water
 
 MAX_PIXELS = 768  # the longer side
 _BG = np.array([24, 24, 28], dtype=np.uint8)
@@ -61,6 +61,12 @@ def render_map(loaded: LoadedWorld) -> WorldMap:
     rgb = loaded.palette.rgba_table()[surf][..., :3].astype(np.float64) * (
         0.45 + 0.6 * shade[..., None]
     )
+    # Water: its own color, flat, a little darker where it's deep.
+    level, color = water(loaded, x, z)
+    wet = level > hm
+    if wet.any():
+        depth = np.clip((level - hm)[wet] / 4.0, 0.0, 1.0)
+        rgb[wet] = loaded.palette.rgba_table()[color[wet]][..., :3] * (1.0 - 0.3 * depth[:, None])
 
     # Contour lines where the height crosses a multiple of the interval (aim for ~12 bands).
     span = float(hm.max() - hm.min())
