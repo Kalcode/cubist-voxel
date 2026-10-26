@@ -661,6 +661,47 @@ def test_region_renders_build_the_area_like_the_bake():
         region_grid(loaded, (2000, 2000), size_m=32)
 
 
+def test_region_renders_draw_props_where_kiln_stamps_them(tmp_path):
+    import json
+
+    from cubist.core.grid import VoxelGrid
+    from cubist.io.vox import VoxPart, VoxScene, write_vox
+    from cubist.world import place
+    from cubist.world.region import region_grid
+
+    project = _project(tmp_path)
+    # A post 2 voxels along x, 32 up, 1 along z, its origin at its base corner.
+    post = VoxelGrid(np.full((2, 32, 1), 5, dtype=np.uint8))
+    write_vox(
+        project / "export" / "post.vox",
+        VoxScene([VoxPart("post", post)], _demo_palette().rgba_table()),
+    )
+    (project / "export" / "post.cubist.json").write_text(
+        json.dumps(
+            {"cubist_manifest": 1, "name": "post", "size": [2, 32, 1], "glb_origin": [0, 0, 0]}
+        )
+    )
+
+    @world(name="posts", size_m=(64, 64))
+    def posts(p):
+        props = [place("post", at=(10, 10)), place("post", at=(20, 10), rotate_y=90)]
+        return World(ground=flat(5), surface=[p.leaf.mid], props=props)
+
+    loaded = load_world(posts, _demo_palette(), seed=0)
+    grid, level, corner = region_grid(loaded, (16, 16), size_m=16, export=project / "export")
+    assert level == 0
+    x0, y0, z0 = (int(round(c * 16)) for c in corner)
+
+    def at(x, y, z):  # world voxel → the grid's color there
+        return int(grid.data[x - x0, y - y0, z - z0])
+
+    # Unturned: voxels (160..161, 80..111, 160), standing on the ground (5 m = voxel 80).
+    assert at(160, 80, 160) == at(161, 111, 160) == 5 and at(162, 80, 160) == 0
+    # A quarter turn maps (x, y, z) to (z, y, -x - 1), as Kiln stamps it: along -z from 159.
+    assert at(320, 80, 159) == at(320, 111, 158) == 5 and at(321, 80, 159) == at(320, 80, 160) == 0
+    assert at(200, 79, 200) != 0 and at(200, 80, 200) == 0  # the ground below them
+
+
 def test_path_distance_fields_cap_far_away():
     from cubist.world import path
 

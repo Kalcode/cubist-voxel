@@ -352,12 +352,14 @@ def cmd_world_bake(args: argparse.Namespace) -> int:
 
 
 def cmd_world_render(args: argparse.Namespace) -> int:
+    from cubist.build.runner import find_style
     from cubist.world.build import load_script
     from cubist.world.region import render_region
 
     loaded = load_script(args.script, args.seed, args.style)
     x, z = (float(v) for v in args.at.split(","))
-    image = render_region(loaded, (x, z), args.size, args.cut)
+    export = Path(args.style or find_style(args.script)).parent / "export"
+    image = render_region(loaded, (x, z), args.size, args.cut, export if export.is_dir() else None)
     out = args.out or Path(args.script).resolve().parent.parent / "out" / "worlds" / loaded.name
     out.mkdir(parents=True, exist_ok=True)
     cut = "" if args.cut is None else f"-cut{args.cut:g}"
