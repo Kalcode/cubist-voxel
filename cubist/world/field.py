@@ -80,6 +80,11 @@ class Field:
         """Level the ground to ``at_m`` where ``mask`` is 1 (a town), easing out at its edge."""
         return self.blend(flat(at_m), mask)
 
+    def level(self, center, radius_m: float, edge_m: float = 20.0) -> Field:
+        """Flatten a circle to this ground's own height at its center (a square, a pass), easing out
+        over ``edge_m``: like ``flatten`` without knowing the height."""
+        return _Level(self, (float(center[0]), float(center[1])), float(radius_m), float(edge_m))
+
     def terrace(self, step_m: float, softness: float = 0.3) -> Field:
         """Steps every ``step_m`` metres; ``softness`` (0–1) rounds their edges."""
         if step_m <= 0:
@@ -105,6 +110,23 @@ class _Blend(Field):
         w = np.clip(self.mask.sample(x, z, seed), 0.0, 1.0)
         a = self.a.sample(x, z, seed)
         return a + (self.b.sample(x, z, seed) - a) * w
+
+
+class _Level(Field):
+    name = "level"
+
+    def __init__(self, base: Field, center, radius: float, edge: float):
+        self.base, self.center, self.radius, self.edge = base, center, radius, edge
+        self._heights: dict[int, float] = {}
+
+    def sample(self, x, z, seed):
+        if seed not in self._heights:
+            c = self.base.sample(np.array([self.center[0]]), np.array([self.center[1]]), seed)
+            self._heights[seed] = float(c[0])
+        h = self.base.sample(x, z, seed)
+        d = np.hypot(np.asarray(x) - self.center[0], np.asarray(z) - self.center[1]) - self.radius
+        w = _falloff(d, self.edge)
+        return h + (self._heights[seed] - h) * w
 
 
 class _Terrace(Field):

@@ -45,7 +45,9 @@ def _nice(value: float, steps=(1, 2, 2.5, 5)) -> float:
 
 def render_map(loaded: LoadedWorld) -> WorldMap:
     sx, sz = loaded.size_m
-    mpp = _nice(max(sx, sz) / MAX_PIXELS)
+    # Whole metres per pixel for big worlds (4 km: 6 m, 667 px); a 'nice' fraction under a metre.
+    want = max(sx, sz) / MAX_PIXELS
+    mpp = float(math.ceil(want)) if want > 1 else _nice(want)
     w, h = max(1, math.ceil(sx / mpp)), max(1, math.ceil(sz / mpp))
     x, z = np.meshgrid((np.arange(w) + 0.5) * mpp, (np.arange(h) + 0.5) * mpp)
     hm = heights(loaded, x, z)

@@ -64,6 +64,8 @@ Combine fields with `+ - *` (with fields or numbers), and:
 
 - `a.blend(b, mask)`: `a` where the mask is 0, `b` where it is 1.
 - `a.flatten(mask, at_m)`: level the ground to `at_m` under the mask (a town, a quarry).
+- `a.level(center, radius_m, edge_m=20)`: level a circle to the ground's own height at its center (a
+  square, a pass), when you don't know that height.
 - `a.max(b)`, `a.min(b)`.
 - `a.terrace(step_m, softness=0.3)`: steps every `step_m`.
 

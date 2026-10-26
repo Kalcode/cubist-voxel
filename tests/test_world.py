@@ -602,3 +602,14 @@ def test_caves_and_props_can_be_placed_below_the_ground():
     assert c.c[1] == pytest.approx(40 - 12)
     [torch] = placements(loaded, Path("/nonexistent"))
     assert torch.at[1] == pytest.approx((40 - 15.5) * 16)
+
+
+def test_level_flattens_to_the_ground_at_the_center():
+    f = (flat(10) + Custom(lambda x, z, s: np.asarray(x) * 0.5, "slope")).level(
+        (40, 40), radius_m=5, edge_m=0
+    )
+    h = f.sample(np.array([36.0, 44.0, 80.0]), np.array([40.0, 40.0, 40.0]), seed=0)
+    assert h[:2].tolist() == [30.0, 30.0] and h[2] == 50.0
+
+
+from cubist.world.field import Custom  # noqa: E402
