@@ -587,7 +587,8 @@ def test_bake_writes_props_into_world_json(tmp_path):
         "    trees = scatter('oak', ((0, 0), (128, 128)), per_ha=20)\n"
         "    return World(ground=flat(5), surface=[p.leaf.mid],\n"
         "                 props=[place('oak', at=(64, 64)), trees,\n"
-        "                        place('oak', at=(20, 30), below_ground_m=3, name='deep')],\n"
+        "                        place('oak', at=(20, 30), below_ground_m=3, name='deep',\n"
+        "                              carve=True)],\n"
         "                 landmarks={'grove': (64, 64), 'cellar': 'deep'})\n"
     )
     bake_world(script, levels=1, workers=1)
@@ -595,6 +596,7 @@ def test_bake_writes_props_into_world_json(tmp_path):
     world_json = json.loads((out / "world.json").read_text())
     # A landmark at a named prop sits at its base: here 3 m under the ground.
     assert world_json["landmarks"] == {"grove": [1024, 80, 1024], "cellar": [320, 32, 480]}
+    assert world_json["props"][-1]["carve"] is True and "carve" not in world_json["props"][0]
     assert world_json["props"][0] == {
         "asset": "../../oak.vox",
         "at": [1024.0, 80.0, 1024.0],

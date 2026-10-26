@@ -121,9 +121,11 @@ Caves cost bake time: a 1 km² world with 5% of it over worms bakes in about 90 
 Kiln stamps the exported assets (`export/<asset>.vox` and its manifest), so moving one doesn't re-bake the
 terrain. Export an asset before baking a world that uses it (`cubist export out/<asset>`).
 
-- `place(asset, at, rotate_y=0, name=None, sink_m=0, below_ground_m=None)`: `at` is `(x, z)` to stand it
-  on the ground (the highest point under its footprint) or `(x, y, z)` for its base; `below_ground_m`
-  puts its base that far under the ground (a torch on a cavern floor). `name` is how game code finds it.
+- `place(asset, at, rotate_y=0, name=None, sink_m=0, below_ground_m=None, carve=False)`: `at` is `(x, z)`
+  to stand it on the ground (the highest point under its footprint) or `(x, y, z)` for its base;
+  `below_ground_m` puts its base that far under the ground (a torch on a cavern floor). `name` is how game
+  code finds it. `carve` digs it into the rock: Kiln empties the world wherever the asset's box is empty, so
+  a crypt or a room placed underground is hollow (vale's crypt, joined to its cavern by a `tunnel`).
 - `scatter(asset, region, per_ha, seed=0, spacing_m=None, rotate=True, slope_max=None, height_m=None,
   avoid=None, sink_m=0.25)`: about `per_ha` per hectare over `region` (a mask, or `((x0, z0), (x1, z1))`),
   on a jittered grid at least `spacing_m` apart (default from the density), turned by random quarter turns.

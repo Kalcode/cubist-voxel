@@ -29,6 +29,7 @@ class Place:
     name: str | None
     sink_m: float
     below_ground_m: float | None = None
+    carve: bool = False
 
 
 @dataclass(frozen=True)
@@ -58,17 +59,20 @@ def place(
     name: str | None = None,
     sink_m: float = 0.0,
     below_ground_m: float | None = None,
+    carve: bool = False,
 ) -> Place:
     """One ``asset`` (a built, exported asset's name) at ``at``.
 
     (x, z) metres stands it on the ground (its footprint's highest point); (x, y, z) puts its base
     at that height. ``sink_m`` lowers it. ``below_ground_m`` puts its base that far under the
-    ground at (x, z) instead: on a cave floor, say.
+    ground at (x, z) instead: on a cave floor, say. ``carve`` digs it into the rock: Kiln empties
+    the world wherever the asset's box is empty (a crypt or a room underground).
     """
     if len(at) not in (2, 3):
         raise WorldError(f"place {asset}: at is (x, z) or (x, y, z) metres, got {at!r}")
-    return Place(asset, tuple(float(v) for v in at), _rotation(rotate_y), name, float(sink_m),
-                 None if below_ground_m is None else float(below_ground_m))  # fmt: skip
+    below = None if below_ground_m is None else float(below_ground_m)
+    at = tuple(float(v) for v in at)
+    return Place(asset, at, _rotation(rotate_y), name, float(sink_m), below, bool(carve))
 
 
 def scatter(
@@ -108,6 +112,7 @@ class Placement:
     at: tuple[float, float, float]
     rotate_y: int
     name: str | None
+    carve: bool = False
 
     def json(self, relative_to: Path, export: Path) -> dict:
         import os
@@ -119,6 +124,8 @@ class Placement:
         out = {"asset": asset, "at": [round(v, 3) for v in self.at], "rotate_y": self.rotate_y}
         if self.name:
             out["name"] = self.name
+        if self.carve:
+            out["carve"] = True
         return out
 
 
@@ -209,7 +216,7 @@ def placements(loaded, export: Path) -> list[Placement]:
                 w, d = footprint(export, prop.asset, prop.rotate_y)
                 y = float(_stand(loaded, [x], [z], w / 2, d / 2)[0])
             base = (x * VOXELS_PER_M, (y - prop.sink_m) * VOXELS_PER_M, z * VOXELS_PER_M)
-            out.append(Placement(prop.asset, base, prop.rotate_y, prop.name))
+            out.append(Placement(prop.asset, base, prop.rotate_y, prop.name, prop.carve))
         elif isinstance(prop, Scatter):
             x, z, turn = scatter_points(loaded, prop)
             if len(x) == 0:
