@@ -44,6 +44,7 @@ class Carver:
 
 class Tunnel(Carver):
     name = "tunnel"
+    label: str | None = None  # its line's name in world.json
 
     def __init__(self, points, radius_m: float, smooth: bool, below_ground: bool = False):
         pts = np.asarray(points, dtype=np.float64)
@@ -231,14 +232,21 @@ class Worms(Carver):
 
 
 def tunnel(
-    points, radius_m: float = 2.5, smooth: bool = True, below_ground: bool = False
+    points,
+    radius_m: float = 2.5,
+    smooth: bool = True,
+    below_ground: bool = False,
+    name: str | None = None,
 ) -> Tunnel:
     """A tunnel through (x, y, z) points in metres (y up), ``radius_m`` round.
 
     ``smooth`` curves it through the points. With ``below_ground``, each y is a depth under the
     ground at that point instead (negative: above it), so a mouth opens wherever the ground is.
+    ``name`` names its line in the bake's ``world.json`` (default ``tunnel1``, ``tunnel2``, ...).
     """
-    return Tunnel(points, radius_m, smooth, below_ground)
+    t = Tunnel(points, radius_m, smooth, below_ground)
+    t.label = name
+    return t
 
 
 def cavern(

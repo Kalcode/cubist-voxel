@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from cubist.build.runner import find_style, load_project_style
-from cubist.world.caves import Worms
+from cubist.world.caves import Tunnel, Worms
 from cubist.world.field import WorldError
 from cubist.world.model import LoadedWorld, Rule
 from cubist.world.sample import heights, paint, water, world_context
@@ -579,6 +579,26 @@ def sample_columns_at(
     return h * VOXELS_PER_M, s, surface(loaded, gx, gz, h, s)
 
 
+def paths_of(loaded: LoadedWorld) -> list[dict]:
+    """The world's roads, rivers and tunnels as named lines for the engine (walks, caravans): points
+    every 4 m or so in voxels, on the road or river bed, or along a tunnel's floor."""
+    out = []
+
+    def line(kind: str, name: str, pts: np.ndarray) -> None:
+        points = [[round(float(v) * VOXELS_PER_M, 2) for v in p] for p in pts]
+        out.append({"kind": kind, "name": name, "points": points})
+
+    for kind, edits in (("road", loaded.world.roads), ("river", loaded.world.rivers)):
+        for i, edit in enumerate(edits, 1):
+            p = edit.path.points
+            y = heights(loaded, p[:, 0], p[:, 1])
+            line(kind, edit.name or f"{kind}{i}", np.stack([p[:, 0], y, p[:, 1]], axis=-1))
+    tunnels = [c for c in loaded.world.caves if isinstance(c, Tunnel)]
+    for i, t in enumerate(tunnels, 1):
+        line("tunnel", t.label or f"tunnel{i}", t.points - np.array([0.0, t.radius, 0.0]))
+    return out
+
+
 def materials_of(loaded: LoadedWorld, glow: dict[str, float]) -> list[dict]:
     """The material registry for the engine: one entry per palette color, its index as the id."""
     out = []
@@ -712,7 +732,12 @@ def bake_world(
 
     export = style_path.parent / "export"
     props = [p.json(out, export) for p in placements(loaded, export)]
-    world_json = {"voxel_size_m": 1 / VOXELS_PER_M, "landmarks": landmarks, "props": props}
+    world_json = {
+        "voxel_size_m": 1 / VOXELS_PER_M,
+        "landmarks": landmarks,
+        "paths": paths_of(loaded),
+        "props": props,
+    }
     (out / "world.json").write_text(json.dumps(world_json, indent=2) + "\n")
     disk = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
     level0 = sum(s.packed for s in stats if s.level == 0)

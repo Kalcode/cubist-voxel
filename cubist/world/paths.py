@@ -191,6 +191,8 @@ def path(points, smooth: bool = True) -> Path:
 class PathEdit:
     """A river or road: lowers or levels the ground along a path and paints a strip of it."""
 
+    name: str | None = None  # its line's name in world.json
+
     def __init__(self, line: Path, width_m: float, bank_m: float | None):
         if not isinstance(line, Path):
             raise WorldError(f"expected a path(...), got {line!r}")
@@ -295,30 +297,42 @@ def river(
     bank_m: float | None = None,
     bed: Color | None = None,
     water: Color | None = None,
+    name: str | None = None,
 ) -> River:
     """A river along ``line`` (source first).
 
     A channel ``width_m`` wide and ``depth_m`` deep whose water level only falls downstream, banks
     easing out over ``bank_m`` (default: the width), its bed painted ``bed`` and filled with
-    ``water`` (solid voxels of that color).
+    ``water`` (solid voxels of that color). ``name`` names its line in the bake's ``world.json``
+    (default ``river1``, ...).
     """
     for c in (bed, water):
         if c is not None and not isinstance(c, Color):
             raise WorldError(f"river colors are palette colors such as p.water.mid, got {c!r}")
-    return River(line, width_m, depth_m, bank_m, bed, water)
+    r = River(line, width_m, depth_m, bank_m, bed, water)
+    r.name = name
+    return r
 
 
 def road(
-    line: Path, width_m: float, color: Color, bank_m: float | None = None, smooth_m: float = 30.0
+    line: Path,
+    width_m: float,
+    color: Color,
+    bank_m: float | None = None,
+    smooth_m: float = 30.0,
+    name: str | None = None,
 ) -> Road:
     """A road along ``line``.
 
     ``width_m`` of ground levelled to the road's own profile (averaged over ``smooth_m``) and
-    painted ``color``, cut and filled into the ground over ``bank_m``.
+    painted ``color``, cut and filled into the ground over ``bank_m``. ``name`` names its line in
+    the bake's ``world.json`` (default ``road1``, ...): routes for walks and caravans.
     """
     if not isinstance(color, Color):
         raise WorldError(f"road color must be a palette color such as p.stone.light, got {color!r}")
-    return Road(line, width_m, color, bank_m, smooth_m)
+    r = Road(line, width_m, color, bank_m, smooth_m)
+    r.name = name
+    return r
 
 
 class EditedGround(Field):

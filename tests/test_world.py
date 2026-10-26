@@ -613,6 +613,36 @@ def test_bake_writes_props_into_world_json(tmp_path):
         )
 
 
+def test_bake_writes_roads_rivers_and_tunnels_as_paths(tmp_path):
+    import json
+
+    from cubist.world.bake import bake_world
+
+    script = tmp_path / "ways.py"
+    script.write_text(
+        "from cubist.world import *\n\n"
+        "@world(name='ways', size_m=(128, 128))\n"
+        "def ways(p):\n"
+        "    lane = road(path([(10, 20), (120, 20)]), width_m=3, color=p.cork, name='lane')\n"
+        "    brook = river(path([(10, 90), (120, 100)]), width_m=4, depth_m=1)\n"
+        "    dig = tunnel([(60, 3, 60), (100, 6, 60)], radius_m=2, below_ground=True, name='dig')\n"
+        "    return World(ground=flat(12), surface=[p.leaf.mid], roads=[lane], rivers=[brook],\n"
+        "                 caves=[dig])\n"
+    )
+    bake_world(script, out_dir=tmp_path / "out", levels=1, workers=1, style=DEMO / "style.toml")
+    paths = json.loads((tmp_path / "out" / "world.json").read_text())["paths"]
+    assert [(p["kind"], p["name"]) for p in paths] == [
+        ("road", "lane"),
+        ("river", "river1"),
+        ("tunnel", "dig"),
+    ]
+    lane = np.array(paths[0]["points"])
+    assert lane[0, 0] == 10 * 16 and lane[-1, 0] == 120 * 16 and np.all(lane[:, 2] == 20 * 16)
+    assert np.allclose(lane[:, 1], 12 * 16, atol=1)  # on the road (the flat ground)
+    dig = np.array(paths[2]["points"])
+    assert np.isclose(dig[0, 1], (12 - 3 - 2) * 16)  # the tunnel's floor: its line, less its radius
+
+
 def test_world_lint_finds_edges_slopes_props_and_closed_caves(tmp_path):
     from cubist.world import cavern, place, scatter, tunnel
     from cubist.world.field import Custom
