@@ -447,6 +447,83 @@ linear, with `step` tracks kept as their keys. Blender imports them and matches 
 <file>` for OBJ, Qubicle, Minecraft schematics, and the other formats vengi supports. Cubist
 does not reimplement them.
 
+## Worlds
+
+Kiln's MMO world is premade, not generated at runtime (Kiln's `docs/engine/world-streaming.md`, "Premade
+maps"), so terrain joins the asset pipeline. Cubist authors a world the way it authors an asset: a script
+is the model, every build comes back as pictures and a lint report, and the output is a boring format an
+engine reads. Status: designed (Oct 25); milestone 12 below.
+
+**Scale.** An asset is one dense grid of at most 256³. A 4 × 4 km world at 1/16 m is 64,000 × 64,000
+columns, so a world is never one grid: it is a function evaluated wherever it's needed, a block of
+columns at a time, with numpy.
+
+### World scripts
+
+`worlds/<name>.py` in a project, next to `assets/`. A `@world` function returns layers:
+
+```python
+@world(name="vale", size_m=(4000, 4000), seed=1)
+def vale(p):
+    ground = fbm(scale_m=900, octaves=5, amplitude_m=60) + ridge(...)  # heights in metres
+    ground = ground.blend(height_map("maps/vale.png", low_m=0, high_m=700), mask=...)
+    ground = ground.flatten(area(...), at_m=42).river(path([...]), width_m=8, depth_m=2)
+    return World(
+        ground=ground,
+        surface=[slope_over(38, p.stone.mid), height_over(520, p.white), p.leaf.mid],
+        subsoil=[(1, p.wood.dark), p.stone.dark],         # metres under the surface
+        caves=[tunnel(path([...]), radius_m=2.5), cavern((x, y, z), radius_m=8), worms(region, ...)],
+        props=[place("cottage", at=(x, z), rotate_y=90), scatter("tree", region, per_ha=40, ...)],
+        landmarks={"spawn": (x, z), "town": (x, z)},
+    )
+```
+
+- **Ground** is a height field in metres: noise (`fbm`, `ridge`, `terrace`), painted maps (`height_map`,
+  greyscale PNG), arithmetic and `blend` by masks, and edits: `flatten` an area, cut a `river` or a `road`
+  along a path.
+- **Materials** are rules on the surface (slope, height, painted masks), first match wins, plus subsoil
+  layers by depth. Colors are palette names, as in assets.
+- **Caves** are 3D carvers: tunnels and caverns along paths and points, and noise worms in a region.
+- **Props** place built assets by name (`out/<asset>/`) at a position and rotation, snapped onto the ground,
+  or scatter them by density and rules. They stay placements: Kiln stamps them, so moving one doesn't
+  re-bake terrain.
+- **Landmarks** are named points for the engine (spawn, towns, cave mouths).
+- **Determinism:** the same script, seed and painted maps give the same world (noise from `dsl/noise.py`).
+
+### Feedback
+
+- `cubist world build worlds/<name>.py` writes `out/worlds/<name>/`: `map.png` (the whole world top-down,
+  hill-shaded, with contour lines, a ruler in metres, landmarks, props and caves drawn on), a lint report,
+  and stats (height range, slope histogram, cave volume, prop counts).
+- `cubist world render <name> --at x,z --size 64` renders a region in voxels with the asset renderer
+  (iso and top views), for close critique.
+- **Lint:** slopes too steep to walk (`[world] max_walk_slope_deg`), props sunk or floating (their footprint
+  over uneven ground), props overlapping, caves with no way in from the surface, floating rock left by
+  carving, and anything outside the world's size.
+
+### Bake
+
+`cubist world bake <name>` writes `export/worlds/<name>/` in Kiln's map format (Kiln `formats.md`, "Baked
+maps"):
+
+- **Tiles** of 64 × 64 columns per level of detail (levels 0–6), each level sampled directly at its own cell
+  size, and the far field's height grids.
+- **`map.json`** carries the material registry (id → palette name, color, glow), so an engine needs no style
+  bible.
+- **`world.json`**: props as Kiln scene placements (`asset`, `at` with the snapped y, `rotate_y`), landmarks,
+  and the voxel size.
+- **Incremental:** each tile records a hash of what it was built from; a bake rewrites only tiles whose inputs
+  changed. Tiles bake in parallel (processes).
+- Bakes are large (Kiln's valley: ~250 MiB per km²), so `export/` stays out of git.
+
+**Edits made in the game** (Kiln's save file) sit on top of the map in Kiln, so they survive a re-bake: an
+edited chunk keeps its edited voxels. Later, Kiln can log edits as operations and replay them on a new base.
+
+**The risk is speed.** Kiln's C# baker took ~35 s per km² on 10 cores. Python with numpy is expected to be
+several times slower *(estimate)*. Milestone 12b measures 1 km². If a 4 × 4 km bake would take more than
+about 30 minutes, the work splits: Cubist writes a compact description (height and material maps at about
+1 m, paths, carvers, placements) and Kiln's baker fills in the voxels.
+
 ## Build plan
 
 Build in six milestones, each usable on its own; v1 is done when an agent can take a prop brief
@@ -561,6 +638,19 @@ simulated.
    regression in dense sampling) and additions (`cubist build --check`, iteration numbers in
    build output, `joint()`, `in`/`out` easing, `burst(start=)`). Details:
    `projects/motion/eval/agent-notes.md`; GIFs to score in `projects/motion/eval/gifs/`.
+
+### Worlds (M12)
+
+12. **Worlds** — in progress. Terrain for premade game worlds (see Worlds above), toward a 4 × 4 km world
+   for Kiln: a town, a river, mountains on the horizon, a cave system.
+   - **12a. Ground and the map.** `@world`, height fields (noise, painted maps, blend, flatten), surface and
+     subsoil rules, `cubist world build` with `map.png`. Done when builds are deterministic and a golden map
+     passes.
+   - **12b. Bake, and Kiln plays it.** Tiles, `map.json` with materials, `world.json`; Kiln opens a world
+     directory. Done when Kiln walks a Cubist world, and 1 km² has been timed (the speed decision).
+   - **12c. Features.** Rivers and roads, caves, props and scatter, landmarks.
+   - **12d. Lint and region renders.**
+   - **12e. The 4 × 4 km world**, authored with the build and critique loop, baked, and walked in Kiln.
 
 ### v1 acceptance targets
 
