@@ -45,6 +45,9 @@ The world covers `[0, size_m)` on both axes. Its seed mixes with the build's (`-
 
 ## Fields
 
+`path(...).distance(max_m=1000)` is also a field: the distance to a path in metres (shape a valley
+around a river with it).
+
 A field is a value per ground column. Height fields are metres; masks are weights in [0, 1].
 
 | Field | Gives |
@@ -85,10 +88,12 @@ shows it in the far field.
 `World(caves=[...])` hollows the ground. Caves only remove ground, and the bake reaches each column's
 chunks down to the caves under it.
 
-- `tunnel(points, radius_m=2.5, smooth=True)`: a tube along `(x, y, z)` points in metres (y is height).
-  Start it above the ground to open a mouth in a hillside.
-- `cavern(center, radius_m, roughness_m=0, seed=0)`: an ellipsoid (one radius, or `(x, y, z)` radii)
-  whose walls wobble by up to `roughness_m`.
+- `tunnel(points, radius_m=2.5, smooth=True, below_ground=False)`: a tube along `(x, y, z)` points in
+  metres (y is height). With `below_ground`, each y is a depth under the ground at that point (negative:
+  above it), so a mouth opens wherever the ground is: start at `-1`.
+- `cavern(center, radius_m, roughness_m=0, seed=0, below_ground=False)`: an ellipsoid (one radius, or
+  `(x, y, z)` radii) whose walls wobble by up to `roughness_m`; `below_ground` makes the center's y a
+  depth.
 - `worms(region, depth_m=(4, 30), scale_m=24, thickness=0.08, seed=0)`: winding noise tunnels under
   `region` (`(x0, z0), (x1, z1)`), between `depth_m` metres under the ground. `scale_m` spaces them;
   `thickness` widens them. Their noise is sampled every metre and interpolated.
@@ -103,8 +108,9 @@ Caves cost bake time: a 1 km² world with 5% of it over worms bakes in about 90 
 Kiln stamps the exported assets (`export/<asset>.vox` and its manifest), so moving one doesn't re-bake the
 terrain. Export an asset before baking a world that uses it (`cubist export out/<asset>`).
 
-- `place(asset, at, rotate_y=0, name=None, sink_m=0)`: `at` is `(x, z)` to stand it on the ground (the
-  highest point under its footprint) or `(x, y, z)` for its base. `name` is how game code finds it.
+- `place(asset, at, rotate_y=0, name=None, sink_m=0, below_ground_m=None)`: `at` is `(x, z)` to stand it
+  on the ground (the highest point under its footprint) or `(x, y, z)` for its base; `below_ground_m`
+  puts its base that far under the ground (a torch on a cavern floor). `name` is how game code finds it.
 - `scatter(asset, region, per_ha, seed=0, spacing_m=None, rotate=True, slope_max=None, height_m=None,
   avoid=None, sink_m=0.25)`: about `per_ha` per hectare over `region` (a mask, or `((x0, z0), (x1, z1))`),
   on a jittered grid at least `spacing_m` apart (default from the density), turned by random quarter turns.

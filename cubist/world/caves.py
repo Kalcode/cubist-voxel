@@ -19,6 +19,10 @@ class Carver:
     max_level = 2
     name = "carver"
 
+    def resolve(self, ground_at) -> None:
+        """Turns depths below the ground into heights once the world's ground is known;
+        ``ground_at(x, z)`` gives heights (metres) for arrays."""
+
     def bounds(self, ground_range) -> tuple[float, float, float, float, float, float]:
         """(x0, y0, z0, x1, y1, z1) in metres that holds everything it carves.
 
@@ -38,17 +42,31 @@ class Carver:
 class Tunnel(Carver):
     name = "tunnel"
 
-    def __init__(self, points, radius_m: float, smooth: bool):
+    def __init__(self, points, radius_m: float, smooth: bool, below_ground: bool = False):
         pts = np.asarray(points, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 2:
             raise WorldError(f"a tunnel needs at least two (x, y, z) points, got {points!r}")
         if radius_m <= 0:
             raise WorldError(f"tunnel radius_m must be positive, got {radius_m}")
-        if smooth and len(pts) >= 3:
+        self.radius, self.below_ground, self._smooth = float(radius_m), below_ground, smooth
+        self._authored = pts.copy()
+        self._set(pts)
+
+    def _set(self, pts: np.ndarray) -> None:
+        if self._smooth and len(pts) >= 3:
             pts = _catmull_rom(pts, 2.0)
-        self.points, self.radius = pts, float(radius_m)
+        self.points = pts
         self.a, self.ab = pts[:-1], pts[1:] - pts[:-1]
         self.len2 = np.maximum((self.ab**2).sum(axis=1), 1e-12)
+
+    def resolve(self, ground_at) -> None:
+        if not self.below_ground:
+            return
+        # Depths at the authored points become heights; the curve then runs through those.
+        pts = self._authored
+        heights = ground_at(pts[:, 0], pts[:, 2]) - pts[:, 1]
+        self._set(np.stack([pts[:, 0], heights, pts[:, 2]], axis=-1))
+        self.below_ground = False
 
     def bounds(self, ground_range):
         lo, hi = self.points.min(axis=0) - self.radius, self.points.max(axis=0) + self.radius
@@ -74,7 +92,8 @@ class Tunnel(Carver):
 class Cavern(Carver):
     name = "cavern"
 
-    def __init__(self, center, radius_m, roughness_m: float, seed: int):
+    def __init__(self, center, radius_m, roughness_m: float, seed: int, below_ground: bool = False):
+        self.below_ground = below_ground
         self.c = np.asarray(center, dtype=np.float64)
         r = np.broadcast_to(np.asarray(radius_m, dtype=np.float64), (3,)).copy()
         if self.c.shape != (3,) or (r <= 0).any():
@@ -83,6 +102,12 @@ class Cavern(Carver):
                 f"got {center!r}, {radius_m!r}"
             )
         self.r, self.rough, self.seed = r, float(roughness_m), int(seed)
+
+    def resolve(self, ground_at) -> None:
+        if self.below_ground:
+            ground = float(ground_at(np.array([self.c[0]]), np.array([self.c[2]]))[0])
+            self.c = np.array([self.c[0], ground - self.c[1], self.c[2]])
+            self.below_ground = False
 
     def bounds(self, ground_range):
         lo, hi = self.c - self.r - self.rough, self.c + self.r + self.rough
@@ -156,18 +181,24 @@ class Worms(Carver):
         return self.inside(x, y, z, ground) & (self.value(x, y, z, seed) < self.thickness)
 
 
-def tunnel(points, radius_m: float = 2.5, smooth: bool = True) -> Tunnel:
+def tunnel(
+    points, radius_m: float = 2.5, smooth: bool = True, below_ground: bool = False
+) -> Tunnel:
     """A tunnel through (x, y, z) points in metres (y up), ``radius_m`` round.
 
-    ``smooth`` curves it through the points.
+    ``smooth`` curves it through the points. With ``below_ground``, each y is a depth under the
+    ground at that point instead (negative: above it), so a mouth opens wherever the ground is.
     """
-    return Tunnel(points, radius_m, smooth)
+    return Tunnel(points, radius_m, smooth, below_ground)
 
 
-def cavern(center, radius_m, roughness_m: float = 0.0, seed: int = 0) -> Cavern:
+def cavern(
+    center, radius_m, roughness_m: float = 0.0, seed: int = 0, below_ground: bool = False
+) -> Cavern:
     """A cavern: an ellipsoid at ``center`` (x, y, z metres) with ``radius_m`` (one number, or
-    (x, y, z) radii), its walls wobbling by up to ``roughness_m``."""
-    return Cavern(center, radius_m, roughness_m, seed)
+    (x, y, z) radii), its walls wobbling by up to ``roughness_m``. With ``below_ground``, the
+    center's y is a depth under the ground there."""
+    return Cavern(center, radius_m, roughness_m, seed, below_ground)
 
 
 def worms(

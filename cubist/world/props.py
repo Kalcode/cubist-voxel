@@ -28,6 +28,7 @@ class Place:
     rotate_y: int
     name: str | None
     sink_m: float
+    below_ground_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -50,15 +51,24 @@ def _rotation(rotate_y: int) -> int:
     return rotate_y
 
 
-def place(asset: str, at, rotate_y: int = 0, name: str | None = None, sink_m: float = 0.0) -> Place:
+def place(
+    asset: str,
+    at,
+    rotate_y: int = 0,
+    name: str | None = None,
+    sink_m: float = 0.0,
+    below_ground_m: float | None = None,
+) -> Place:
     """One ``asset`` (a built, exported asset's name) at ``at``.
 
     (x, z) metres stands it on the ground (its footprint's highest point); (x, y, z) puts its base
-    at that height. ``sink_m`` lowers it.
+    at that height. ``sink_m`` lowers it. ``below_ground_m`` puts its base that far under the
+    ground at (x, z) instead: on a cave floor, say.
     """
     if len(at) not in (2, 3):
         raise WorldError(f"place {asset}: at is (x, z) or (x, y, z) metres, got {at!r}")
-    return Place(asset, tuple(float(v) for v in at), _rotation(rotate_y), name, float(sink_m))
+    return Place(asset, tuple(float(v) for v in at), _rotation(rotate_y), name, float(sink_m),
+                 None if below_ground_m is None else float(below_ground_m))  # fmt: skip
 
 
 def scatter(
@@ -175,7 +185,12 @@ def placements(loaded, export: Path) -> list[Placement]:
     out: list[Placement] = []
     for prop in loaded.world.props:
         if isinstance(prop, Place):
-            if len(prop.at) == 3:
+            if prop.below_ground_m is not None:
+                x, z = prop.at[0], prop.at[-1]
+                from cubist.world.sample import heights as ground
+
+                y = float(ground(loaded, [x], [z])[0]) - prop.below_ground_m
+            elif len(prop.at) == 3:
                 x, y, z = prop.at
             else:
                 x, z = prop.at

@@ -217,6 +217,10 @@ def load_world(
     edits = [*result.rivers, *result.roads]
     ground = EditedGround(result.ground, edits) if edits else result.ground
     loaded = LoadedWorld(defn, result, palette, mix_seed(defn.seed, seed), directory, ground)
+    from cubist.world.sample import heights
+
+    for cave in result.caves:
+        cave.resolve(lambda x, z: heights(loaded, x, z))
     loaded.default_surface()
     for rule in result.surface[:-1]:
         if not isinstance(rule, Rule):

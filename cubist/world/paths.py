@@ -45,6 +45,11 @@ class Path:
     def length(self) -> float:
         return float(self.cum[-1])
 
+    def distance(self, max_m: float = 1000.0) -> Field:
+        """A field: the distance (metres) to this path, capped at ``max_m`` (shape a valley around a
+        river, say). Farther than ``max_m`` it reads ``max_m``, and is cheap to sample there."""
+        return _PathDistance(self, float(max_m))
+
     def nearest(self, x, z, reach: float) -> tuple[np.ndarray, np.ndarray]:
         """(distance, arc length of the nearest point) to the path, per (x, z); distance is inf past
         ``reach``. Grids are searched block by block, each against the segments near it."""
@@ -84,6 +89,17 @@ class Path:
         arc = self.cum[segs[k]] + u[np.arange(len(k)), k] * self.seg_len[segs[k]]
         best = np.where(best <= reach, best, np.inf)
         return best.reshape(x.shape), arc.reshape(x.shape)
+
+
+class _PathDistance(Field):
+    name = "distance"
+
+    def __init__(self, line: Path, cap: float):
+        self.path, self.cap = line, cap
+
+    def sample(self, x, z, seed):
+        d, _ = self.path.nearest(x, z, self.cap)
+        return np.minimum(d, self.cap)
 
 
 def _catmull_rom(pts: np.ndarray, spacing: float) -> np.ndarray:

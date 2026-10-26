@@ -565,3 +565,40 @@ def test_region_renders_build_the_area_like_the_bake():
     assert render_region(loaded, (128, 128), size_m=32, cut_m=12).width > 200
     with pytest.raises(WorldError, match="outside the world"):
         region_grid(loaded, (2000, 2000), size_m=32)
+
+
+def test_path_distance_fields_cap_far_away():
+    from cubist.world import path
+
+    d = path([(0, 0), (100, 0)], smooth=False).distance(max_m=50)
+    assert d.sample(
+        np.array([50.0, 50.0, 300.0]), np.array([10.0, 80.0, 0.0]), seed=0
+    ).tolist() == [10.0, 50.0, 50.0]
+
+
+def test_caves_and_props_can_be_placed_below_the_ground():
+    from cubist.world import cavern, place, tunnel
+    from cubist.world.props import placements
+
+    @world(name="deep", size_m=(256, 256))
+    def deep(p):
+        ground = flat(30) + Custom(lambda x, z, s: np.asarray(x) * 0.1, "tilt")
+        return World(
+            ground=ground,
+            surface=[p.leaf.mid],
+            caves=[tunnel([(50, -1, 50), (100, 10, 50)], radius_m=2, smooth=False,
+                          below_ground=True),
+                   cavern((100, 12, 50), radius_m=4, below_ground=True)],
+            props=[place("torch", at=(100, 50), below_ground_m=15.5)],
+        )  # fmt: skip
+
+    from cubist.world.field import Custom
+
+    loaded = load_world(deep, _demo_palette(), seed=0)
+    t, c = loaded.world.caves
+    assert t.points[0, 1] == pytest.approx(30 + 5 + 1) and t.points[-1, 1] == pytest.approx(
+        30 + 10 - 10
+    )
+    assert c.c[1] == pytest.approx(40 - 12)
+    [torch] = placements(loaded, Path("/nonexistent"))
+    assert torch.at[1] == pytest.approx((40 - 15.5) * 16)
