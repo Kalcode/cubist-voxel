@@ -71,8 +71,8 @@ class World:
     ``ground`` is the height field in metres. ``surface`` is a list of rules, first match wins,
     ending in a plain color (the default); the surface is the top ``surface_depth_m`` of ground.
     ``subsoil`` is ``(depth_m, color)`` layers under it, ending in the color that fills the rest.
-    ``rivers`` and ``roads`` cut and level the ground along paths (rivers first). ``landmarks``
-    names points (x, z) for the engine.
+    ``rivers`` and ``roads`` cut and level the ground along paths (rivers first); ``caves`` hollow
+    it out. ``landmarks`` names points (x, z) for the engine.
     """
 
     ground: Field
@@ -81,6 +81,7 @@ class World:
     surface_depth_m: float = 0.25
     rivers: Sequence = ()
     roads: Sequence = ()
+    caves: Sequence = ()
     landmarks: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
@@ -127,10 +128,28 @@ class LoadedWorld:
     seed: int
     script_dir: Path | None
     ground: Field = None  # type: ignore[assignment]  # the ground with rivers and roads applied
+    _caves: list | None = None
 
     @property
     def name(self) -> str:
         return self.defn.name
+
+    def ground_range(self, x0: float, z0: float, x1: float, z1: float) -> tuple[float, float]:
+        """The ground's (lowest, highest) height over an area, sampled about every 4 m."""
+        nx = int(min(max((x1 - x0) / 4.0, 2), 512))
+        nz = int(min(max((z1 - z0) / 4.0, 2), 512))
+        gx, gz = np.meshgrid(np.linspace(x0, x1, nx), np.linspace(z0, z1, nz))
+        h = self.ground.sample(gx, gz, self.seed)
+        return float(h.min()), float(h.max())
+
+    def cave_bounds(self) -> list:
+        """Each cave with the box (x0, y0, z0, x1, y1, z1 metres) holding what it carves; cached."""
+        if self._caves is None:
+            from cubist.world.sample import world_context
+
+            with world_context(self):
+                self._caves = [(c, c.bounds(self.ground_range)) for c in self.world.caves]
+        return self._caves
 
     @property
     def size_m(self) -> tuple[float, float]:
@@ -180,9 +199,15 @@ def load_world(
             f"world {defn.name}: ground must be a field (noise, flat, height_map, ...), "
             f"got {result.ground!r}"
         )
+    from cubist.world.caves import Carver
     from cubist.world.paths import EditedGround, River, Road
 
-    for kind, items, cls in (("rivers", result.rivers, River), ("roads", result.roads, Road)):
+    kinds = (
+        ("rivers", result.rivers, River),
+        ("roads", result.roads, Road),
+        ("caves", result.caves, Carver),
+    )
+    for kind, items, cls in kinds:
         for item in items:
             if not isinstance(item, cls):
                 raise WorldError(

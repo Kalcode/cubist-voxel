@@ -22,6 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from cubist.build.runner import find_style, load_project_style
+from cubist.world.caves import Worms
 from cubist.world.field import WorldError
 from cubist.world.model import LoadedWorld, Rule
 from cubist.world.sample import heights, paint, water, world_context
@@ -259,11 +260,112 @@ class TileStats:
     chunks: int
 
 
+WORM_STEP = 16  # worm noise is sampled every 16 cells (1 m at level 0) and interpolated
+
+
+def _upsample(v: np.ndarray, n: int, step: int) -> np.ndarray:
+    """Values on a lattice every ``step`` cells (``n / step + 1`` points per axis, last three axes)
+    at the ``n`` cell centers between, trilinearly."""
+    idx = (np.arange(n) + 0.5) / step
+    i0 = np.minimum(np.floor(idx).astype(int), v.shape[-1] - 2)
+    f = idx - i0
+    for axis in (-1, -2, -3):
+        a = np.take(v, i0, axis=axis)
+        b = np.take(v, i0 + 1, axis=axis)
+        shape = [1] * v.ndim
+        shape[axis] = n
+        v = a * (1 - f.reshape(shape)) + b * f.reshape(shape)
+    return v
+
+
+class WormLattice:
+    """A worm carver's noise for a row of chunk columns, sampled in one go.
+
+    Points every ``WORM_STEP`` cells (aligned to them); each column slices its part.
+    """
+
+    def __init__(
+        self, carver: Worms, level: int, x0: int, z0: int, nx: int, nz: int, top, seed: int
+    ):
+        cell_m = (1 << level) / VOXELS_PER_M
+        inside = top > -1e8
+        y0, y1 = carver.band(
+            float(top[inside].min()) / VOXELS_PER_M, float(top[inside].max()) / VOXELS_PER_M
+        )
+        self.ly0 = math.floor(y0 / cell_m / WORM_STEP) - 1
+        ly1 = math.ceil(y1 / cell_m / WORM_STEP) + 1
+        self.lx0, self.lz0 = x0 // WORM_STEP, z0 // WORM_STEP
+        lx = (self.lx0 + np.arange(nx // WORM_STEP + 1)) * WORM_STEP * cell_m
+        lz = (self.lz0 + np.arange(nz // WORM_STEP + 1)) * WORM_STEP * cell_m
+        ly = (self.ly0 + np.arange(ly1 - self.ly0 + 1)) * WORM_STEP * cell_m
+        self.values = carver.value(
+            lx.reshape(1, 1, -1), ly.reshape(1, -1, 1), lz.reshape(-1, 1, 1), seed
+        )
+
+    def chunk_values(self, cx0: int, cz0: int, rows: np.ndarray) -> np.ndarray:
+        """The lattice over chunks starting at cell rows ``rows`` of the column at (cx0, cz0).
+
+        ``[chunk, z, y, x]``, ``N / WORM_STEP + 1`` points a side; unsampled points are far above 1.
+        """
+        k = N // WORM_STEP
+        xs = slice(cx0 // WORM_STEP - self.lx0, cx0 // WORM_STEP - self.lx0 + k + 1)
+        zs = slice(cz0 // WORM_STEP - self.lz0, cz0 // WORM_STEP - self.lz0 + k + 1)
+        out = np.full((len(rows), k + 1, k + 1, k + 1), 9.0)
+        for i, r in enumerate(rows):
+            y = r // WORM_STEP - self.ly0
+            lo, hi = max(y, 0), min(y + k + 1, self.values.shape[1])
+            if lo < hi:
+                out[i, :, lo - y : hi - y, :] = self.values[zs, lo:hi, xs]
+        return out
+
+
+def carve_column(
+    cells, caves, level: int, min_cy: int, cx0: int, cz0: int, top, seed: int, lattices=None
+) -> None:
+    """Hollows a chunk column's cells ``[chunk, z, y, x]`` where its caves carve (in place).
+    ``lattices`` holds each worm carver's noise for the column's row (``WormLattice``)."""
+    cell_m = (1 << level) / VOXELS_PER_M
+    count = cells.shape[0]
+    x = ((cx0 + np.arange(N) + 0.5) * cell_m).reshape(1, 1, 1, N)
+    z = ((cz0 + np.arange(N) + 0.5) * cell_m).reshape(1, N, 1, 1)
+    ground = (top / VOXELS_PER_M).reshape(1, N, 1, N)
+    for carver, (_, y0, _, _, y1, _) in caves:
+        if isinstance(carver, Worms):  # this column's own band under its ground
+            y0, y1 = carver.band(float(ground.min()), float(ground.max()))
+        chunk_lo = (min_cy + np.arange(count)) * N * cell_m
+        sub = np.flatnonzero((chunk_lo < y1) & (chunk_lo + N * cell_m > y0))
+        if len(sub) == 0:
+            continue
+        rows = (min_cy + sub)[:, None] * N
+        y = ((rows + np.arange(N) + 0.5) * cell_m).reshape(len(sub), 1, N, 1)
+        if isinstance(carver, Worms):
+            inside = carver.inside(x, y, z, ground)
+            if not inside.any():
+                continue
+            # The noise is smooth: sampled on a coarse lattice per row of columns, interpolated.
+            if lattices is not None and carver in lattices:
+                coarse = lattices[carver].chunk_values(cx0, cz0, rows[:, 0])
+            else:
+                lattice = np.arange(0, N + 1, WORM_STEP)
+                lx = ((cx0 + lattice) * cell_m).reshape(1, 1, 1, -1)
+                lz = ((cz0 + lattice) * cell_m).reshape(1, -1, 1, 1)
+                ly = ((rows + lattice) * cell_m).reshape(len(sub), 1, -1, 1)
+                coarse = carver.value(lx, ly, lz, seed)
+            value = _upsample(coarse, N, WORM_STEP)
+            hollow = inside & (value < carver.thickness)
+        else:
+            hollow = carver.carve(x, y, z, ground, seed)
+        block = cells[sub]
+        block[np.broadcast_to(hollow, block.shape)] = 0
+        cells[sub] = block
+
+
 def bake_tile(
     loaded: LoadedWorld, out: Path, level: int, tx: int, tz: int, layers: Layers
 ) -> TileStats:
     """Writes ``L{level}/{tx}_{tz}.tile``: 64 × 64 columns, those outside the world left empty."""
     size_cells = [int(round(s * VOXELS_PER_M)) >> level for s in loaded.size_m]
+    caves = loaded.cave_bounds()
     entries = []
     blobs: list[bytes] = []
     raw_total = chunks = 0
@@ -275,6 +377,16 @@ def bake_tile(
             continue
         x0 = tx * TILE_COLUMNS * N
         h, _, surf, wet, wet_color = sample_columns(loaded, level, x0, cz0, TILE_COLUMNS * N, N)
+        # Worm noise for the whole row at once (one call instead of one per column).
+        row_m = (x0 * (1 << level) / VOXELS_PER_M, cz0 * (1 << level) / VOXELS_PER_M)
+        row_w = TILE_COLUMNS * N * (1 << level) / VOXELS_PER_M
+        lattices = {
+            c: WormLattice(c, level, x0, cz0, TILE_COLUMNS * N, N, h, loaded.seed)
+            for c, b in caves
+            if isinstance(c, Worms) and level <= c.max_level
+            and b[0] < row_m[0] + row_w and b[3] > row_m[0]
+            and b[2] < row_m[1] + N * (1 << level) / VOXELS_PER_M and b[5] > row_m[1]
+        }  # fmt: skip
         for col in range(TILE_COLUMNS):
             cx0 = x0 + col * N
             if cx0 >= size_cells[0] or cx0 < 0:
@@ -292,10 +404,34 @@ def bake_tile(
             cell = 1 << level
             hi = max(top[inside].max(), water_top[inside].max()) / cell
             lo = (top[inside].min() - layers.deepest - cell) / cell
+            # Caves under this chunk column reach the bounds down to their floor.
+            x_lo, z_lo = cx0 * cell / VOXELS_PER_M, cz0 * cell / VOXELS_PER_M
+            x_hi, z_hi = x_lo + N * cell / VOXELS_PER_M, z_lo + N * cell / VOXELS_PER_M
+            here = [
+                (c, b)
+                for c, b in caves
+                if level <= c.max_level
+                and b[0] < x_hi
+                and b[3] > x_lo
+                and b[2] < z_hi
+                and b[5] > z_lo
+            ]
+            if here:
+                floor_m = min(
+                    c.band(top[inside].min() / VOXELS_PER_M, 0)[0] if isinstance(c, Worms) else b[1]
+                    for c, b in here
+                )
+                lo = min(lo, floor_m * VOXELS_PER_M / cell - 1)
             # Below min_cy every cell is deeper than the last band (one cell of slack for ties).
             min_cy = math.floor((lo - 1) / N)
             max_cy = max(math.ceil(hi / N), min_cy + 1)
             cells = column_cells(top, colors, min_cy, max_cy, level, layers, water_top, water_color)
+            if here:
+                carve_column(cells, here, level, min_cy, cx0, cz0, top, loaded.seed, lattices)
+                # Chunks at the bottom the caves missed are all rock again: back under the bounds.
+                rock = (cells.reshape(len(cells), -1) == layers.rest).all(axis=1)
+                keep = int(np.argmin(rock[:-1])) if not rock[:-1].all() else len(cells) - 1
+                cells, min_cy = cells[keep:], min_cy + keep
             payloads = encode_chunks(cells)
             raw = b"".join(struct.pack("<I", len(p)) + p for p in payloads)
             blob = zlib.compress(raw, DEFLATE_LEVEL)

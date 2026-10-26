@@ -3,8 +3,8 @@
 Worlds are terrain for premade game worlds; [design.md](design.md), "Worlds", says why and how they fit
 in. A world script lives in `worlds/<name>.py` of a project and starts with `from cubist.world import *`.
 Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a,
-12b and part of 12c (ground, surface rules, rivers and roads, the map, the bake); caves, props and lint
-come next.
+12b and most of 12c (ground, surface rules, rivers, roads, caves, the map, the bake); props and lint come
+next.
 
 ```python
 from cubist.world import *
@@ -79,6 +79,23 @@ them. Rivers and roads follow paths, in `World(rivers=[...], roads=[...])` (rive
 
 The map draws water in its own color, a little darker where it's deep; the bake fills it as voxels and
 shows it in the far field.
+
+## Caves
+
+`World(caves=[...])` hollows the ground. Caves only remove ground, and the bake reaches each column's
+chunks down to the caves under it.
+
+- `tunnel(points, radius_m=2.5, smooth=True)`: a tube along `(x, y, z)` points in metres (y is height).
+  Start it above the ground to open a mouth in a hillside.
+- `cavern(center, radius_m, roughness_m=0, seed=0)`: an ellipsoid (one radius, or `(x, y, z)` radii)
+  whose walls wobble by up to `roughness_m`.
+- `worms(region, depth_m=(4, 30), scale_m=24, thickness=0.08, seed=0)`: winding noise tunnels under
+  `region` (`(x0, z0), (x1, z1)`), between `depth_m` metres under the ground. `scale_m` spaces them;
+  `thickness` widens them. Their noise is sampled every metre and interpolated.
+
+Tunnels and caverns carve up to level of detail 2, so a mouth shows from a distance; worms only at level
+0. The map draws caves over the ground: tunnels as lines, caverns as outlines, worm regions dashed.
+Caves cost bake time: a 1 km² world with 5% of it over worms bakes in about 90 s instead of 55.
 
 ## Surface rules
 

@@ -79,6 +79,7 @@ def render_map(loaded: LoadedWorld) -> WorldMap:
     body = np.clip(rgb, 0, 255).astype(np.uint8)
 
     canvas = _frame(loaded, body, mpp, contour, hm, surf)
+    _caves(canvas, loaded, mpp)
     _landmarks(canvas, loaded, mpp)
     return WorldMap(Image.fromarray(canvas), mpp, hm, slope, surf, contour)
 
@@ -154,6 +155,42 @@ def _legend(loaded: LoadedWorld, surf: np.ndarray, width: int) -> np.ndarray:
         legend[y : y + text_height(), 0:10] = table[by_name[name]][:3]
         draw_text(legend, 14, y, f"{name}  {pct:.1f}%", _INK)
     return legend
+
+
+_CAVE = np.array([214, 120, 255], dtype=np.uint8)
+
+
+def _plot(
+    canvas: np.ndarray, xs: np.ndarray, zs: np.ndarray, mpp: float, dashed: bool = False
+) -> None:
+    """Draws a polyline through world points (metres) in the cave color, densely sampled."""
+    pts = np.stack([xs, zs], axis=-1)
+    for a, b in zip(pts[:-1], pts[1:], strict=False):
+        n = max(2, int(np.hypot(*(b - a)) / mpp * 2))
+        t = np.linspace(0.0, 1.0, n)[:, None]
+        line = a + (b - a) * t
+        px = (MARGIN_LEFT + line[:, 0] / mpp).astype(int)
+        py = (MARGIN_TOP + line[:, 1] / mpp).astype(int)
+        keep = (px >= 0) & (px < canvas.shape[1]) & (py >= 0) & (py < canvas.shape[0])
+        if dashed:
+            keep &= (np.arange(n) // 6) % 2 == 0
+        canvas[py[keep], px[keep]] = _CAVE
+
+
+def _caves(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:
+    """Caves seen through the ground: tunnels as lines, caverns as outlines, worm regions dashed."""
+    from cubist.world.caves import Cavern, Tunnel, Worms
+
+    for cave in loaded.world.caves:
+        if isinstance(cave, Tunnel):
+            _plot(canvas, cave.points[:, 0], cave.points[:, 2], mpp)
+        elif isinstance(cave, Cavern):
+            a = np.linspace(0, 2 * np.pi, 64)
+            _plot(canvas, cave.c[0] + cave.r[0] * np.cos(a), cave.c[2] + cave.r[2] * np.sin(a), mpp)
+        elif isinstance(cave, Worms):
+            xs = np.array([cave.x0, cave.x1, cave.x1, cave.x0, cave.x0])
+            zs = np.array([cave.z0, cave.z0, cave.z1, cave.z1, cave.z0])
+            _plot(canvas, xs, zs, mpp, dashed=True)
 
 
 def _landmarks(canvas: np.ndarray, loaded: LoadedWorld, mpp: float) -> None:

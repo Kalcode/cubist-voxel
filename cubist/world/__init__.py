@@ -2,6 +2,7 @@
 ``from cubist.world import *``."""
 
 from cubist.world.build import WorldBuild, build_world, load_script
+from cubist.world.caves import cavern, tunnel, worms
 from cubist.world.field import (
     Field,
     WorldError,
@@ -36,6 +37,7 @@ __all__ = [
     "WorldDef",
     "WorldError",
     "build_world",
+    "cavern",
     "circle",
     "flat",
     "height_map",
@@ -52,6 +54,8 @@ __all__ = [
     "river",
     "road",
     "slope_over",
+    "tunnel",
     "where",
     "world",
+    "worms",
 ]

@@ -322,3 +322,72 @@ def _demo_palette() -> Palette:
     from cubist.build.runner import load_project_style
 
     return load_project_style(DEMO / "style.toml").palette
+
+
+def test_carvers_say_where_the_air_is():
+    from cubist.world import cavern, tunnel, worms
+
+    t = tunnel([(0, 10, 0), (20, 10, 0)], radius_m=2, smooth=False)
+    air = t.carve(
+        np.array([10.0, 10.0, 10.0]), np.array([10.0, 11.9, 12.1]), np.zeros(3), 0, seed=0
+    )
+    assert air.tolist() == [True, True, False]
+    c = cavern((50, 20, 50), radius_m=(8, 4, 8))
+    assert c.carve(
+        np.array([50.0, 57.0, 50.0]), np.array([20.0, 20.0, 25.0]), np.full(3, 50.0), 0, 0
+    ).tolist() == [True, True, False]
+    rough = cavern((50, 20, 50), radius_m=8, roughness_m=2, seed=1)
+    probe = np.linspace(40, 60, 41)
+    assert (
+        rough.carve(probe, np.full(41, 20.0), np.full(41, 50.0), 0, 0).sum()
+        != c.carve(probe, np.full(41, 20.0), np.full(41, 50.0), 0, 0).sum()
+    )
+    w = worms(((0, 0), (100, 100)), depth_m=(4, 20), scale_m=16, thickness=0.2, seed=3)
+    xs, ys, zs = np.meshgrid(
+        np.linspace(1, 99, 30), np.linspace(-40, 60, 30), np.linspace(1, 99, 30)
+    )
+    hollow = w.carve(xs, ys, zs, 30.0, seed=0)
+    assert hollow.any()
+    depth = 30.0 - ys[hollow]
+    assert depth.min() >= 4 and depth.max() <= 20  # only in the band under the ground
+    assert np.array_equal(hollow, w.carve(xs, ys, zs, 30.0, seed=0))
+
+
+def test_baked_caves_are_hollow_below_the_surface(tmp_path):
+    import struct
+    import zlib
+
+    from cubist.world import cavern, tunnel
+    from cubist.world.bake import N, bake_tile, decode_chunk, layers_of
+
+    @world(name="caves", size_m=(128, 128))
+    def caves(p):
+        return World(
+            ground=flat(40),
+            surface=[p.leaf.mid],
+            subsoil=[p.stone.dark],
+            caves=[
+                cavern((64, 25, 64), radius_m=6),
+                tunnel([(64, 25, 64), (64, 25, 120)], radius_m=2),
+            ],
+        )
+
+    loaded = load_world(caves, _demo_palette(), seed=0)
+    bake_tile(loaded, tmp_path, 0, 0, 0, layers_of(loaded))
+    tile = (tmp_path / "L0" / "0_0.tile").read_bytes()
+    cx = cz = 64 * 16 // N  # the chunk column over the cavern's middle
+    min_cy, max_cy, _, _, off, length, _ = struct.unpack_from(
+        "<iiHHIII", tile, 16 + 24 * (cx + 64 * cz)
+    )
+    assert min_cy * N <= (25 - 6) * 16  # the bounds reach down to the cavern's floor
+    raw = zlib.decompress(tile[off : off + length])
+    cells, at = [], 0
+    for _ in range(min_cy, max_cy):
+        n = struct.unpack_from("<I", raw, at)[0]
+        cells.append(decode_chunk(raw[at + 4 : at + 4 + n]))
+        at += 4 + n
+    column = np.concatenate(cells, axis=1)[0, :, 0]  # one voxel column, bottom to top
+    y = np.arange(min_cy * N, max_cy * N)
+    assert (column[(y > 25 * 16 - 50) & (y < 25 * 16 + 50)] == 0).all()  # hollow around 25 m
+    assert (column[(y > 25 * 16 + 120) & (y < 40 * 16)] != 0).all()  # solid rock over it
+    assert y[-1] == 40 * 16 - 1 and column[-1] != 0  # the column ends with the ground's top voxel
