@@ -346,6 +346,7 @@ def cmd_world_bake(args: argparse.Namespace) -> int:
                          seed=args.seed, style=args.style, progress=progress,
                          region=region)  # fmt: skip
     print(summary.line())
+    print(summary.levels_line())
     print(f"  {summary.out}")
     return 0
 

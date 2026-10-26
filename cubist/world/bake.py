@@ -16,7 +16,7 @@ import struct
 import time
 import zlib
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -262,6 +262,7 @@ class TileStats:
     raw: int
     packed: int
     chunks: int
+    seconds: float = 0.0
 
 
 WORM_STEP = 16  # worm noise is sampled every 16 cells (1 m at level 0) and interpolated
@@ -441,6 +442,7 @@ def bake_tile(
     loaded: LoadedWorld, out: Path, level: int, tx: int, tz: int, layers: Layers
 ) -> TileStats:
     """Writes ``L{level}/{tx}_{tz}.tile``: 64 × 64 columns, those outside the world left empty."""
+    started = time.perf_counter()
     caves = loaded.cave_bounds()
     entries = []
     blobs: list[bytes] = []
@@ -471,7 +473,7 @@ def bake_tile(
             f.write(_ENTRY.pack(*e))
         for blob in blobs:
             f.write(blob)
-    return TileStats(level, raw_total, offset, chunks)
+    return TileStats(level, raw_total, offset, chunks, time.perf_counter() - started)
 
 
 # ---- The world --------------------------------------------------------------------------------
@@ -592,6 +594,14 @@ class BakeSummary:
     disk_bytes: int
     level0_bytes: int
     km2: float
+    level_seconds: dict[int, tuple[int, float]] = field(default_factory=dict)  # level: (tiles, s)
+
+    def levels_line(self) -> str:
+        """Tiles and worker time per level (summed over processes)."""
+        return "  by level: " + ", ".join(
+            f"L{k} {n} tiles {s:.0f} s ({s / n:.2f} s each)"
+            for k, (n, s) in sorted(self.level_seconds.items())
+        )
 
     def line(self) -> str:
         return (
@@ -700,4 +710,10 @@ def bake_world(
     level0 = sum(s.packed for s in stats if s.level == 0)
     chunks, raw = sum(s.chunks for s in stats), sum(s.raw for s in stats)
     seconds = time.perf_counter() - started
-    return BakeSummary(loaded.name, out, seconds, len(tasks), chunks, raw, disk, level0, km2)
+    by_level: dict[int, tuple[int, float]] = {}
+    for st in stats:
+        n, t = by_level.get(st.level, (0, 0.0))
+        by_level[st.level] = (n + 1, t + st.seconds)
+    return BakeSummary(
+        loaded.name, out, seconds, len(tasks), chunks, raw, disk, level0, km2, by_level
+    )

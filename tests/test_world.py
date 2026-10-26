@@ -202,6 +202,7 @@ def test_bake_writes_kiln_tiles_matching_the_ground(tmp_path):
     assert info["levels"] == 2 and info["compression"] == "deflate" and info["max_x"] == 128 * 16
     assert {m["name"] for m in info["material_registry"]} >= {"leaf.mid", "stone.dark"}
     assert len(info["far"]) == 6 and summary.chunks > 0
+    assert set(summary.level_seconds) == {0, 1} and "L1" in summary.levels_line()
     world_json = json.loads((tmp_path / "a" / "world.json").read_text())
     assert set(world_json["landmarks"]) == {"spawn"}
 
