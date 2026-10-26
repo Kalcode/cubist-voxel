@@ -329,6 +329,9 @@ def cmd_world_build(args: argparse.Namespace) -> int:
     print(f"  size {st['size_m'][0]:g} x {st['size_m'][1]:g} m, height {h['min']}..{h['max']} m")
     print("  slopes: " + ", ".join(f"{k}° {v}%" for k, v in st["slope_pct"].items()))
     print("  surface: " + ", ".join(f"{k} {v}%" for k, v in st["surface_pct"].items()))
+    if st.get("props"):
+        print("  props: " + ", ".join(f"{k} {v}" for k, v in st["props"].items()))
+    print(out.lint.summary())
     return 0
 
 
@@ -339,6 +342,22 @@ def cmd_world_bake(args: argparse.Namespace) -> int:
                          seed=args.seed, style=args.style)  # fmt: skip
     print(summary.line())
     print(f"  {summary.out}")
+    return 0
+
+
+def cmd_world_render(args: argparse.Namespace) -> int:
+    from cubist.world.build import load_script
+    from cubist.world.region import render_region
+
+    loaded = load_script(args.script, args.seed, args.style)
+    x, z = (float(v) for v in args.at.split(","))
+    image = render_region(loaded, (x, z), args.size, args.cut)
+    out = args.out or Path(args.script).resolve().parent.parent / "out" / "worlds" / loaded.name
+    out.mkdir(parents=True, exist_ok=True)
+    cut = "" if args.cut is None else f"-cut{args.cut:g}"
+    path = out / f"region-{x:g}-{z:g}{cut}.png"
+    image.save(path)
+    print(f"rendered {loaded.name} at ({x:g}, {z:g}), {args.size:g} m: {path}")
     return 0
 
 
@@ -468,6 +487,17 @@ def parser() -> argparse.ArgumentParser:
     wb.add_argument("--out", type=Path, help="output root (default: <project>/out/worlds)")
     wb.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
     wb.set_defaults(fn=cmd_world_build)
+    wr = w_sub.add_parser("render", help="render part of a world in voxels (iso and top views)")
+    wr.add_argument("script", type=Path)
+    wr.add_argument("--at", required=True, help="x,z metres: the middle of the area")
+    wr.add_argument("--size", type=float, default=64.0, help="metres across (default 64)")
+    wr.add_argument(
+        "--cut", type=float, help="remove everything above this height (m): see into caves"
+    )
+    wr.add_argument("--style", type=Path, help="style.toml (default: nearest above the script)")
+    wr.add_argument("--out", type=Path, help="output dir (default: <project>/out/worlds/<name>)")
+    wr.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
+    wr.set_defaults(fn=cmd_world_render)
     wk = w_sub.add_parser(
         "bake", help="bake a world into Kiln's map format (tiles, map.json, world.json)"
     )

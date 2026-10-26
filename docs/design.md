@@ -676,7 +676,10 @@ simulated.
      - **In Kiln:** 2,981 scattered oaks stamp in 98 ms. Distant chunks under props are generated and
        stamped with coarse copies of the prefabs (Kiln's `WorldStore.CoarseStamps`) instead of downsampling
        eight finer chunks recursively: settling a view went from 25.5 s to 0.7 s.
-   - **12d. Lint and region renders.**
+   - **12d. Lint and region renders** — done. World lint (bounds, edges, slopes near landmarks, props on
+     uneven ground or overlapping, caves with no way in) prints with every world build; `cubist world
+     render` draws an area in voxels, with a cut height for looking into caves. The bake and the region
+     render share one per-column builder (`chunk_row`).
    - **12e. The 4 × 4 km world**, authored with the build and critique loop, baked, and walked in Kiln.
 
 ### v1 acceptance targets

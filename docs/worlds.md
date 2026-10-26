@@ -3,8 +3,8 @@
 Worlds are terrain for premade game worlds; [design.md](design.md), "Worlds", says why and how they fit
 in. A world script lives in `worlds/<name>.py` of a project and starts with `from cubist.world import *`.
 Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a,
-12b and 12c (ground, surface rules, rivers, roads, caves, props, the map, the bake); lint and region
-renders come next.
+12b, 12c and 12d (ground, surface rules, rivers, roads, caves, props, the map, lint, region renders, the
+bake); the 4 × 4 km world is next.
 
 ```python
 from cubist.world import *
@@ -132,6 +132,26 @@ asset.
 - **The map:** the whole world top-down, hill-shaded from the top-left, with contour lines, a ruler in
   metres, landmarks, and a legend of surface colors with their share of the ground.
 - **The stats:** height range, slope bands (0–15°, 15–30°, 30–45°, 45°+) and surface shares.
+
+## Lint and close looks
+
+`cubist world build` lints the world and prints the findings (also in `lint.json`):
+
+| Check | Finds | Severity |
+| --- | --- | --- |
+| bounds | Landmarks or placed props outside the world (rivers or roads leaving it: info) | Error |
+| edge | Landmarks within 400 m of the edge, where the engine shows the world's end | Warning |
+| slope | Ground within 20 m of a landmark steeper than 45°; the share of all ground that steep (info) | Warning |
+| uneven | A placed prop whose footprint's ground falls more than 1 m (it floats on the low side) | Warning |
+| overlap | Placed props overlapping, and scattered props growing into a placed one | Warning |
+| cave | A cavern or tunnel with no way in from the surface | Warning |
+
+Props are checked against their exported manifests; until they're exported, lint says so and skips them.
+
+`cubist world render worlds/<name>.py --at x,z [--size 64] [--cut y]` draws an area in voxels (iso and top
+views, `out/worlds/<name>/region-x-z.png`), built as the bake builds it, at the finest level that fits 256
+cells. `--cut` removes everything above a height in metres, to look into caves from above. Props aren't
+drawn in it yet.
 
 ## Baking for Kiln
 

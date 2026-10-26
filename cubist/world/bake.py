@@ -183,8 +183,10 @@ def sample_columns(loaded: LoadedWorld, level: int, x0: int, z0: int, nx: int, n
         u = np.broadcast_to(cx / step - lx0, (nz, nx))
         v = np.broadcast_to((cz / step - lz0)[:, None], (nz, nx))
     else:
-        gx, gz = np.meshgrid(np.concatenate([[cx[0] - step], cx, [cx[-1] + step]]),
-                             np.concatenate([[cz[0] - step], cz, [cz[-1] + step]]))  # fmt: skip
+        gx, gz = np.meshgrid(
+            np.concatenate([[cx[0] - step], cx, [cx[-1] + step]]),
+            np.concatenate([[cz[0] - step], cz, [cz[-1] + step]]),
+        )
         u = np.broadcast_to(np.arange(nx) + 1.0, (nz, nx))
         v = np.broadcast_to((np.arange(nz) + 1.0)[:, None], (nz, nx))
     grid = heights(loaded, gx, gz)
@@ -360,11 +362,81 @@ def carve_column(
         cells[sub] = block
 
 
+def chunk_row(
+    loaded: LoadedWorld, level: int, x0: int, cz0: int, columns: int, layers: Layers, caves=None
+):
+    """The chunk columns ``[x0, x0 + 32 · columns)`` × ``[cz0, cz0 + 32)`` (that level's cells).
+
+    For each, ``(min_cy, max_cy, cells [chunk, z, y, x])``, or None past the world's edge.
+    """
+    size_cells = [int(round(s * VOXELS_PER_M)) >> level for s in loaded.size_m]
+    caves = loaded.cave_bounds() if caves is None else caves
+    if cz0 >= size_cells[1] or cz0 < 0:
+        return [None] * columns
+    h, _, surf, wet, wet_color = sample_columns(loaded, level, x0, cz0, columns * N, N)
+    cell = 1 << level
+    # Worm noise for the whole row at once (one call instead of one per column).
+    row_x, row_z = x0 * cell / VOXELS_PER_M, cz0 * cell / VOXELS_PER_M
+    row_w, row_d = columns * N * cell / VOXELS_PER_M, N * cell / VOXELS_PER_M
+    lattices = {
+        c: WormLattice(c, level, x0, cz0, columns * N, N, h, loaded.seed)
+        for c, b in caves
+        if isinstance(c, Worms)
+        and level <= c.max_level
+        and b[0] < row_x + row_w
+        and b[3] > row_x
+        and b[2] < row_z + row_d
+        and b[5] > row_z
+    }
+    out = []
+    for col in range(columns):
+        cx0 = x0 + col * N
+        if cx0 >= size_cells[0] or cx0 < 0:
+            out.append(None)
+            continue
+        top = h[:, col * N : (col + 1) * N].copy()
+        colors = surf[:, col * N : (col + 1) * N]
+        water_top = wet[:, col * N : (col + 1) * N]
+        water_color = wet_color[:, col * N : (col + 1) * N]
+        # Columns past the world's edge (a chunk column straddling it) are air.
+        outside_x = cx0 + np.arange(N) >= size_cells[0]
+        outside_z = cz0 + np.arange(N) >= size_cells[1]
+        top[outside_z[:, None] | outside_x[None, :]] = -1e9
+        inside = top > -1e8
+        hi = max(top[inside].max(), water_top[inside].max()) / cell
+        lo = (top[inside].min() - layers.deepest - cell) / cell
+        # Caves under this chunk column reach the bounds down to their floor.
+        x_lo, z_lo = cx0 * cell / VOXELS_PER_M, cz0 * cell / VOXELS_PER_M
+        x_hi, z_hi = x_lo + N * cell / VOXELS_PER_M, z_lo + N * cell / VOXELS_PER_M
+        here = [
+            (c, b)
+            for c, b in caves
+            if level <= c.max_level and b[0] < x_hi and b[3] > x_lo and b[2] < z_hi and b[5] > z_lo
+        ]
+        if here:
+            floor_m = min(
+                c.band(top[inside].min() / VOXELS_PER_M, 0)[0] if isinstance(c, Worms) else b[1]
+                for c, b in here
+            )
+            lo = min(lo, floor_m * VOXELS_PER_M / cell - 1)
+        # Below min_cy every cell is deeper than the last band (one cell of slack for ties).
+        min_cy = math.floor((lo - 1) / N)
+        max_cy = max(math.ceil(hi / N), min_cy + 1)
+        cells = column_cells(top, colors, min_cy, max_cy, level, layers, water_top, water_color)
+        if here:
+            carve_column(cells, here, level, min_cy, cx0, cz0, top, loaded.seed, lattices)
+            # Chunks at the bottom the caves missed are all rock again: back under the bounds.
+            rock = (cells.reshape(len(cells), -1) == layers.rest).all(axis=1)
+            keep = int(np.argmin(rock[:-1])) if not rock[:-1].all() else len(cells) - 1
+            cells, min_cy = cells[keep:], min_cy + keep
+        out.append((min_cy, max_cy, cells))
+    return out
+
+
 def bake_tile(
     loaded: LoadedWorld, out: Path, level: int, tx: int, tz: int, layers: Layers
 ) -> TileStats:
     """Writes ``L{level}/{tx}_{tz}.tile``: 64 × 64 columns, those outside the world left empty."""
-    size_cells = [int(round(s * VOXELS_PER_M)) >> level for s in loaded.size_m]
     caves = loaded.cave_bounds()
     entries = []
     blobs: list[bytes] = []
@@ -372,66 +444,13 @@ def bake_tile(
     offset = _HEADER.size + _ENTRY.size * TILE_COLUMNS * TILE_COLUMNS
     for row in range(TILE_COLUMNS):
         cz0 = (tz * TILE_COLUMNS + row) * N
-        if cz0 >= size_cells[1] or cz0 < 0:
-            entries.extend([(0, 0, 0, 0, 0, 0, 0)] * TILE_COLUMNS)
-            continue
-        x0 = tx * TILE_COLUMNS * N
-        h, _, surf, wet, wet_color = sample_columns(loaded, level, x0, cz0, TILE_COLUMNS * N, N)
-        # Worm noise for the whole row at once (one call instead of one per column).
-        row_m = (x0 * (1 << level) / VOXELS_PER_M, cz0 * (1 << level) / VOXELS_PER_M)
-        row_w = TILE_COLUMNS * N * (1 << level) / VOXELS_PER_M
-        lattices = {
-            c: WormLattice(c, level, x0, cz0, TILE_COLUMNS * N, N, h, loaded.seed)
-            for c, b in caves
-            if isinstance(c, Worms) and level <= c.max_level
-            and b[0] < row_m[0] + row_w and b[3] > row_m[0]
-            and b[2] < row_m[1] + N * (1 << level) / VOXELS_PER_M and b[5] > row_m[1]
-        }  # fmt: skip
-        for col in range(TILE_COLUMNS):
-            cx0 = x0 + col * N
-            if cx0 >= size_cells[0] or cx0 < 0:
+        for column in chunk_row(
+            loaded, level, tx * TILE_COLUMNS * N, cz0, TILE_COLUMNS, layers, caves
+        ):
+            if column is None:
                 entries.append((0, 0, 0, 0, 0, 0, 0))
                 continue
-            top = h[:, col * N : (col + 1) * N].copy()
-            colors = surf[:, col * N : (col + 1) * N]
-            water_top = wet[:, col * N : (col + 1) * N]
-            water_color = wet_color[:, col * N : (col + 1) * N]
-            # Columns past the world's edge (a chunk column straddling it) are air.
-            outside_x = cx0 + np.arange(N) >= size_cells[0]
-            outside_z = cz0 + np.arange(N) >= size_cells[1]
-            top[outside_z[:, None] | outside_x[None, :]] = -1e9
-            inside = top > -1e8
-            cell = 1 << level
-            hi = max(top[inside].max(), water_top[inside].max()) / cell
-            lo = (top[inside].min() - layers.deepest - cell) / cell
-            # Caves under this chunk column reach the bounds down to their floor.
-            x_lo, z_lo = cx0 * cell / VOXELS_PER_M, cz0 * cell / VOXELS_PER_M
-            x_hi, z_hi = x_lo + N * cell / VOXELS_PER_M, z_lo + N * cell / VOXELS_PER_M
-            here = [
-                (c, b)
-                for c, b in caves
-                if level <= c.max_level
-                and b[0] < x_hi
-                and b[3] > x_lo
-                and b[2] < z_hi
-                and b[5] > z_lo
-            ]
-            if here:
-                floor_m = min(
-                    c.band(top[inside].min() / VOXELS_PER_M, 0)[0] if isinstance(c, Worms) else b[1]
-                    for c, b in here
-                )
-                lo = min(lo, floor_m * VOXELS_PER_M / cell - 1)
-            # Below min_cy every cell is deeper than the last band (one cell of slack for ties).
-            min_cy = math.floor((lo - 1) / N)
-            max_cy = max(math.ceil(hi / N), min_cy + 1)
-            cells = column_cells(top, colors, min_cy, max_cy, level, layers, water_top, water_color)
-            if here:
-                carve_column(cells, here, level, min_cy, cx0, cz0, top, loaded.seed, lattices)
-                # Chunks at the bottom the caves missed are all rock again: back under the bounds.
-                rock = (cells.reshape(len(cells), -1) == layers.rest).all(axis=1)
-                keep = int(np.argmin(rock[:-1])) if not rock[:-1].all() else len(cells) - 1
-                cells, min_cy = cells[keep:], min_cy + keep
+            min_cy, max_cy, cells = column
             payloads = encode_chunks(cells)
             raw = b"".join(struct.pack("<I", len(p)) + p for p in payloads)
             blob = zlib.compress(raw, DEFLATE_LEVEL)
@@ -494,8 +513,10 @@ def far_grids(loaded: LoadedWorld, out: Path) -> list[dict]:
         # Heights at the grid points (in voxels) and the surface color there by the world's rules;
         # water shows as its surface.
         h, _, surf = sample_columns_at(loaded, x0, z0, spacing, count_x, count_z)
-        gx, gz = np.meshgrid((x0 + np.arange(count_x) * spacing) / VOXELS_PER_M,
-                             (z0 + np.arange(count_z) * spacing) / VOXELS_PER_M)  # fmt: skip
+        gx, gz = np.meshgrid(
+            (x0 + np.arange(count_x) * spacing) / VOXELS_PER_M,
+            (z0 + np.arange(count_z) * spacing) / VOXELS_PER_M,
+        )
         level, color = water(loaded, gx, gz)
         wet = level * VOXELS_PER_M > h
         h = np.where(wet, level * VOXELS_PER_M, h)
@@ -505,8 +526,17 @@ def far_grids(loaded: LoadedWorld, out: Path) -> list[dict]:
         (out / name).write_bytes(
             b"KFAR" + struct.pack("<HH", 1, 0) + zlib.compress(payload, DEFLATE_LEVEL)
         )
-        grids.append({"level": k, "spacing": spacing, "x0": x0, "z0": z0, "count_x": count_x,
-                      "count_z": count_z, "file": name})  # fmt: skip
+        grids.append(
+            {
+                "level": k,
+                "spacing": spacing,
+                "x0": x0,
+                "z0": z0,
+                "count_x": count_x,
+                "count_z": count_z,
+                "file": name,
+            }
+        )
     return grids
 
 
@@ -559,8 +589,9 @@ class BakeSummary:
         )
 
 
-def bake_world(script, out_dir=None, levels: int = 7, workers: int | None = None, seed: int = 0,
-               style=None) -> BakeSummary:  # fmt: skip
+def bake_world(
+    script, out_dir=None, levels: int = 7, workers: int | None = None, seed: int = 0, style=None
+) -> BakeSummary:
     """Bakes every tile of every level, the far grids, ``map.json`` and ``world.json``."""
     from cubist.world.build import load_script
 
@@ -592,7 +623,7 @@ def bake_world(script, out_dir=None, levels: int = 7, workers: int | None = None
         "min_x": 0,
         "min_z": 0,
         "max_x": sx,
-        "max_z": sz,  # fmt: skip
+        "max_z": sz,
         "materials": len(loaded.palette),
         "compression": "deflate",
         "voxel_size_m": 1 / VOXELS_PER_M,

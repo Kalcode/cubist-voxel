@@ -42,9 +42,11 @@ reference, with every signature, is `docs/dsl.md`.
 ## Authoring worlds
 
 Worlds are terrain for premade game worlds (`docs/worlds.md`). Write `worlds/<name>.py`, build with
-`cubist world build worlds/<name>.py`, and read `out/worlds/<name>/map.png` and the printed stats:
-is the ground believable from above, are slopes walkable where people go, is rock where it's steep,
-do the landmarks sit where they should? Revise and rebuild, as with assets.
+`cubist world build worlds/<name>.py`, and read `out/worlds/<name>/map.png`, the printed stats and
+the lint: is the ground believable from above, are slopes walkable where people go, is rock where it's
+steep, do the landmarks, roads, rivers and props sit where they should? Look closer with `cubist world
+render worlds/<name>.py --at x,z` (`--cut y` to see into caves). Revise and rebuild, as with assets;
+bake with `cubist world bake` when it's right.
 
 ## Developing Cubist
 

@@ -11,7 +11,9 @@ import numpy as np
 from PIL import Image
 
 from cubist.build.runner import find_style, load_project_style
+from cubist.lint import LintReport
 from cubist.world.field import WorldError
+from cubist.world.lint import lint_world, write_lint
 from cubist.world.map import WorldMap, render_map, surface_shares
 from cubist.world.model import LoadedWorld, WorldDef, load_world
 
@@ -25,6 +27,7 @@ class WorldBuild:
     map: WorldMap
     stats: dict
     map_path: Path | None
+    lint: LintReport | None = None
 
     @property
     def map_image(self) -> Image.Image:
@@ -98,6 +101,9 @@ def build_world(
     loaded = load_script(script, seed, style)
     m = render_map(loaded)
     stats = stats_of(loaded, m)
+    style_path = Path(style) if style else find_style(Path(script))
+    report = lint_world(loaded, m.slopes, style_path.parent / "export")
+    stats["lint"] = {"errors": report.count("error"), "warnings": report.count("warning")}
     map_path = None
     if write:
         base = Path(out_dir) if out_dir else find_style(Path(script)).parent / "out" / "worlds"
@@ -106,4 +112,5 @@ def build_world(
         map_path = target / "map.png"
         m.image.save(map_path, optimize=False)
         (target / "stats.json").write_text(json.dumps(stats, indent=2) + "\n")
-    return WorldBuild(loaded.name, loaded, m, stats, map_path)
+        write_lint(report, target / "lint.json")
+    return WorldBuild(loaded.name, loaded, m, stats, map_path, report)

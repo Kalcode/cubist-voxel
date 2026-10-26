@@ -492,3 +492,76 @@ def test_bake_writes_props_into_world_json(tmp_path):
     assert all(
         p["at"][1] == 80 - 0.25 * 16 for p in world_json["props"][1:]
     )  # scattered ones sink 0.25 m
+
+
+def test_world_lint_finds_edges_slopes_props_and_closed_caves(tmp_path):
+    from cubist.world import cavern, place, scatter, tunnel
+    from cubist.world.field import Custom
+    from cubist.world.lint import lint_world
+    from cubist.world.sample import slopes
+
+    project = _project(tmp_path)
+    (project / "export" / "cottage.cubist.json").write_text(
+        '{"cubist_manifest": 1, "name": "cottage", '
+        '"size": [96, 80, 128], "glb_origin": [48, 0, 64]}'
+    )
+
+    @world(name="linty", size_m=(1000, 1000))
+    def linty(p):
+        cliff = Custom(
+            lambda x, z, s: np.where(np.asarray(x) > 500, 30.0, 0.0) + np.asarray(z) * 0.0, "cliff"
+        )
+        return World(
+            ground=flat(10) + cliff,
+            surface=[p.leaf.mid],
+            caves=[
+                cavern((200, -20, 200), radius_m=6),  # deep, nothing reaches it
+                cavern((700, 25, 700), radius_m=6),
+                tunnel(
+                    [(700, 41, 640), (700, 25, 700)], radius_m=2, smooth=False
+                ),  # opens at the surface (40 m)
+            ],
+            props=[
+                place("cottage", at=(498, 300)),  # straddles the cliff
+                place("cottage", at=(300, 300)),
+                place("cottage", at=(303, 302)),  # on top of the last one
+                scatter("oak", ((280, 280), (320, 320)), per_ha=400, spacing_m=6),
+            ],
+            landmarks={"spawn": (100, 500), "lost": (1200, 10), "cliff": (500, 600)},
+        )
+
+    loaded = load_world(linty, _demo_palette(), seed=0)
+    x, z = np.meshgrid(np.arange(0, 1000, 10.0), np.arange(0, 1000, 10.0))
+    report = lint_world(loaded, slopes(loaded, x, z), project / "export")
+    text = report.summary()
+    assert report.count("error") == 1 and "landmark lost" in text
+    assert "landmark spawn is 100 m from the world's edge" in text
+    assert "within 20 m of cliff" in text
+    assert "falls" in text and "(498, 300)" in text
+    assert "overlaps cottage at (303, 302)" in text
+    assert "scattered oak grow into cottage" in text
+    assert "(200, -20, 200) has no way in" in text
+    assert "(700, 25, 700)" not in text  # its tunnel opens at the surface
+
+
+def test_region_renders_build_the_area_like_the_bake():
+    from cubist.world import cavern
+    from cubist.world.region import region_grid, render_region
+
+    @world(name="hollow", size_m=(256, 256))
+    def hollow(p):
+        return World(ground=flat(20), surface=[p.leaf.mid], subsoil=[(1, p.wood[1]), p.stone.dark],
+                     caves=[cavern((128, 12, 128), radius_m=5)])  # fmt: skip
+
+    loaded = load_world(hollow, _demo_palette(), seed=0)
+    grid, level, corner = region_grid(loaded, (128, 128), size_m=32)
+    assert level == 1 and grid.data.shape[0] == grid.data.shape[2] == 256  # 32 m in 0.125 m cells
+    column = grid.data[128, :, 128]  # through the cavern's middle
+    y = corner[1] + (np.arange(len(column)) + 0.5) * 0.125
+    assert column[(y > 8) & (y < 16)].max() == 0  # hollow
+    assert column[(y > 18) & (y < 19.5)].min() > 0 and y[-1] < 20.2  # solid up to the ground
+    cut, _, _ = region_grid(loaded, (128, 128), size_m=32, cut_m=12)
+    assert cut.data.shape[1] < grid.data.shape[1]
+    assert render_region(loaded, (128, 128), size_m=32, cut_m=12).width > 200
+    with pytest.raises(WorldError, match="outside the world"):
+        region_grid(loaded, (2000, 2000), size_m=32)
