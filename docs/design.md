@@ -652,8 +652,21 @@ simulated.
      blend, flatten, terrace), surface and subsoil rules, `cubist world build` with `map.png` and
      `stats.json`, the reference in [worlds.md](worlds.md), and the demo `islet`. Builds are
      deterministic and its map has a golden image.
-   - **12b. Bake, and Kiln plays it.** Tiles, `map.json` with materials, `world.json`; Kiln opens a world
-     directory. Done when Kiln walks a Cubist world, and 1 km² has been timed (the speed decision).
+   - **12b. Bake, and Kiln plays it** — done. `cubist world bake` writes tiles for levels 0–6, the far
+     grids, `map.json` (with the material registry, deflate) and `world.json` (landmarks); Kiln opens it
+     with `--world <dir>`.
+     - **The speed decision: Python bakes.** A 1 km² world (7 levels, 633k chunks) bakes in 57 s on 9
+       processes of an M1 Max: 55 s per km², so about 15 minutes for 4 × 4 km, against the 30-minute line.
+       Kiln's C# baker did its valley at ~35 s per km² with caves, which this world doesn't have yet.
+     - **Size:** 153 MiB per km² at level 0, 208 MiB for all levels (Kiln's valley: 171 at level 0).
+     - **Encoding:** chunks share one palette per chunk column; mixed bricks are bit-packed against it (1–8
+       bits), uniform bricks are table entries. Kiln re-encodes compactly on load, so this only sets the
+       disk size. Raw bricks were 7× larger and slower to compress.
+     - **Coarse levels** keep the surface band at least one cell deep, so distant ground shows grass, not
+       the dirt under it (as Kiln's own downsampling does).
+     - **In Kiln:** the 1 km² world streams with 0 holes; main-thread p99 0.74 ms at 8 m/s; validation
+       clean.
+     - **Not yet:** incremental bakes (each tile's input hash); props; caves.
    - **12c. Features.** Rivers and roads, caves, props and scatter, landmarks.
    - **12d. Lint and region renders.**
    - **12e. The 4 × 4 km world**, authored with the build and critique loop, baked, and walked in Kiln.

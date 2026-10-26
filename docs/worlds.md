@@ -2,20 +2,28 @@
 
 Worlds are terrain for premade game worlds; [design.md](design.md), "Worlds", says why and how they fit
 in. A world script lives in `worlds/<name>.py` of a project and starts with `from cubist.world import *`.
-Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestone 12a
-(ground, surface rules, the map); caves, props, lint and the bake come next.
+Positions are metres: x east, z toward the front (rows go down the map), y up. Status: milestones 12a
+and 12b (ground, surface rules, the map, the bake); caves, props and lint come next.
 
 ```python
 from cubist.world import *
 
+
 @world(name="islet", size_m=(512, 512), seed=7)
 def islet(p):
     land = circle((256, 256), radius_m=150, edge_m=90)
-    hills = noise(scale_m=120, amplitude_m=14, octaves=4) + ridges(scale_m=200, amplitude_m=30) * land
+    hills = (
+        noise(scale_m=120, amplitude_m=14, octaves=4) + ridges(scale_m=200, amplitude_m=30) * land
+    )
     ground = (flat(2) + hills * land + land * 12).flatten(rect((150, 300), (200, 340)), at_m=19)
     return World(
         ground=ground,
-        surface=[height_under(3, p.cork), height_over(44, p.white), slope_over(35, p.stone.mid), p.leaf.mid],
+        surface=[
+            height_under(3, p.cork),
+            height_over(44, p.white),
+            slope_over(35, p.stone.mid),
+            p.leaf.mid,
+        ],
         subsoil=[(1, p.wood[1]), p.stone.dark],
         landmarks={"quarry": (175, 320)},
     )
@@ -72,3 +80,20 @@ Combine fields with `+ - *` (with fields or numbers), and:
 - **The map:** the whole world top-down, hill-shaded from the top-left, with contour lines, a ruler in
   metres, landmarks, and a legend of surface colors with their share of the ground.
 - **The stats:** height range, slope bands (0–15°, 15–30°, 30–45°, 45°+) and surface shares.
+
+## Baking for Kiln
+
+`cubist world bake worlds/<name>.py [--levels 7] [--workers N] [--out DIR]` writes the world in Kiln's
+map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<name>/`:
+
+- **Tiles** `L{k}/{tx}_{tz}.tile`: 64 × 64 columns of level k (cells of 2^k voxels, 128·2^k m a tile).
+  Heights are sampled every 0.5 m and interpolated per column.
+- **Far-field grids** `far-L{k}.bin`, reaching past the world (the ground's fields go on beyond it).
+- **`map.json`:** the tiles' extent, compression (deflate) and the material registry (palette index →
+  name, color, glow).
+- **`world.json`:** landmarks in voxels, with their ground height.
+
+Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
+(or `spawn`). Expect about a minute per km² on a 10-core laptop, and 150–200 MiB per km²; bakes stay out
+of git.
+

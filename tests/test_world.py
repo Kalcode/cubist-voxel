@@ -157,3 +157,76 @@ def test_cli_world_build(tmp_path, capsys):
     ).exists()
     assert main(["world", "build", str(tmp_path / "nope.py")]) == 1
     assert "no such world script" in capsys.readouterr().err
+
+
+def test_chunk_payloads_round_trip():
+    from cubist.world.bake import decode_chunk, encode_chunk
+
+    rng = np.random.default_rng(3)
+    cells = np.zeros((32, 32, 32), dtype=np.uint16)
+    cells[:10] = 7  # a few uniform bricks
+    cells[10:20] = rng.integers(0, 4, size=(10, 32, 32))  # mixed ones, air included
+    payload = encode_chunk(cells)
+    assert payload[:2] == b"\x01\x00"
+    assert np.array_equal(decode_chunk(payload), cells)
+    layered = np.zeros((32, 32, 32), dtype=np.uint16)
+    layered[:, :8] = 3  # every brick uniform, but not the same
+    assert np.array_equal(decode_chunk(encode_chunk(layered)), layered)
+    uniform = np.full((32, 32, 32), 9, dtype=np.uint16)
+    assert encode_chunk(uniform) == b"\x01\x01\x09\x00"
+    assert np.array_equal(decode_chunk(encode_chunk(uniform)), uniform)
+
+
+def test_bake_writes_kiln_tiles_matching_the_ground(tmp_path):
+    import json
+    import struct
+    import zlib
+
+    from cubist.world.bake import N, bake_world, decode_chunk
+    from cubist.world.build import load_script
+    from cubist.world.sample import heights
+
+    # A one-tile world (128 m) keeps the test quick.
+    script = tmp_path / "tiny.py"
+    script.write_text(
+        "from cubist.world import *\n\n"
+        "@world(name='tiny', size_m=(128, 128), seed=2)\n"
+        "def tiny(p):\n"
+        "    ground = flat(20) + noise(scale_m=40, amplitude_m=8, octaves=3)\n"
+        "    return World(ground=ground, surface=[slope_over(35, p.stone.mid), p.leaf.mid],\n"
+        "                 subsoil=[(1, p.wood[1]), p.stone.dark], landmarks={'spawn': (64, 64)})\n"
+    )
+    style = DEMO / "style.toml"
+    summary = bake_world(script, out_dir=tmp_path / "a", levels=2, workers=1, style=style)
+    info = json.loads((tmp_path / "a" / "map.json").read_text())
+    assert info["levels"] == 2 and info["compression"] == "deflate" and info["max_x"] == 128 * 16
+    assert {m["name"] for m in info["material_registry"]} >= {"leaf.mid", "stone.dark"}
+    assert len(info["far"]) == 6 and summary.chunks > 0
+    world_json = json.loads((tmp_path / "a" / "world.json").read_text())
+    assert set(world_json["landmarks"]) == {"spawn"}
+
+    # Column (40, 50) of level 0 (2 m chunks): its top solid cell sits at the ground's height.
+    tile = (tmp_path / "a" / "L0" / "0_0.tile").read_bytes()
+    assert tile[:4] == b"KTIL"
+    cx, cz = 40, 50
+    min_cy, max_cy, below, _, off, length, raw_len = struct.unpack_from(
+        "<iiHHIII", tile, 16 + 24 * (cx + 64 * cz)
+    )
+    raw = zlib.decompress(tile[off : off + length])
+    loaded = load_script(script, style=style)
+    assert len(raw) == raw_len and below == loaded.subsoil_layers()[1].index
+    column = []
+    at = 0
+    for _ in range(min_cy, max_cy):
+        n = struct.unpack_from("<I", raw, at)[0]
+        column.append(decode_chunk(raw[at + 4 : at + 4 + n]))
+        at += 4 + n
+    solid = np.concatenate(column, axis=1)[:, :, :] != 0  # [z, y, x] stacked along y
+    top = min_cy * N + solid[0, :, 0].nonzero()[0].max() + 1  # the first empty voxel above
+    x_m, z_m = (40 * N + 0.5) / 16, (50 * N + 0.5) / 16
+    expected = heights(loaded, np.array([x_m]), np.array([z_m]))[0] * 16
+    assert abs(top - expected) <= 1
+
+    again = bake_world(script, out_dir=tmp_path / "b", levels=2, workers=1, style=style)
+    assert (tmp_path / "b" / "L0" / "0_0.tile").read_bytes() == tile
+    assert again.chunks == summary.chunks

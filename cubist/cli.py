@@ -332,6 +332,16 @@ def cmd_world_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_world_bake(args: argparse.Namespace) -> int:
+    from cubist.world.bake import bake_world
+
+    summary = bake_world(args.script, out_dir=args.out, levels=args.levels, workers=args.workers,
+                         seed=args.seed, style=args.style)  # fmt: skip
+    print(summary.line())
+    print(f"  {summary.out}")
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="cubist", description="Build voxel assets from scripts.")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -458,6 +468,16 @@ def parser() -> argparse.ArgumentParser:
     wb.add_argument("--out", type=Path, help="output root (default: <project>/out/worlds)")
     wb.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
     wb.set_defaults(fn=cmd_world_build)
+    wk = w_sub.add_parser(
+        "bake", help="bake a world into Kiln's map format (tiles, map.json, world.json)"
+    )
+    wk.add_argument("script", type=Path)
+    wk.add_argument("--style", type=Path, help="style.toml (default: nearest above the script)")
+    wk.add_argument("--out", type=Path, help="output dir (default: <project>/export/worlds/<name>)")
+    wk.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
+    wk.add_argument("--levels", type=int, default=7, help="levels of detail to bake (default 7)")
+    wk.add_argument("--workers", type=int, help="processes (default: cores − 1)")
+    wk.set_defaults(fn=cmd_world_bake)
 
     s = sub.add_parser("style", help="print the parsed style bible with palette names")
     s.add_argument("--style", type=Path, help="style.toml (default: nearest above the cwd)")
