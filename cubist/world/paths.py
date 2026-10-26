@@ -45,10 +45,15 @@ class Path:
     def length(self) -> float:
         return float(self.cum[-1])
 
-    def distance(self, max_m: float = 1000.0) -> Field:
+    def distance(self, max_m: float = 1000.0, step_m: float | None = None) -> Field:
         """A field: the distance (metres) to this path, capped at ``max_m`` (shape a valley around a
-        river, say). Farther than ``max_m`` it reads ``max_m``, and is cheap to sample there."""
-        return _PathDistance(self, float(max_m))
+        river, say). Farther than ``max_m`` it reads ``max_m``.
+
+        ``step_m`` samples it on a grid that far apart and interpolates: much cheaper for a far
+        reach (a valley's walls), but off by up to about a third of a step where the nearest part of
+        the path switches and half a step next to it, so leave it unset for masks near a path.
+        """
+        return _PathDistance(self, float(max_m), step_m)
 
     def nearest(self, x, z, reach: float) -> tuple[np.ndarray, np.ndarray]:
         """(distance, arc length of the nearest point) to the path, per (x, z); distance is inf past
@@ -94,12 +99,38 @@ class Path:
 class _PathDistance(Field):
     name = "distance"
 
-    def __init__(self, line: Path, cap: float):
-        self.path, self.cap = line, cap
+    def __init__(self, line: Path, cap: float, step: float | None):
+        self.path, self.cap, self.step = line, cap, step
 
-    def sample(self, x, z, seed):
+    def _exact(self, x, z):
         d, _ = self.path.nearest(x, z, self.cap)
         return np.minimum(d, self.cap)
+
+    def sample(self, x, z, seed):
+        x, z = np.asarray(x, dtype=np.float64), np.asarray(z, dtype=np.float64)
+        s = self.step
+        if s is None or x.size == 0:
+            return self._exact(x, z)
+        # Bilinear between the distances at the corners of a fixed step_m grid: the same value
+        # for a point however it's batched (props stand on what the bake carves).
+        u, v = x / s, z / s
+        i, j = np.floor(u), np.floor(v)
+        fu, fv = u - i, v - j
+        i0, j0 = int(i.min()), int(j.min())
+        ni, nj = int(i.max()) - i0 + 2, int(j.max()) - j0 + 2
+        if ni * nj <= 4 * x.size:  # dense queries: measure the grid over them
+            gx, gz = np.meshgrid((i0 + np.arange(ni)) * s, (j0 + np.arange(nj)) * s)
+            grid = self._exact(gx, gz)
+            ii, jj = (i - i0).astype(int), (j - j0).astype(int)
+            c00, c10 = grid[jj, ii], grid[jj, ii + 1]
+            c01, c11 = grid[jj + 1, ii], grid[jj + 1, ii + 1]
+        else:  # sparse queries: measure each one's four corners
+            cx = np.stack([i, i + 1, i, i + 1]) * s
+            cz = np.stack([j, j, j + 1, j + 1]) * s
+            c00, c10, c01, c11 = self._exact(cx, cz)
+        top = c00 * (1 - fu) + c10 * fu
+        bottom = c01 * (1 - fu) + c11 * fu
+        return top * (1 - fv) + bottom * fv
 
 
 def _catmull_rom(pts: np.ndarray, spacing: float) -> np.ndarray:

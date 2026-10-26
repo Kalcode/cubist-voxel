@@ -338,8 +338,11 @@ def cmd_world_build(args: argparse.Namespace) -> int:
 def cmd_world_bake(args: argparse.Namespace) -> int:
     from cubist.world.bake import bake_world
 
+    def progress(done: int, total: int, seconds: float) -> None:
+        print(f"  {done}/{total} tiles ({100 * done // total}%) in {seconds:.0f} s", flush=True)
+
     summary = bake_world(args.script, out_dir=args.out, levels=args.levels, workers=args.workers,
-                         seed=args.seed, style=args.style)  # fmt: skip
+                         seed=args.seed, style=args.style, progress=progress)  # fmt: skip
     print(summary.line())
     print(f"  {summary.out}")
     return 0

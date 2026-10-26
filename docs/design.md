@@ -681,6 +681,12 @@ simulated.
      render` draws an area in voxels, with a cut height for looking into caves. The bake and the region
      render share one per-column builder (`chunk_row`).
    - **12e. The 4 × 4 km world**, authored with the build and critique loop, baked, and walked in Kiln.
+     `vale` lives in Kiln's Cubist project (`assets/cubist/worlds/vale.py`), with its brief at the top.
+     - **The first critique round** found snow on a third of the map (the snow line rose to 460 m) and a
+       pass on a 55° cliff (lint's slope warning). Fixing the pass needed `level()`: flatten a circle to
+       the ground's own height, since a script can't know the height.
+     - **Scripts can't know the ground's height** (it depends on the seed), so caves and props also take
+       depths below the ground (`below_ground`), resolved when the world loads.
 
 ### v1 acceptance targets
 

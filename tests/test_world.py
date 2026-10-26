@@ -613,3 +613,19 @@ def test_level_flattens_to_the_ground_at_the_center():
 
 
 from cubist.world.field import Custom  # noqa: E402
+
+
+def test_coarse_path_distance_stays_close_away_from_the_path():
+    from cubist.world import path
+
+    line = path([(0, 0), (300, 200), (600, 0)])
+    exact, coarse = line.distance(max_m=800), line.distance(max_m=800, step_m=8)
+    x, z = np.meshgrid(np.linspace(0, 600, 300), np.linspace(-400, 400, 300))
+    a, b = exact.sample(x, z, 0), coarse.sample(x, z, 0)
+    far = a > 50
+    # Off by at most a few metres (where the nearest part of the path switches, and next to it).
+    assert np.abs(a - b)[far].max() < 3 and np.abs(a - b).max() < 4.5
+    # A point on its own reads what it reads in a dense batch (props stand on the baked ground).
+    for i, j in ((0, 0), (150, 77), (299, 299)):
+        alone = coarse.sample(np.array([x[i, j]]), np.array([z[i, j]]), 0)[0]
+        assert alone == b[i, j]

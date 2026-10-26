@@ -590,9 +590,18 @@ class BakeSummary:
 
 
 def bake_world(
-    script, out_dir=None, levels: int = 7, workers: int | None = None, seed: int = 0, style=None
+    script,
+    out_dir=None,
+    levels: int = 7,
+    workers: int | None = None,
+    seed: int = 0,
+    style=None,
+    progress=None,
 ) -> BakeSummary:
-    """Bakes every tile of every level, the far grids, ``map.json`` and ``world.json``."""
+    """Bakes every tile of every level, the far grids, ``map.json`` and ``world.json``.
+
+    ``progress(done, total, seconds)`` is called as tiles finish (about every 5%).
+    """
     from cubist.world.build import load_script
 
     started = time.perf_counter()
@@ -604,13 +613,22 @@ def bake_world(
     tasks = tiles_for(loaded, levels)
     workers = workers or max(1, (os.cpu_count() or 2) - 1)
     stats: list[TileStats] = []
+    step = max(1, len(tasks) // 20)
+
+    def done(stat: TileStats) -> None:
+        stats.append(stat)
+        if progress and (len(stats) % step == 0 or len(stats) == len(tasks)):
+            progress(len(stats), len(tasks), time.perf_counter() - started)
+
     if workers == 1:
         _init_worker(str(script), seed, str(style_path), str(out))
-        stats = [_bake_task(t) for t in tasks]
+        for t in tasks:
+            done(_bake_task(t))
     else:
         init = (str(script), seed, str(style_path), str(out))
         with ProcessPoolExecutor(workers, initializer=_init_worker, initargs=init) as pool:
-            stats = list(pool.map(_bake_task, tasks, chunksize=1))
+            for stat in pool.map(_bake_task, tasks, chunksize=1):
+                done(stat)
     grids = far_grids(loaded, out)
     sx, sz = (int(round(s * VOXELS_PER_M)) for s in loaded.size_m)
     style_bible = load_project_style(style_path)

@@ -45,8 +45,10 @@ The world covers `[0, size_m)` on both axes. Its seed mixes with the build's (`-
 
 ## Fields
 
-`path(...).distance(max_m=1000)` is also a field: the distance to a path in metres (shape a valley
-around a river with it).
+`path(...).distance(max_m=1000, step_m=None)` is also a field: the distance to a path in metres (shape a
+valley around a river with it). For a far reach, `step_m=8` samples it on an 8 m grid and interpolates:
+much cheaper, and off by a couple of metres at most, which a valley wall doesn't show (leave it unset for
+masks right next to a path).
 
 A field is a value per ground column. Height fields are metres; masks are weights in [0, 1].
 
@@ -173,7 +175,7 @@ map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<na
   name, color, glow).
 - **`world.json`:** landmarks in voxels, with their ground height.
 
-Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
+The bake prints its progress every 5% of tiles. Kiln plays it with `demos/Diorama/run.sh --world <that directory>`, starting at the landmark `--at` names
 (or `spawn`). Expect about a minute per km² on a 10-core laptop, and 150–200 MiB per km²; bakes stay out
 of git.
 
