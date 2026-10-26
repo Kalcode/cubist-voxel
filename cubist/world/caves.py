@@ -157,7 +157,10 @@ class Worms(Carver):
 
 
 def tunnel(points, radius_m: float = 2.5, smooth: bool = True) -> Tunnel:
-    """A tunnel along (x, y, z) points in metres (y up), ``radius_m`` round, curved by ``smooth``."""
+    """A tunnel through (x, y, z) points in metres (y up), ``radius_m`` round.
+
+    ``smooth`` curves it through the points.
+    """
     return Tunnel(points, radius_m, smooth)
 
 
