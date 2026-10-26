@@ -35,7 +35,7 @@ def islet(p):
 `@world(name, size_m=(x, z), seed=0)` on a function taking the palette `p` and returning a `World`.
 The world covers `[0, size_m)` on both axes. Its seed mixes with the build's (`--seed`).
 
-`World(ground, surface, subsoil=(), surface_depth_m=0.25, landmarks={})`:
+`World(ground, surface, subsoil=(), surface_depth_m=0.25, landmarks={}, step_m=None)`:
 
 - `ground`: a height field (metres).
 - `surface`: rules, first match wins, ending in a plain color (the default). The surface material is
@@ -44,6 +44,10 @@ The world covers `[0, size_m)` on both axes. Its seed mixes with the build's (`-
 - `landmarks`: named points for the engine (spawn, towns, cave mouths); drawn on the map. `(x, z)` sits
   on the ground; the name of a `place(..., name=...)` sits at that prop's base, so a landmark can be on a
   cave floor (`"cavern": "cavern_torch"`).
+- `step_m`: the baked ground's heights snap to multiples of it (say `0.25`, four voxels). A slope at one voxel
+  per step is a field of tiny risers (busy dots up close, and many quads for Kiln); taller steps read as
+  terrace lines, and on a test of vale-like hills `0.25` cut the terrain's quads 3.5× at Kiln's finest
+  level and its level-0 disk size from 181 to 101 MiB/km². Props still stand on the unsnapped ground.
 
 ## Fields
 

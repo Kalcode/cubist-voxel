@@ -73,7 +73,9 @@ class World:
     ``subsoil`` is ``(depth_m, color)`` layers under it, ending in the color that fills the rest.
     ``rivers`` and ``roads`` cut and level the ground along paths (rivers first); ``caves`` hollow
     it out. ``props`` places built assets. ``landmarks`` names points for the engine: (x, z) on
-    the ground, or the name of a placed prop to sit at its base (on a cave floor, say).
+    the ground, or the name of a placed prop to sit at its base (on a cave floor, say). ``step_m``
+    snaps the baked ground's heights to multiples of it: on slopes, fewer and taller steps than one
+    voxel each (fewer quads for the engine).
     """
 
     ground: Field
@@ -85,6 +87,7 @@ class World:
     caves: Sequence = ()
     props: Sequence = ()
     landmarks: dict[str, tuple[float, float] | str] = field(default_factory=dict)
+    step_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -246,6 +249,8 @@ def load_world(
     for cave in result.caves:
         if isinstance(cave, Worms):
             cave.keep_floors(result.caves)
+    if result.step_m is not None and result.step_m <= 0:
+        raise WorldError(f"world {defn.name}: step_m must be positive, got {result.step_m}")
     named = {p.name for p in result.props if isinstance(p, Place) and p.name}
     for name, at in result.landmarks.items():
         if isinstance(at, str) and at not in named:

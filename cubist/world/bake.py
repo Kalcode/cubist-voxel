@@ -193,6 +193,8 @@ def sample_columns(loaded: LoadedWorld, level: int, x0: int, z0: int, nx: int, n
     dz, dx = np.gradient(grid, step)
     slope_grid = np.degrees(np.arctan(np.hypot(dx, dz)))
     h = _bilinear(grid, u, v)
+    if loaded.world.step_m:  # the world's ground steps: heights snap to them
+        h = np.floor(h / loaded.world.step_m + 0.5) * loaded.world.step_m
     s = _bilinear(slope_grid, u, v)
     out = np.full((nz, nx), loaded.default_surface().index, dtype=np.int16)
     decided = np.zeros((nz, nx), dtype=bool)

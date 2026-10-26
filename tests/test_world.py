@@ -290,6 +290,26 @@ def test_rivers_cut_a_channel_that_holds_water_and_roads_level_a_strip():
     assert surface_names(loaded, names) == ["cork", "leaf.mid"]
 
 
+def test_ground_steps_snap_baked_heights():
+    from cubist.world.bake import sample_columns
+    from cubist.world.field import Custom
+
+    def ramp(step_m):
+        @world(name="ramp", size_m=(64, 64))
+        def ramp(p):
+            slope = Custom(lambda x, z, s: 10 + np.asarray(x) * 0.3 + np.asarray(z) * 0.0, "ramp")
+            return World(ground=slope, surface=[p.leaf.mid], step_m=step_m)
+
+        return load_world(ramp, _demo_palette())
+
+    fine = sample_columns(ramp(None), 0, 0, 0, 64, 4)[0]
+    steps = sample_columns(ramp(0.25), 0, 0, 0, 64, 4)[0]
+    assert len(np.unique(fine)) > 60  # one-voxel steps, nearly every column
+    assert np.all(steps % 4 == 0) and np.abs(steps - fine).max() <= 2  # 4-voxel steps, rounded
+    with pytest.raises(WorldError, match="step_m"):
+        ramp(-1)
+
+
 def test_region_bakes_redo_only_the_tiles_over_the_area(tmp_path):
     from cubist.world.bake import bake_world
 
