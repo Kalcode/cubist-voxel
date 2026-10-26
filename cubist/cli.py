@@ -319,6 +319,19 @@ def cmd_style(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_world_build(args: argparse.Namespace) -> int:
+    from cubist.world import build_world
+
+    out = build_world(args.script, out_dir=args.out, seed=args.seed, style=args.style)
+    st = out.stats
+    h = st["height_m"]
+    print(f"built world {st['name']}: {out.map_path}")
+    print(f"  size {st['size_m'][0]:g} x {st['size_m'][1]:g} m, height {h['min']}..{h['max']} m")
+    print("  slopes: " + ", ".join(f"{k}° {v}%" for k, v in st["slope_pct"].items()))
+    print("  surface: " + ", ".join(f"{k} {v}%" for k, v in st["surface_pct"].items()))
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="cubist", description="Build voxel assets from scripts.")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -436,6 +449,15 @@ def parser() -> argparse.ArgumentParser:
     m = sub.add_parser("mcp", help="run the MCP server on stdio")
     m.add_argument("--project", type=Path, help="project directory (default: from cwd)")
     m.set_defaults(fn=cmd_mcp)
+
+    w = sub.add_parser("world", help="worlds: terrain for premade game worlds")
+    w_sub = w.add_subparsers(dest="action", required=True)
+    wb = w_sub.add_parser("build", help="build a world script: map.png and stats.json")
+    wb.add_argument("script", type=Path)
+    wb.add_argument("--style", type=Path, help="style.toml (default: nearest above the script)")
+    wb.add_argument("--out", type=Path, help="output root (default: <project>/out/worlds)")
+    wb.add_argument("--seed", type=int, default=0, help="build seed mixed into the world's")
+    wb.set_defaults(fn=cmd_world_build)
 
     s = sub.add_parser("style", help="print the parsed style bible with palette names")
     s.add_argument("--style", type=Path, help="style.toml (default: nearest above the cwd)")

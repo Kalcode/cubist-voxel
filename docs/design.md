@@ -458,6 +458,11 @@ engine reads. Status: designed (Oct 25); milestone 12 below.
 columns, so a world is never one grid: it is a function evaluated wherever it's needed, a block of
 columns at a time, with numpy.
 
+**Fields are sampled on a 0.5 m lattice for the bake** (decided in 12a). Noise and painted maps have no
+detail at 1/16 m, and evaluating them per voxel column would take billions of samples for 4 × 4 km. The
+bake samples heights every 8 voxels and interpolates each column bilinearly, 64× fewer samples; slopes
+use the same spacing. The map samples at its own pixel size.
+
 ### World scripts
 
 `worlds/<name>.py` in a project, next to `assets/`. A `@world` function returns layers:
@@ -643,9 +648,10 @@ simulated.
 
 12. **Worlds** — in progress. Terrain for premade game worlds (see Worlds above), toward a 4 × 4 km world
    for Kiln: a town, a river, mountains on the horizon, a cave system.
-   - **12a. Ground and the map.** `@world`, height fields (noise, painted maps, blend, flatten), surface and
-     subsoil rules, `cubist world build` with `map.png`. Done when builds are deterministic and a golden map
-     passes.
+   - **12a. Ground and the map** — done. `@world`, height fields (noise, ridges, painted maps, masks,
+     blend, flatten, terrace), surface and subsoil rules, `cubist world build` with `map.png` and
+     `stats.json`, the reference in [worlds.md](worlds.md), and the demo `islet`. Builds are
+     deterministic and its map has a golden image.
    - **12b. Bake, and Kiln plays it.** Tiles, `map.json` with materials, `world.json`; Kiln opens a world
      directory. Done when Kiln walks a Cubist world, and 1 km² has been timed (the speed decision).
    - **12c. Features.** Rivers and roads, caves, props and scatter, landmarks.

@@ -39,6 +39,13 @@ lid hinged at its back edge opens with `hinge("-x")`, and a hinge's pivot belong
 the part turns on, at the face it swings away from. The full DSL
 reference, with every signature, is `docs/dsl.md`.
 
+## Authoring worlds
+
+Worlds are terrain for premade game worlds (`docs/worlds.md`). Write `worlds/<name>.py`, build with
+`cubist world build worlds/<name>.py`, and read `out/worlds/<name>/map.png` and the printed stats:
+is the ground believable from above, are slopes walkable where people go, is rock where it's steep,
+do the landmarks sit where they should? Revise and rebuild, as with assets.
+
 ## Developing Cubist
 
 - `uv run pytest` — full suite (must stay green; `tests/test_godot.py` needs `godot` on PATH
