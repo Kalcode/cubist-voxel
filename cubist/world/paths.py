@@ -18,6 +18,7 @@ from cubist.world.field import Field, WorldError
 _BLOCK = 64  # grids are searched in blocks this many columns on a side (each block culls segments)
 _BUCKET_M = 64.0  # scattered points are searched in buckets of this many metres on a side
 _TILE = 64  # a coarse distance grid is measured, and kept, in tiles of this many points a side
+_TILE_MIN_POINTS = 256  # fewer queries than this in a tile not yet measured get their own corners
 
 
 def _smoothstep(t: np.ndarray) -> np.ndarray:
@@ -151,7 +152,16 @@ class _PathDistance(Field):
             tiles = [(int(ti.min()) + k // width, int(tj.min()) + k % width) for k in touched]
         for a, b in tiles:
             m = (ti == a) & (tj == b)
-            if not m.any():
+            count = int(m.sum())
+            if count == 0:
+                continue
+            if (a, b) not in self._tiles and count < _TILE_MIN_POINTS:
+                # A few points in a tile not measured yet (far-field samples kilometres
+                # apart): their own corners, the values the tile would hold, without the tile.
+                ci, cj = i[m], j[m]
+                cx = np.stack([ci, ci + 1, ci, ci + 1]) * s
+                cz = np.stack([cj, cj, cj + 1, cj + 1]) * s
+                c00[m], c10[m], c01[m], c11[m] = self._exact(cx, cz)
                 continue
             grid = self._tile(int(a), int(b))
             gi, gj = li[m], lj[m]
