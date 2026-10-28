@@ -65,7 +65,7 @@
         "pivot": {"$ref": "#/$defs/vec3"},
         "joint": {"oneOf": [{"$ref": "#/$defs/joint"}, {"type": "null"}]},
         "hidden": {"type": "boolean"},
-        "occlusion": {"enum": ["roof", "upper", "canopy", null]},
+        "occlusion": {"enum": ["roof", "upper", "canopy", "clutter", null]},
         "frames": {
           "oneOf": [
             {

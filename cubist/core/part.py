@@ -1,7 +1,7 @@
 """Named parts: a shape plus a pivot, an optional parent part, an optional symmetry axis that
 lint checks against the asset's center plane, an optional joint saying how it moves, and
 whether it starts hidden (shown by clips), and an occlusion tag for engines that hide parts
-between the camera and the player."""
+between the camera and the player, or let their follow camera pass through them."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ from cubist.dsl.shape import Shape, ShapeError
 from cubist.motion.joints import Joint
 
 Vec3 = tuple[float, float, float]
-OCCLUSION = ("roof", "upper", "canopy")  # roofs, upper storeys, tree crowns
+# Roofs, upper storeys and tree crowns (an engine hides them to show the player), and clutter: small
+# set-dressing (a stall's counter and posts, crates) that a follow camera passes through.
+OCCLUSION = ("roof", "upper", "canopy", "clutter")
 
 
 def _swap_side(parent: str | None, old: str, new: str) -> str | None:
@@ -39,7 +41,7 @@ class Part:
     hidden: bool = False  # hidden at rest; a clip's visible(...) track shows it
     frames: tuple[Shape, ...] | list[Shape] | None = None  # a flipbook: one shape per frame
     fps: float = 8.0  # flipbook frames per second when it plays on its own
-    occlusion: str | None = None  # one of OCCLUSION: what an engine hides to show the player
+    occlusion: str | None = None  # one of OCCLUSION: what an engine hides or its camera passes
 
     def __post_init__(self):
         if self.occlusion is not None and self.occlusion not in OCCLUSION:

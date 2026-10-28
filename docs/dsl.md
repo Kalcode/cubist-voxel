@@ -62,9 +62,11 @@ Part(...).mirrored(name, about_x=None, about_y=None, about_z=None)  # -> (part, 
 - `sockets`: `{"hand_r": (x, y, z)}`, attached to the nearest part, or
   `{"hand_r": (x, y, z, "arm_r")}` to name the part. They become empty nodes in the GLB.
 - `occlusion`: `"roof"`, `"upper"` (an upper storey) or `"canopy"` (a tree's crown), for
-  engines that hide what's between the camera and the player. Parts hanging from a tagged part
-  share its tag unless they have their own, so parent the chimney to the roof. Give a building's
-  roof its own part; lint notes a building with no `roof` or `upper` part.
+  engines that hide what's between the camera and the player; or `"clutter"`, small
+  set-dressing (a market stall's counter and posts, crates, a cart) that an engine's follow
+  camera passes through instead of pulling in. Parts hanging from a tagged part share its tag
+  unless they have their own, so parent the chimney to the roof. Give a building's roof its own
+  part; lint notes a building with no `roof` or `upper` part (clutter isn't a roof).
 - Each voxel should belong to one part; lint warns when parts overlap (they double up in exports
   and poke through when a part moves). Subtract one part's shape from the other.
 

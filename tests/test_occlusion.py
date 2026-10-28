@@ -1,5 +1,6 @@
 """Occlusion tags: which parts an engine hides when they come between the camera and the player
-(a roof, an upper storey, a tree's crown)."""
+(a roof, an upper storey, a tree's crown), and small set-dressing its follow camera passes through
+(clutter)."""
 
 import json
 
@@ -63,8 +64,35 @@ def test_mirrored_parts_keep_their_tag():
 
 
 def test_unknown_occlusion_value_suggests_the_known_ones():
-    with pytest.raises(ModelError, match="roof.*upper.*canopy"):
+    with pytest.raises(ModelError, match="roof.*upper.*canopy.*clutter"):
         Part("roof", box((2, 2, 2)), occlusion="rooftop")
+
+
+def stall(p):
+    # Kiln's alchemist stall: a clutter body (counter, posts, shelves), a roof awning hanging from
+    # it, and a sign hanging from it with no tag of its own.
+    body = Part("body", box((8, 6, 8), color=p.wood.dark), occlusion="clutter")
+    awning = Part(
+        "awning", box((8, 2, 8), color=p.wood.light).at(0, 6, 0), parent="body", occlusion="roof"
+    )
+    sign = Part("sign", box((2, 2, 1), color=p.stone.light).at(3, 9, 0), parent="body")
+    return Model([body, awning, sign])
+
+
+def test_clutter_is_a_tag_children_inherit():
+    m = build_manifest(built(stall, tags=("building", "wood")), voxel_size_m=1)
+    jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
+    tags = {p["name"]: p["occlusion"] for p in m["parts"]}
+    # The sign hangs from the clutter body, so the camera passes it too; the awning keeps its own.
+    assert tags == {"body": "clutter", "awning": "roof", "sign": "clutter"}
+
+
+def test_clutter_survives_the_build_summary_and_vox():
+    a = built(stall, tags=("building", "wood"))
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), a.summary(), P)
+    assert {p.name: p.occlusion for p in again.parts} == {
+        "body": "clutter", "awning": "roof", "sign": None
+    }  # fmt: skip
 
 
 def lint_info(a):
@@ -75,6 +103,16 @@ def lint_info(a):
 def test_building_with_no_roof_or_upper_tag_gets_an_info():
     [f] = lint_info(built(lambda p: house(p, roof_tag=None)))
     assert f.severity == "info" and "occlusion=" in f.message
+
+
+def test_clutter_is_not_a_roof():
+    # A building whose only tag is clutter still has no roof an engine can lift.
+    def shed(p):
+        return Model([Part("shed", box((8, 6, 8), color=p.wood.dark), occlusion="clutter")])
+
+    [f] = lint_info(built(shed))
+    assert f.severity == "info"
+    assert lint_info(built(stall, tags=("building", "wood"))) == []
 
 
 def test_tagged_roof_or_non_building_is_quiet():

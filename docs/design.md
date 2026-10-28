@@ -121,6 +121,12 @@ convention, is [dsl.md](dsl.md).** This section records the design decisions beh
   out (so bevel steps don't darken) and skips one-voxel walls (so nothing shows through); an
   edge is open on one side along two different axes (so thin plates don't light up entirely).
 - **Left and right are the character's own**: characters face +Z, so their right is at low x.
+- **Occlusion tags are per part, and inherited**: `roof`, `upper` and `canopy` say what an engine
+  may hide to show the player (a roof, an upper storey, a crown); `clutter` says what its follow
+  camera passes through instead of pulling in (small set-dressing: a stall's counter and posts,
+  crates). Kiln added `clutter` (Oct 28) after a play report: small objects mustn't squeeze the
+  camera, since its see-through cutout and x-ray ghost already show the character. A part
+  without a tag takes its nearest tagged ancestor's; the manifest writes the resolved tag.
 - **Errors point at the script**: every shape records the script line that created it, so a
   lazily evaluated failure (a primitive with no color, a shape too large to sample) names the
   primitive, its line, and the part it belongs to.
@@ -254,7 +260,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Thin features | 1-voxel walls or spans with open air on both sides, reported as the largest clusters | Info |
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
 | Scale | An asset tagged `<tag>` more than 20% under or 25% over `[scale]` `<tag>_height` (`door`, `table`, `humanoid`), or a `building` shorter than `door_height` | Warning |
-| Occlusion | A `building` with no part tagged `roof` or `upper` | Info |
+| Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
 | Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
