@@ -76,6 +76,25 @@ Part(...).mirrored(name, about_x=None, about_y=None, about_z=None)  # -> (part, 
 - Each voxel should belong to one part; lint warns when parts overlap (they double up in exports
   and poke through when a part moves). Subtract one part's shape from the other.
 
+Buildings (tagged `building`, or `walkable` for a bridge) name the points a walk needs, and when
+the style's `[scale]` gives `walker_width`, `walker_height` and `walker_climb` (the game
+character's box and the ledge it climbs, in voxels), lint walks them:
+
+- `door`: outside the main entrance, on the ground (y = `ground_y`). The walk starts here.
+- `floor_0` … `floor_n`: a standing point on each storey, `floor_0` the ground floor. A bridge puts
+  `door` and `floor_0` at its deck ends.
+- `cellar`: a standing point in the cellar.
+- `tour_01` … `tour_NN`: the stops of a walk through the building, in order (the door, the foot and
+  head of each flight, each floor, the cellar).
+
+`door` and `floor_0` are required. The walker, two voxels wider and taller than the character,
+must reach every one of them from `door`, its feet within 2 voxels of the socket's y: so doorways
+at least `walker_width + 2` wide and `walker_height + 2` tall, risers of `walker_climb` at most,
+and stairwells open `walker_climb + walker_height + 2` above each tread. Give each storey its own
+part tagged `upper` and the roof its own `roof` part, split by y bands (stair steps above a line
+belong to the storey above): lint errors when one reaches up past the next one's lowest voxel,
+save the roof coming down over the top storey.
+
 ## Joints and clips
 
 ```python

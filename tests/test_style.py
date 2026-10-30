@@ -82,6 +82,29 @@ def test_bad_value_type_is_an_error(tmp_path):
         load_style(write(tmp_path, '[budgets]\nmax_voxels = "lots"\n'))
 
 
+def test_the_walker_keys_come_together_in_whole_voxels(tmp_path):
+    # The walk lint's walker: all three keys or none, so a typo never silently turns it off.
+    walker = {"walker_width": "8", "walker_height": "22", "walker_climb": "6"}
+
+    def scale(**change):
+        keys = {**walker, **change}
+        return "[scale]\n" + "".join(f"{k} = {v}\n" for k, v in keys.items() if v is not None)
+
+    assert load_style(write(tmp_path, scale())).scale["walker_climb"] == 6
+    assert load_style(write(tmp_path, scale(walker_width="8.0"))).scale["walker_width"] == 8
+    with pytest.raises(StyleError, match="walker_climb.*all three"):
+        load_style(write(tmp_path, scale(walker_climb=None)))
+    for key, bad in [
+        ("walker_width", "8.5"),
+        ("walker_width", "0"),
+        ("walker_height", "-22"),
+        ("walker_climb", "-1"),
+        ("walker_climb", "22"),  # a climb as high as the walker
+    ]:
+        with pytest.raises(StyleError, match=key):
+            load_style(write(tmp_path, scale(**{key: bad})))
+
+
 def test_to_dict_lists_palette_names_and_hex(tmp_path):
     d = load_style(write(tmp_path, FULL)).to_dict()
     assert d["palette"][0] == {"index": 1, "name": "wood.dark", "hex": "#3b2414"}

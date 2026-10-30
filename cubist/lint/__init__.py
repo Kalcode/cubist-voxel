@@ -1,5 +1,6 @@
-"""Lint: palette, bounds, pivots, part overlap, motion, connectivity, symmetry, grounding,
-budgets, thin features, and hidden interior. Errors block export; warnings and infos are advice."""
+"""Lint: palette, bounds, pivots, part overlap, motion, connectivity, symmetry, grounding, scale,
+a building's walk and storey bands, budgets, thin features, and hidden interior. Errors block
+export; warnings and infos are advice."""
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import numpy as np
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.core.style import StyleBible
-from cubist.lint import checks, motion
+from cubist.lint import checks, motion, walk
 from cubist.lint.checks import Finding
 
 SEVERITIES = ("error", "warning", "info")
@@ -129,6 +130,8 @@ def lint(
         *checks.check_light_reach(asset, style),
         *checks.check_scale(asset, style),
         *checks.check_occlusion(asset),
+        *walk.check_walk(asset, style),
+        *walk.check_storeys(asset),
         *checks.check_budgets(asset, merged, style),
         *checks.check_thin(merged),
         *checks.check_hidden(merged),

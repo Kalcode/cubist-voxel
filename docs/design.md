@@ -261,12 +261,39 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
 | Scale | An asset tagged `<tag>` more than 20% under or 25% over `[scale]` `<tag>_height` (`door`, `table`, `humanoid`), or a `building` shorter than `door_height` | Warning |
 | Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
+| Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with no `door` or `floor_0` socket, or with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the door | Error |
+| Storeys | A part tagged `upper` or `roof` (its own tag or a parent's) reaching up past the next such part's lowest voxel; the topmost may reach down over the one under it | Error |
 | Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
 | Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |
 | Motion bounds | How far each clip reaches beyond the rest box | Info |
 | Hand edit | An animated asset's `.vox` no longer matches its build | Error |
+
+The walk lint (13b, `cubist/lint/walk.py`) is the gate that keeps a building enterable by the
+game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height` 22, `StepUp` 6):
+
+- **The world:** the asset's voxels at rest (hidden parts left out), plus solid ground below
+  `ground_y` outside the asset's x–z bounds, 16 voxels past them. Inside the bounds there is no
+  ground, as Kiln carves a cellared building's footprint.
+- **The walker:** a box `(w + 2) × (h + 2) × (w + 2)` from `[scale]` `walker_width`,
+  `walker_height` and `walker_climb`, at whole voxels. It moves a voxel in x or z as `MoveAxis`
+  does: where the box fits it moves and drops onto the highest voxel under it; where it doesn't,
+  it steps up if the box raised by the climb fits, onto the highest voxel under it. Halfway
+  through a move the goblin's footprint is `w + 1` wide (its box between whole voxels), so that
+  footprint must stand at the walker's height before a step up, and a drop must land where the
+  walker's does.
+- **Reaching a socket:** a reached place whose footprint holds the socket's x–z (edges included),
+  with the feet within 2 voxels of its y. It flood-fills from the places it can stand at `door`.
+- **The error** names the socket and the walker, gives the reached place nearest to the socket and
+  its distance, and says to check the stair or doorway between them.
+- **Against the goblin:** a Python port of `Goblin.Update`, run on Oct 30, climbs a riser of 6
+  and not 7 and stays up over a gap of 8 but falls into 9, as the walker does. It steps up with 28
+  voxels of air above the tread it leaves (the walker needs 30) and passes a doorway 9 wide (8 when
+  centred on a whole voxel) and 22 tall (the walker needs 10 × 24). Where the grid differs, the
+  walker is the stricter, save one contrived case: across its path the goblin covers `w + 1` of
+  the walker's `w + 2` columns, so support that hands over from one edge to the other within a
+  voxel holds the walker but drops the goblin unless it sidesteps in the same frame.
 
 ## Style bible and example library
 
@@ -289,6 +316,9 @@ metal = ["#2a2d34", "#4b505a", "#7d8491", "#c2c8d0"]
 [scale]                      # lint: assets tagged <tag> against <tag>_height; buildings vs door
 humanoid_height = 24
 door_height = 32
+walker_width = 8             # the walk lint's walker, in voxels: all three or none
+walker_height = 22
+walker_climb = 6
 
 [budgets]
 max_colors = 32
@@ -310,8 +340,9 @@ water = { ramp = "water", fps = 6 }
 ```
 
 Every section is optional; unknown sections and keys are errors with a suggestion, so a typo
-never silently disables a budget. `[budgets]` also takes `max_parts`. `cubist style` prints the
-parsed bible with every palette name.
+never silently disables a budget. `[budgets]` also takes `max_parts`. The walker keys come
+together, in whole voxels (a climb below the height). `cubist style` prints the parsed bible
+with every palette name.
 
 ### Example library
 
@@ -557,7 +588,7 @@ cubist/
              noise.py  context.py
   build/     runner.py
   render/    raster.py  contact_sheet.py  ascii.py  font.py  diff.py
-  lint/      __init__.py (report)  checks.py
+  lint/      __init__.py (report)  checks.py  motion.py  walk.py
   io/        vox.py  mesh.py  gltf.py  vengi.py
   export.py  project.py  examples.py  palette_import.py
   cli.py
@@ -725,7 +756,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   below it. The default 0 changes no output. A negative `ground_y`, or one at or above the asset's height,
   is an error; the scale lint measures a building's height from the ground line. `build.json` carries it,
   so an export (which reads the asset back from `out/`) and `cubist lint` keep it.
-- **13b. Walk lint** and **13c. Bridges**: not started.
+- **13b. Walk lint (Oct 30).** The walk and storey lints (above, "Linting and validation"): a
+  `building` or `walkable` asset walks from `door` to every `floor_N`, `cellar` and `tour_NN`
+  socket when `[scale]` names the walker, and `upper` and `roof` parts are y bands. A
+  160 × 368 × 192 townhouse (a cellar, five storeys and their stairs) walks and checks its bands
+  in 0.48–0.51 s over three runs, of 1.35 s for its whole lint (M1 Max; the test's line is 5 s).
+- **13c. Bridges**: not started.
 
 ### v1 acceptance targets
 

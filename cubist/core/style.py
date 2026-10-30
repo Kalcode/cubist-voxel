@@ -8,6 +8,7 @@ turns a budget off.
 from __future__ import annotations
 
 import difflib
+import math
 import os
 import tomllib
 from dataclasses import asdict, dataclass, field
@@ -20,6 +21,8 @@ from cubist.core.palette import Palette, PaletteError
 
 DEFAULT_VOXEL_SIZE_M = 0.0625
 DITHER_RULES = ("allowed", "forbidden")
+# The walk lint's walker, in voxels: its box's width (x and z) and height, and the ledge it climbs.
+WALKER_KEYS = ("walker_width", "walker_height", "walker_climb")
 
 
 class StyleError(ValueError):
@@ -175,6 +178,30 @@ def _cycles(palette: Palette, table: dict) -> list[Cycle]:
     return out
 
 
+def _walker(scale: dict) -> None:
+    """The walker keys come together, as whole voxels: a width and height of 1 or more, and a climb
+    below the height. Whole floats (8.0) become ints."""
+    given = [k for k in WALKER_KEYS if k in scale]
+    if not given:
+        return
+    missing = [k for k in WALKER_KEYS if k not in scale]
+    if missing:
+        raise StyleError(
+            f"[scale] has {', '.join(given)} but not {', '.join(missing)}: the walk lint needs all "
+            "three (the walker's width, its height and the ledge it climbs, in voxels), or none"
+        )
+    for key in WALKER_KEYS:
+        value = scale[key]
+        low = 0 if key == "walker_climb" else 1
+        high = scale["walker_height"] if key == "walker_climb" else math.inf
+        if not float(value).is_integer() or not low <= value < high:
+            limits = "0 or more, below walker_height" if key == "walker_climb" else "1 or more"
+            raise StyleError(
+                f"[scale] {key} must be a whole number of voxels, {limits}; got {value!r}"
+            )
+        scale[key] = int(value)
+
+
 def _unknown(kind: str, name: str, known) -> StyleError:
     close = difflib.get_close_matches(name, list(known), n=1)
     hint = f" Did you mean {close[0]!r}?" if close else ""
@@ -250,6 +277,7 @@ def load_style(path: str | os.PathLike) -> StyleBible:
     for key, value in scale.items():
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise StyleError(f"[scale] {key} must be a number, got {value!r}")
+    _walker(scale)
 
     entries = dict(data.get("palette", {}))
     source = None
