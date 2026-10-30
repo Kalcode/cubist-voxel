@@ -49,7 +49,9 @@ def _print(data) -> None:
 
 def cmd_build(args: argparse.Namespace) -> int:
     if args.check:
-        checked = check_script(args.script, style=args.style, timeout=args.timeout, seed=args.seed)
+        checked = check_script(
+            args.script, style=args.style, timeout=args.timeout, seed=args.seed, only=args.only
+        )
         _print(checked)
         return 0
     results = build_script(
@@ -59,6 +61,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         timeout=args.timeout,
         seed=args.seed,
         check_determinism=args.check_determinism,
+        only=args.only,
     )
     if args.full:
         _print([r.summary for r in results])
@@ -383,6 +386,12 @@ def parser() -> argparse.ArgumentParser:
         "--check",
         action="store_true",
         help="run and lint only: no outputs, and it doesn't count as an iteration",
+    )
+    b.add_argument(
+        "--only",
+        action="append",
+        metavar="NAME",
+        help="build only this @asset of the script (repeat for more); the rest aren't built",
     )
     b.add_argument("--full", action="store_true", help="print the whole build summary")
     b.add_argument(

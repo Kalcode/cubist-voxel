@@ -261,7 +261,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Hidden interior | Solid voxels nobody can see (auto-hollowed on export) | Info |
 | Scale | An asset tagged `<tag>` more than 20% under or 25% over `[scale]` `<tag>_height` (`door`, `table`, `humanoid`; not the walker's keys), or a `building` shorter than `door_height` | Warning |
 | Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
-| Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the street at its door (error), or with no `door` or `floor_0` socket to walk (warning: older buildings no one enters) | Error, Warning |
+| Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the street at its door (error), a tour leg (`door` to `tour_01`, then each stop to the next) it can't walk in a straight line (error), or with no `door` or `floor_0` socket to walk (warning: older buildings no one enters) | Error, Warning |
 | Storeys | A part tagged `upper` or `roof` (its own tag or a parent's) reaching up past the next such part's lowest voxel; the topmost may reach down over the one under it | Error |
 | Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
@@ -300,6 +300,12 @@ game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height
   out from) and its distance, and saying to check the stair or doorway between them; an error
   when there's no street near `door` to start from. With no `door` or `floor_0` there's nothing to
   walk, and lint warns: older buildings that no one enters still export.
+- **The tour's legs:** Kiln's walk steers straight from one tour stop to the next, so from `door`
+  to `tour_01` and from each `tour_NN` to the next (name order) the walker must get there keeping
+  its footprint's centre within a voxel of the line, its feet between the two stops' heights (2 to
+  spare), over the moves the walk kept. A leg that can't is an error on the stop it ends at,
+  naming the one it starts from and how far along the line the walker got; a leg whose ends are
+  already errors isn't walked again.
 - **Against the goblin:** `tests/goblin.py` ports `Goblin.Tick` and `VoxelCollision`, and
   `test_walk_lint.py` runs the same strips through it and the walker. It climbs a riser of 6 and
   not 7 and stays up over a gap of 8 but falls into 9, as the walker does. It steps up with 28
@@ -395,7 +401,7 @@ image content so the agent sees them without opening files.
 | Command | Does |
 | --- | --- |
 | `cubist new <name> --category prop [--size x,y,z] [--tags ...] [--must-have ...]` | Scaffold a brief and script stub |
-| `cubist build <script> [--seed N] [--check-determinism]` | Build → `.vox`, contact sheet, `lint.json` in `out/<name>/` |
+| `cubist build <script> [--only NAME] [--seed N] [--check-determinism]` | Build → `.vox`, contact sheet, `lint.json` in `out/<name>/`; `--only` builds just the named assets of a script defining several |
 | `cubist render <asset> --views front,side,iso --slices y=10..14` | Re-render or print ASCII slices |
 | `cubist lint <asset>` | Lint only (exit 2 on errors) |
 | `cubist style` | Parsed `style.toml` with palette names |
@@ -800,6 +806,14 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   the ground line, as the scale lint does since 13a: a townhouse's door lamp 40 voxels above the street
   needs a range of 57, where measuring from the cellar's floor asked 125 of it. A light below the line,
   in the cellar, is measured from the asset's floor.
+- **13f. Tour legs (Oct 30).** The walk lint walks a building's tour as Kiln does, in straight legs:
+  from `door` to `tour_01` and from each stop to the next, the walker must follow the line (its
+  footprint's centre within a voxel of it, its feet between the stops' heights) over the moves the
+  flood kept. A leg that turns or runs through a wall errors. The test fixture's tour gained corner
+  stops; the 160 × 368 × 192 case still lints in under 5 s.
+- **13g. One asset of a family (Oct 30).** `cubist build --only NAME` (repeatable; the MCP
+  `build_asset` tool's `only`) builds just the named assets of a script that defines several, so
+  one variant of a family rebuilds alone, under its own timeout, and only its iteration counts.
 
 ### v1 acceptance targets
 

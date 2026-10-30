@@ -186,6 +186,35 @@ def test_an_error_in_a_project_module_reports_its_line(project):
         build_script(script)
 
 
+PAIR = """
+from cubist import *
+
+@asset(name="a", size=(2, 2, 2))
+def a(p):
+    return box((2, 2, 2), color=p.wood.dark)
+
+@asset(name="b", size=(2, 2, 2))
+def b(p):
+    return box((2, 2, 2), color=p.wood.mid)
+"""
+
+
+def test_only_builds_the_named_assets_of_a_script(project):
+    script = write_script(project, "pair", PAIR)
+    [result] = build_script(script, only=["b"])
+    assert result.name == "b"
+    # The other asset isn't built, so it gets no outputs and no iteration.
+    assert not (project / "out" / "a").exists()
+    assert {r.name for r in build_script(script, only=["a", "b"])} == {"a", "b"}
+
+
+def test_only_with_a_name_the_script_does_not_define_is_an_error(project):
+    script = write_script(project, "pair", PAIR)
+    with pytest.raises(BuildError, match=r"defines no asset named 'c'.*'a', 'b'"):
+        build_script(script, only=["c"])
+    assert not (project / "out" / "a").exists()
+
+
 def test_script_without_assets_is_an_error(project):
     script = write_script(project, "empty", "x = 1\n")
     with pytest.raises(BuildError, match="@asset"):

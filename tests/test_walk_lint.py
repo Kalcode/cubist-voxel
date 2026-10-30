@@ -78,7 +78,8 @@ def house(
     floor's top.
 
     Sockets: ``door`` on the street outside the door, ``floor_N`` near the front of each floor,
-    ``cellar``, and ``tour_NN`` at the foot and head of each flight."""
+    ``cellar``, and with a flight, ``tour_NN``: in at the door, then up every flight (down the
+    cellar's and back), in straight legs along the front of each floor and the flights."""
     g = 48 if cellar else WALL
     top = g + storeys * storey
     levels = ([WALL] if cellar else []) + [g + k * storey for k in range(storeys)]
@@ -96,7 +97,16 @@ def house(
     x = width // 2 - wide // 2
     site.fill((x, g, depth - WALL), (x + wide, g + tall, depth), False)
 
-    tour = []
+    left, right, front = STAIR_X - 6, width - WALL - 10, depth - WALL - 14
+    tour = [(width / 2, g, front)]  # just inside the door
+
+    def go(to):
+        """Straight legs from the last stop to ``to`` on one floor, by way of the front."""
+        x, y, z = tour[-1]
+        for stop in ((x, y, front), (to[0], y, front), to):
+            if stop != tour[-1]:
+                tour.append(stop)
+
     for k, (a, b) in enumerate(zip(levels, levels[1:], strict=False)):
         if cellar and k == 0 and not cellar_stair:
             continue
@@ -106,7 +116,15 @@ def house(
         site.fill((STAIR_X, b - WALL, z), (end, b, z + 16), False)  # the stairwell
         for i in range(1, n + 1):
             site.fill((STAIR_X + 5 * (i - 1), a, z), (end, min(a + riser * i, b), z + 16))
-        tour += [(STAIR_X - 6, a, z + 8), (end + 6, b, z + 8)]
+        foot, head = (left, a, z + 8), (right, b, z + 8)
+        if tour[-1][1] == a:  # climb it
+            go(foot)
+            tour.append(head)
+        else:  # the cellar's flight, from the ground floor: down it and back up
+            go(head)
+            tour += [foot, head]
+    if len(tour) == 1:
+        tour = []  # no flight, no tour
 
     front = depth - WALL - 10
     site.sockets["door"] = (width / 2, g, depth)
@@ -172,7 +190,7 @@ def test_lint_runs_the_walk_and_storey_checks():
 def test_risers_of_6_are_climbed_and_7_are_not():
     assert walk_errors(house(riser=6).built()) == []
     found = walk_errors(house(riser=7).built())
-    assert {f.details["socket"] for f in found} == {"floor_1", "tour_02"}  # the flight's head too
+    assert {f.details["socket"] for f in found} == {"floor_1", "tour_04"}  # the flight's head too
     [f] = [f for f in found if f.details["socket"] == "floor_1"]
     assert "'floor_1'" in f.message and "8 × 22" in f.message and "climbs 6" in f.message
     assert "stair or doorway" in f.message
@@ -259,7 +277,7 @@ def test_the_walker_must_get_back_out():
     found = walk_errors(house(storeys=1, cellar=True, riser=7).built())
     assert {(f.details["socket"], f.details["way"]) for f in found} == {
         ("cellar", "out"),
-        ("tour_01", "out"),  # the foot of the flight
+        ("tour_04", "out"),  # the foot of the flight
     }
     [f] = [f for f in found if f.details["socket"] == "cellar"]
     assert "can't get back from 'cellar'" in f.message and "to the street" in f.message
@@ -268,6 +286,37 @@ def test_the_walker_must_get_back_out():
     hatch = house(storeys=1, cellar=True, cellar_stair=False)
     hatch.fill((40, 44, 40), (60, 48, 60), False)  # 20 × 20 through the ground floor
     assert way_out(hatch.built()) == {("cellar", "out")}
+
+
+def test_a_tour_goes_from_stop_to_stop_in_straight_lines():
+    # A walk steers straight from one stop to the next. Two stops either side of a wall, which the
+    # walker reaches only by going round its end: an error on the stop the line ends at, naming
+    # the one it starts from. Stops at the corner mend it.
+    site = house(storeys=1)
+    site.fill((WALL, WALL, 40), (70, 48, 44))  # a wall across the room, open past x = 70
+    site.sockets["tour_01"] = (50, WALL, 62)  # just inside the door
+    site.sockets["tour_02"] = (50, WALL, 20)  # behind the wall
+    [f] = walk_errors(site.built())
+    assert f.details["socket"] == "tour_02" and f.details["from"] == "tour_01"
+    assert f.details["way"] == "leg" and f.details["nearest"][2] == pytest.approx(47, abs=2)
+    assert "straight line" in f.message and "'tour_01'" in f.message and "'tour_02'" in f.message
+    site.sockets["tour_02"] = (80, WALL, 62)  # round the wall's end
+    site.sockets["tour_03"] = (80, WALL, 20)
+    site.sockets["tour_04"] = (50, WALL, 20)
+    assert walk_errors(site.built()) == []
+
+
+def test_a_tour_starts_from_the_door():
+    # The first leg runs from 'door', on the street, to tour_01.
+    site = house(storeys=1)
+    site.fill((30, WALL, 50), (70, 48, 54))  # a screen across the hall, open at both ends
+    site.sockets["tour_01"] = (50, WALL, 30)
+    [f] = walk_errors(site.built())
+    assert f.details["socket"] == "tour_01" and f.details["from"] == "door"
+    site.sockets["tour_01"] = (50, WALL, 62)
+    site.sockets["tour_02"] = (80, WALL, 62)
+    site.sockets["tour_03"] = (80, WALL, 30)
+    assert walk_errors(site.built()) == []
 
 
 def test_a_cellared_footprint_has_no_ground():
@@ -392,7 +441,7 @@ def test_a_townhouse_sized_asset_walks_in_under_5_seconds():
     # 160 × 368 × 192: a cellar, five storeys and a roof, every floor reached by its stair.
     site = house(width=160, depth=192, storeys=5, cellar=True, roof=80)
     a = site.built()
-    assert a.size == (160, 368, 192) and len(a.sockets) == 1 + 5 + 1 + 2 * 5
+    assert a.size == (160, 368, 192) and len(a.sockets) == 1 + 5 + 1 + 21
     start = time.perf_counter()
     found = check_walk(a, STYLE) + check_storeys(a)
     elapsed = time.perf_counter() - start

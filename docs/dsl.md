@@ -16,7 +16,10 @@ A family of assets can share pieces through the project's own modules: a package
 `style.toml` (say `kit/`) that scripts `import`, whatever directory the build runs from. Its
 functions take `p` and return shapes like any script's. An error inside one shows its lines too.
 A build counts an iteration by the script's text alone, so a change to a shared module alone
-isn't counted: say so when you report iterations.
+isn't counted: say so when you report iterations. The project's directory goes first on the
+import path, so give its modules names no installed package uses (`kit`, not `random` or `cubist`).
+`cubist build <script> --only <name>` builds one asset of a script that defines several (a family's
+variants), and only that asset's iteration counts.
 
 ## Conventions
 
@@ -93,7 +96,9 @@ character's box and the ledge it climbs, in voxels), lint walks them:
   `door` and `floor_0` at its deck ends.
 - `cellar`: a standing point in the cellar.
 - `tour_01` … `tour_NN`: the stops of a walk through the building, in order (the door, the foot and
-  head of each flight, each floor, the cellar).
+  head of each flight, each floor, the cellar). A walk steers straight from stop to stop, so from
+  `door` to `tour_01` and from each stop to the next the walker must follow a straight line: lint
+  errors on a leg that turns or runs through a wall, and a stop where the way turns mends it.
 
 Without `door` or `floor_0` lint warns that it can't walk the building. The walker, two voxels
 wider and taller than the character, must reach every one of them from the street (which runs on

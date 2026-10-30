@@ -3,7 +3,8 @@
 The walk lint flood-fills a building from the street at its ``door`` socket with a walker the
 size of the game's character (``[scale]`` ``walker_width``, ``walker_height`` and
 ``walker_climb``, plus MARGIN) and errors on each door, storey, cellar or tour socket it never
-reaches, or reaches but can't walk back to the street from. The storey lint keeps each hideable
+reaches, or reaches but can't walk back to the street from, and on each leg of the tour (from
+``door``, then stop to stop) it can't walk in a straight line. The storey lint keeps each hideable
 part a horizontal band, because an engine hides the storeys above the character by y.
 """
 
@@ -25,6 +26,7 @@ MARGIN = 2  # voxels added to the walker's width and height, so what passes has 
 GROUND_PAD = 16  # voxels of ground around the asset's footprint
 DOOR_REACH = 16  # voxels from 'door' the walk may start on the street (eaves or a jetty over it)
 REACH_Y = 2  # a socket is reached by feet within this many voxels of its y
+LEG_SLACK = 1.0  # a tour's leg: the footprint's centre stays this close to the straight line
 STOREY_TAGS = ("upper", "roof")
 _MOVES = ((0, 1), (0, -1), (2, 1), (2, -1))  # (axis, step)
 
@@ -190,6 +192,7 @@ class Walker:
         n = len(states)
         src = np.searchsorted(states, np.concatenate([m[0] for m in moves]))
         dst = np.searchsorted(states, np.concatenate([m[1] for m in moves]))
+        self._states, self._src, self._dst = states, src, dst  # for the tour's legs
         # Node n stands for the street, with an edge to each start.
         rows = np.concatenate([dst, np.full(len(starts), n)])
         cols = np.concatenate([src, np.searchsorted(states, starts)])
@@ -223,6 +226,51 @@ class Walker:
                 tos.append(np.ravel_multi_index((ni[keep], to[keep], nk[keep]), self.reached.shape))
         return np.concatenate(froms), np.concatenate(tos)
 
+    def follows(self, a, b) -> tuple[bool, list, float]:
+        """Whether the walker, from where it stands at stop ``a``, walks to stop ``b`` keeping its
+        footprint's centre within LEG_SLACK of the straight line between them (in x-z), its feet
+        between their heights (REACH_Y to spare): a walk that steers straight from stop to stop.
+        Returns that, the farthest point along the line it gets to, and how far short of ``b``."""
+        a, b = np.asarray(a, float), np.asarray(b, float)
+        states, shape = self._states, self.reached.shape
+        i, f, k = np.unravel_index(states, shape)
+        cx = i + self.origin[0] + self.foot / 2
+        cz = k + self.origin[2] + self.foot / 2
+        feet = f + self.origin[1]
+        d = b[[0, 2]] - a[[0, 2]]
+        length = float(np.hypot(*d))
+        t = np.zeros(len(states))
+        if length > 0:
+            t = np.clip(((cx - a[0]) * d[0] + (cz - a[2]) * d[1]) / length**2, 0, 1)
+        lateral = np.hypot(cx - (a[0] + t * d[0]), cz - (a[2] + t * d[1]))
+        ylo, yhi = min(a[1], b[1]) - REACH_Y, max(a[1], b[1]) + REACH_Y
+        near = (lateral <= LEG_SLACK) & (feet >= ylo) & (feet <= yhi)
+
+        def on_line(pos):
+            cells = np.ravel_multi_index(self._around(pos), shape)
+            at = np.searchsorted(states, cells).clip(0, len(states) - 1)
+            at = at[states[at] == cells]
+            return at[near[at]]
+
+        start, goal = on_line(a), on_line(b)
+        if len(start) == 0:
+            return False, [_num(v) for v in a], length
+        ids = np.cumsum(near) - 1  # each state near the line, numbered from 0
+        m = int(near.sum())
+        keep = near[self._src] & near[self._dst]
+        rows = np.concatenate([ids[self._src[keep]], np.full(len(start), m)])
+        cols = np.concatenate([ids[self._dst[keep]], ids[start]])
+        graph = csr_matrix((np.ones(len(rows), np.int8), (rows, cols)), shape=(m + 1, m + 1))
+        order = breadth_first_order(graph, m, directed=True, return_predecessors=False)
+        seen = np.zeros(m + 1, bool)
+        seen[order] = True
+        if seen[ids[goal]].any():
+            return True, [_num(v) for v in b], 0.0
+        walked = np.flatnonzero(near)[seen[:m]]
+        j = walked[np.argmax(t[walked])]
+        point = [_num(v) for v in (cx[j], feet[j], cz[j])]
+        return False, point, float((1 - t[j]) * length)
+
     def reaches(self, pos) -> bool:
         i, f, k = self._around(pos)
         return bool(self.reached[i, f, k].any())
@@ -253,9 +301,9 @@ class Walker:
 
 def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     """A building (or a walkable asset, like a bridge) must let the walker in from the street at
-    its ``door`` and up to every ``floor_N``, ``cellar`` and ``tour_NN`` socket. Without a
-    ``door`` or ``floor_0`` it can't be checked, and lint warns (an older building no one
-    enters)."""
+    its ``door`` and up to every ``floor_N``, ``cellar`` and ``tour_NN`` socket, and back out, and
+    walk its tour in straight legs (``door``, ``tour_01``, ``tour_02``, ...). Without a ``door`` or
+    ``floor_0`` it can't be checked, and lint warns (an older building no one enters)."""
     if not set(WALK_TAGS) & set(asset.tags) or not all(k in style.scale for k in WALKER_KEYS):
         return []
     width, height, climb = (int(style.scale[k]) for k in WALKER_KEYS)
@@ -302,6 +350,7 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
             )
         )
         return out
+    failed = set()
     for name, pos in sorted(sockets.items()):
         if not walked(name):
             continue
@@ -322,6 +371,7 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
             )
         else:
             continue
+        failed.add(name)
         out.append(
             Finding(
                 "walk",
@@ -332,6 +382,34 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
                     "way": way,
                     "nearest": point,
                     "distance": round(distance, 2),
+                    **details,
+                },
+            )
+        )
+    stops = ["door"] + sorted(n for n in sockets if n.startswith("tour_"))
+    for prev, name in zip(stops, stops[1:], strict=False):
+        if prev in failed or name in failed:
+            continue  # already an error: it isn't reached, or there's no way back from it
+        a, b = sockets[prev], sockets[name]
+        ok, point, short = walker.follows(a, b)
+        if ok:
+            continue
+        total = math.hypot(b[0] - a[0], b[2] - a[2])
+        out.append(
+            Finding(
+                "walk",
+                "error",
+                f"the tour can't walk a straight line from {prev!r} {_at(a)} to {name!r} "
+                f"{_at(b)}: keeping to the line, the walker gets {total - short:.0f} of the "
+                f"{total:.0f} voxels, as far as {_at(point)}. A tour's walk steers straight from "
+                "each stop to the next (from 'door', then tour_01, tour_02, ...), so put a stop "
+                f"where the way turns, or clear the line: {walker.needs()}",
+                {
+                    "socket": name,
+                    "from": prev,
+                    "way": "leg",
+                    "nearest": point,
+                    "distance": round(short, 2),
                     **details,
                 },
             )

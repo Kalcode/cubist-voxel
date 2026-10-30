@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -79,7 +80,13 @@ def load_palette(style: Path) -> Palette:
 
 
 def _run_worker(
-    script: Path, style: Path, out: Path, seed: int, timeout: float, check: bool = False
+    script: Path,
+    style: Path,
+    out: Path,
+    seed: int,
+    timeout: float,
+    check: bool = False,
+    only: Sequence[str] | None = None,
 ) -> dict:
     with tempfile.TemporaryDirectory() as tmp:
         result_file = Path(tmp) / "result.json"
@@ -92,7 +99,8 @@ def _run_worker(
             str(out),
             str(result_file),
             str(seed),
-            *(["check"] if check else []),
+            "check" if check else "build",
+            json.dumps(list(only) if only else None),
         ]
         env = {**os.environ, "PYTHONHASHSEED": "0"}
         try:
@@ -131,14 +139,17 @@ def build_script(
     timeout: float = DEFAULT_TIMEOUT_S,
     seed: int = 0,
     check_determinism: bool = False,
+    only: Sequence[str] | None = None,
 ) -> list[BuildResult]:
+    """Build every ``@asset`` of a script, or with ``only`` just those named (the others aren't
+    built, so they get no outputs and no iteration)."""
     script = Path(script).resolve()
     style = Path(style).resolve() if style else find_style(script)
     out = Path(out).resolve() if out else style.parent / "out"
-    result = _run_worker(script, style, out, seed, timeout)
+    result = _run_worker(script, style, out, seed, timeout, only=only)
     if check_determinism:
         with tempfile.TemporaryDirectory() as tmp:
-            again = _run_worker(script, style, Path(tmp), seed, timeout)
+            again = _run_worker(script, style, Path(tmp), seed, timeout, only=only)
         hashes = {r["name"]: r["vox_sha256"] for r in again["assets"]}
         for r in result["assets"]:
             if hashes.get(r["name"]) != r["vox_sha256"]:
@@ -169,12 +180,14 @@ def check_script(
     style: str | os.PathLike | None = None,
     timeout: float = DEFAULT_TIMEOUT_S,
     seed: int = 0,
+    only: Sequence[str] | None = None,
 ) -> list[dict]:
     """Run and lint a script without writing outputs or counting an iteration: a quick check
     for typos and lint before a real build. Returns ``[{"name", "lint"}]``."""
     script = Path(script).resolve()
     style = Path(style).resolve() if style else find_style(script)
-    result = _run_worker(script, style, style.parent / "out", seed, timeout, check=True)
+    out = style.parent / "out"
+    result = _run_worker(script, style, out, seed, timeout, check=True, only=only)
     return [{"name": r["name"], "lint": r["summary_data"]["lint"]} for r in result["assets"]]
 
 
@@ -332,7 +345,12 @@ def _check(a: AssetDef, style: StyleBible, seed: int) -> dict:
 
 
 def _build_in_process(
-    script: Path, style_path: Path, out: Path, seed: int, check: bool = False
+    script: Path,
+    style_path: Path,
+    out: Path,
+    seed: int,
+    check: bool = False,
+    only: Sequence[str] | None = None,
 ) -> list[dict]:
     style = load_project_style(style_path)
     project = _import_project(style_path)
@@ -349,6 +367,16 @@ def _build_in_process(
         if not check:
             _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
         raise BuildError(message)
+    if only:
+        names = [a.name for a in assets]
+        missing = [n for n in only if n not in names]
+        if missing:
+            defined = ", ".join(repr(n) for n in names)
+            raise BuildError(
+                f"{script.name} defines no asset named {missing[0]!r} (--only); "
+                f"it defines {defined}"
+            )
+        assets = [a for a in assets if a.name in only]
     if check:
         return [_check(a, style, seed) for a in assets]
     results = []
@@ -368,8 +396,9 @@ def _worker(argv: list[str]) -> None:
     script, style, out, result_file = (Path(a) for a in argv[:4])
     seed = int(argv[4]) if len(argv) > 4 else 0
     check = len(argv) > 5 and argv[5] == "check"
+    only = json.loads(argv[6]) if len(argv) > 6 else None
     try:
-        payload = {"assets": _build_in_process(script, style, out, seed, check)}
+        payload = {"assets": _build_in_process(script, style, out, seed, check, only)}
     except BuildError as e:
         payload = {"error": str(e)}
     except Exception as e:  # anything else is a bug in cubist, not the script

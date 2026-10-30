@@ -32,6 +32,19 @@ def test_build_prints_json_summary(tmp_path, capsys):
     assert (tmp_path / "out" / "post" / "post.vox").is_file()
 
 
+def test_build_only_builds_the_named_asset(tmp_path, capsys):
+    script = setup(tmp_path)
+    with script.open("a") as f:
+        f.write(
+            "\n@asset(name='peg', size=(1, 2, 1))\ndef peg(p):\n"
+            "    return box((1, 2, 1), color=p.wood.dark)\n"
+        )
+    assert main(["build", str(script), "--only", "peg"]) == 0
+    [summary] = json.loads(capsys.readouterr().out)
+    assert summary["name"] == "peg"
+    assert not (tmp_path / "out" / "post").exists()
+
+
 def test_build_error_exits_nonzero_with_message(tmp_path, capsys):
     (tmp_path / "style.toml").write_text(STYLE)
     bad = tmp_path / "bad.py"

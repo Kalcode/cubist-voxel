@@ -76,6 +76,17 @@ def test_build_asset_from_code_returns_lint_and_the_contact_sheet(project):
     assert (project / "assets" / "crate.py").read_text() == CRATE
 
 
+def test_build_asset_only_builds_the_named_assets(project):
+    pair = CRATE + CRATE.replace("crate", "peg").split("\n", 1)[1]
+    (project / "assets").mkdir()
+    (project / "assets" / "pair.py").write_text(pair)
+    result = call(project, "build_asset", script_path="assets/pair.py", only=["peg"])
+    assert not result.is_error
+    text = "\n".join(texts(result))
+    assert text.startswith("peg:") and "crate:" not in text
+    assert not (project / "out" / "crate").exists()
+
+
 def test_build_errors_come_back_as_tool_errors_with_the_reason(project):
     bad = CRATE.replace("p.wood.mid", "p.wod.mid")
     result = call(project, "build_asset", code=bad, name="crate")

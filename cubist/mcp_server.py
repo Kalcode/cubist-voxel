@@ -74,11 +74,13 @@ def create_server(project: str | Path) -> MCPServer:
         code: str | None = None,
         name: str | None = None,
         seed: int = 0,
+        only: list[str] | None = None,
     ) -> list:
         """Build an asset script and return its lint summary, output paths, and contact sheet.
 
         Pass script_path (relative to the project), or code plus name to save the code as
-        assets/<name>.py first. seed reshuffles every seeded op."""
+        assets/<name>.py first. seed reshuffles every seeded op. only builds just the named
+        @assets of a script that defines several (a family's variants)."""
         if code is not None:
             if not name:
                 raise ToolError("pass name with code; the script is saved as assets/<name>.py")
@@ -90,7 +92,7 @@ def create_server(project: str | Path) -> MCPServer:
         else:
             raise ToolError("pass script_path, or code and name")
         out = []
-        for r in build_script(script, style=project / "style.toml", seed=seed):
+        for r in build_script(script, style=project / "style.toml", seed=seed, only=only):
             s = r.summary
             motion = s["outputs"].get("motion")
             gifs = s["outputs"].get("gifs", {})
