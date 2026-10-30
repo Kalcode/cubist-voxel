@@ -277,9 +277,17 @@ class Road(PathEdit):
     def __init__(self, line, width_m, color, bank_m, smooth_m, bridges=False):
         super().__init__(line, width_m, bank_m)
         self.color, self.smooth, self.bridges = color, float(smooth_m), bool(bridges)
-        self.rivers: list[
-            River
-        ] = []  # the world's rivers, set when it loads (a bridge crosses them)
+        self._rivers: list[River] = []
+        self._scan: tuple[list[tuple[float, float]], list[str]] | None = None
+
+    @property
+    def rivers(self) -> list[River]:
+        """The world's rivers, set when it loads (a bridge crosses them)."""
+        return self._rivers
+
+    @rivers.setter
+    def rivers(self, value) -> None:
+        self._rivers, self._scan = list(value), None
 
     def in_channel(self, x, z) -> np.ndarray:
         """Where a bridged road leaves the ground alone: inside any river's channel."""
@@ -292,9 +300,20 @@ class Road(PathEdit):
     def crossings(self) -> list[tuple[float, float]]:
         """(entry, exit) arc lengths of each stretch of a bridged road over a river's channel,
         found to a few millimetres. A road that starts or ends in the water has no bank to
-        carry a deck from, so that stretch isn't a crossing."""
-        if not self.bridges or not self.rivers:
-            return []
+        carry a deck from, so that stretch isn't a crossing (see ``wet_ends``)."""
+        return self._scanned()[0]
+
+    def wet_ends(self) -> list[str]:
+        """``"start"`` and/or ``"end"`` when a bridged road begins or finishes inside a channel."""
+        return self._scanned()[1]
+
+    def _scanned(self) -> tuple[list[tuple[float, float]], list[str]]:
+        """Walks the road once per loaded world (the bake, the lint and the line share it)."""
+        if self._scan is None:
+            self._scan = self._walk() if self.bridges and self._rivers else ([], [])
+        return self._scan
+
+    def _walk(self) -> tuple[list[tuple[float, float]], list[str]]:
         pts = self.path.points
 
         def over(s):
@@ -305,6 +324,7 @@ class Road(PathEdit):
         s = np.arange(0.0, self.path.length + 0.25, 0.25).clip(max=self.path.length)
         wet = over(s)
         out = []
+        ends = [name for name, i in (("start", 0), ("end", -1)) if wet[i]]
         edges = np.flatnonzero(np.diff(wet.astype(np.int8)))
         enter = None
         for i in edges:
@@ -321,7 +341,7 @@ class Road(PathEdit):
             elif enter is not None:
                 out.append((enter, edge))
                 enter = None
-        return out
+        return out, ends
 
     def at(self, arc: float) -> tuple[float, float]:
         """The (x, z) at an arc length along the road."""
@@ -332,7 +352,11 @@ class Road(PathEdit):
         )
 
     def strip(self, x, z) -> np.ndarray:
-        return super().strip(x, z) & ~self.in_channel(x, z)
+        x, z = np.asarray(x, dtype=np.float64), np.asarray(z, dtype=np.float64)
+        on = super().strip(x, z)
+        if self.bridges and on.any():  # only the painted columns need the channel test
+            on[on] = ~self.in_channel(x[on], z[on])
+        return on
 
     def _shape(self, along):
         # A moving average over about `smooth_m` of road, so it doesn't follow every bump.
@@ -353,9 +377,11 @@ class Road(PathEdit):
         r = self.level(ground, seed, arc[near])
         dn, hn = d[near], h[near]
         out[near] = r + (hn - r) * _smoothstep((dn - self.half) / max(self.bank, 1e-9))
-        if self.bridges:  # the river's channel stays as it was cut, under the deck
-            dry = ~self.in_channel(x, z)
-            out = np.where(dry, out, h)
+        if self.bridges:
+            # The river's channel stays as it was cut, under the deck. The road's level resumes at
+            # the channel's edge with no easing: the bridge's abutment meets it.
+            wet = self.in_channel(np.asarray(x)[near], np.asarray(z)[near])
+            out[near] = np.where(wet, hn, out[near])
         return out
 
 

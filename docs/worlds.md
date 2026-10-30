@@ -93,8 +93,10 @@ them. Rivers and roads follow paths, in `World(rivers=[...], roads=[...])` (rive
   them, and the road's `world.json` line gets a point where it enters the channel and one where it leaves
   (at the road's height on each bank) and a point every 4 m or so between, on the straight line between
   the two: the deck. Kiln's walks follow that line in x–z and the character rides what's under it, so the
-  deck is a prop: `place()` a bridge asset with its footprint over the middle of each crossing. A road
-  that starts or ends in the water has no bank to carry a deck from and isn't a crossing.
+  deck is a prop: `place()` a bridge asset turned to the road, its footprint spanning the water and
+  landing 1 m on each bank. The road's level resumes at the channel's edge, with no easing: the bridge's
+  abutment meets it. A road that starts or ends in the water has no bank to carry a deck from: no deck, and
+  lint warns.
 
 The map draws water in its own color, a little darker where it's deep; the bake fills it as voxels and
 shows it in the far field.
@@ -174,7 +176,7 @@ asset.
 | slope | Ground within 20 m of a landmark steeper than 45°; the share of all ground that steep (info) | Warning |
 | uneven | A placed prop whose footprint's ground falls more than 1 m (it floats on the low side) | Warning |
 | overlap | Placed props overlapping, and scattered props growing into a placed one | Warning |
-| bridge | A bridged road's crossing with no placed prop whose footprint covers the middle of the channel (an unexported prop must stand within 1 m of it) | Warning |
+| bridge | A bridged road's crossing whose water no placed prop's footprint spans along the road (it must cover the middle and 1 m past the channel on each bank; a bridge turned along the river, a tree or a 1 m prop doesn't; a prop that isn't exported must stand within 1 m of the middle); a bridged road that starts or ends in a channel | Warning |
 | cave | A cavern or tunnel with no way in from the surface; a tunnel whose floor rises or drops more than 1 m in a metre (a step no one climbs: vale's worm pit showed as "rises 3.7 m") | Warning |
 
 Props are checked against their exported manifests; until they're exported, lint says so and skips them.

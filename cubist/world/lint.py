@@ -183,19 +183,40 @@ def _props(loaded: LoadedWorld, export: Path | None) -> list[Finding]:
     return out
 
 
+BANK_LAND_M = 1.0  # a bridge must reach this far past the water along the road, onto each bank
+
+
 def _bridges(loaded: LoadedWorld, export: Path | None) -> list[Finding]:
-    """A bridged road's crossing needs a placed prop (the deck) over the middle of the channel. With
-    the prop's export its footprint must cover that point; without, it must stand within a metre."""
+    """A bridged road's crossing needs a placed prop (the deck) spanning the water along the road:
+    its footprint must cover the points ``BANK_LAND_M`` before the channel and after it, and the
+    middle. A prop that isn't exported can't be measured, so it must stand within a metre of the
+    middle. A bridged road that starts or ends in a channel gets no deck, which also warns."""
     out: list[Finding] = []
     placed = [p for p in loaded.world.props if isinstance(p, Place)]
     for i, road in enumerate(loaded.world.roads, 1):
+        label = road.name or f"road{i}"
+        for end in road.wet_ends():
+            x, z = road.at(0.0 if end == "start" else road.path.length)
+            out.append(
+                _f(
+                    "bridge",
+                    "warning",
+                    f"{label} {'starts' if end == 'start' else 'ends'} in a river's channel at "
+                    f"({x:.0f}, {z:.0f}), so it gets no deck: move that end onto dry ground "
+                    f"(the bridge is carried from bank to bank)",
+                )
+            )
         for s0, s1 in road.crossings():
             x, z = road.at((s0 + s1) / 2)
+            ends = [
+                road.at(max(s0 - BANK_LAND_M, 0.0)),
+                road.at(min(s1 + BANK_LAND_M, road.path.length)),
+            ]
             covered = False
             for prop in placed:
                 if export is not None and (export / f"{prop.asset}.cubist.json").is_file():
                     x0, z0, x1, z1 = _footprint_box(export, prop)
-                    covered |= x0 <= x <= x1 and z0 <= z <= z1
+                    covered |= all(x0 <= px <= x1 and z0 <= pz <= z1 for px, pz in [*ends, (x, z)])
                 else:
                     covered |= math.hypot(prop.at[0] - x, prop.at[-1] - z) <= 1.0
             if not covered:
@@ -203,9 +224,10 @@ def _bridges(loaded: LoadedWorld, export: Path | None) -> list[Finding]:
                     _f(
                         "bridge",
                         "warning",
-                        f"{road.name or f'road{i}'} crosses a river at ({x:.0f}, {z:.0f}) "
-                        f"({s1 - s0:.0f} m of water) with no bridge: place() an exported bridge "
-                        f"asset there, its footprint over ({x:.0f}, {z:.0f})",
+                        f"{label} crosses a river at ({x:.0f}, {z:.0f}) ({s1 - s0:.0f} m of "
+                        f"water) with no bridge: place() an exported bridge asset there, long "
+                        f"enough to span the water along the road and land {BANK_LAND_M:g} m on "
+                        f"each bank, turned to the road",
                     )
                 )
     return out

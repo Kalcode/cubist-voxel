@@ -894,7 +894,7 @@ def test_coarse_path_distance_stays_close_away_from_the_path():
         assert alone == b[i, j]
 
 
-def _crossing_world(bridges, props=()):
+def _crossing_world(bridges, props=(), road_points=((40, 10), (40, 110))):
     """A road along x = 40 over a river at z = 60 (56 to 64); the ground falls 0.1 m/m south."""
     from cubist.world import path, place, river, road
     from cubist.world.field import Custom
@@ -917,14 +917,14 @@ def _crossing_world(bridges, props=()):
             ],  # fmt: skip
             roads=[
                 road(
-                    path([(40, 10), (40, 110)], smooth=False),
+                    path(list(road_points), smooth=False),
                     width_m=4,
                     color=p.cork,
                     name="street",
                     **kwargs,
                 )
             ],
-            props=[place(a, at=at) for a, at in props],
+            props=[place(a, at=at, rotate_y=turn) for a, at, turn in props],
         )
 
     return crossing
@@ -1026,10 +1026,83 @@ def test_lint_warns_of_a_bridged_crossing_until_a_prop_stands_on_it(tmp_path):
     assert "place(" in findings[0].message  # says how to fix it
     # A bridge 8 m by 20 m on the crossing's centre covers it; one beside it doesn't.
     assert not [
-        f for f in lint(_crossing_world(True, [("span", (40, 60))])).findings if f.check == "bridge"
+        f
+        for f in lint(_crossing_world(True, [("span", (40, 60), 0)])).findings
+        if f.check == "bridge"
     ]
     assert [
-        f for f in lint(_crossing_world(True, [("span", (80, 60))])).findings if f.check == "bridge"
+        f
+        for f in lint(_crossing_world(True, [("span", (80, 60), 0)])).findings
+        if f.check == "bridge"
     ]
     # A ford needs no bridge.
     assert not [f for f in lint(_crossing_world(False)).findings if f.check == "bridge"]
+
+
+def _bridge_findings(tmp_path, world_fn):
+    import tempfile
+
+    from cubist.world.lint import lint_world
+
+    project = _project(Path(tempfile.mkdtemp(dir=tmp_path)))
+    for name, size in (("span", [128, 64, 320]), ("stub", [16, 16, 16])):
+        (project / "export" / f"{name}.cubist.json").write_text(
+            f'{{"cubist_manifest": 1, "name": "{name}", "size": {size}, '
+            f'"glb_origin": [{size[0] // 2}, 0, {size[2] // 2}]}}'
+        )
+    loaded = load_world(world_fn, _demo_palette(), seed=0)
+    report = lint_world(loaded, np.zeros((4, 4)), project / "export")
+    return [f for f in report.findings if f.check == "bridge"]
+
+
+def test_lint_wants_a_bridge_that_spans_the_water_along_the_road(tmp_path):
+    # A bridge turned along the river or a 1 m prop holds the centre but doesn't span the water.
+    for prop in (("span", (40, 60), 90), ("stub", (40, 60), 0)):
+        assert len(_bridge_findings(tmp_path, _crossing_world(True, [prop]))) == 1
+    assert not _bridge_findings(tmp_path, _crossing_world(True, [("span", (40, 60), 0)]))
+
+
+def test_a_road_crossing_the_river_twice_has_two_decks_and_two_lint_entries(tmp_path):
+    from cubist.world.bake import paths_of
+
+    there_and_back = ((40, 10), (40, 100), (60, 100), (60, 10))
+    loaded = load_world(_crossing_world(True, road_points=there_and_back), _demo_palette(), seed=0)
+    road = loaded.world.roads[0]
+    assert len(road.crossings()) == 2 and road.wet_ends() == []
+    pts = np.array(next(x for x in paths_of(loaded) if x["name"] == "street")["points"]) / 16
+    for x in (40, 60):  # a deck at each: points on the water at its height
+        over = pts[(abs(pts[:, 0] - x) < 0.01) & (pts[:, 2] > 56.2) & (pts[:, 2] < 63.8)]
+        assert len(over) >= 1
+    both = _crossing_world(True, road_points=there_and_back)
+    assert len(_bridge_findings(tmp_path, both)) == 2
+    one = _crossing_world(True, [("span", (40, 60), 0)], road_points=there_and_back)
+    left = _bridge_findings(tmp_path, one)
+    assert len(left) == 1 and "(60, 60)" in left[0].message
+
+
+def test_a_bridged_road_that_starts_or_ends_in_the_water_warns(tmp_path):
+    from cubist.world.bake import paths_of
+
+    ends_in_water = ((40, 10), (40, 60))
+    world_fn = _crossing_world(True, road_points=ends_in_water)
+    loaded = load_world(world_fn, _demo_palette(), seed=0)
+    assert loaded.world.roads[0].crossings() == [] and loaded.world.roads[0].wet_ends() == ["end"]
+    findings = _bridge_findings(tmp_path, world_fn)
+    assert len(findings) == 1 and "ends in a river's channel" in findings[0].message
+    assert paths_of(loaded)  # no deck, no crash
+    starts = _crossing_world(True, road_points=((40, 60), (40, 110)))
+    assert "starts in a river's channel" in _bridge_findings(tmp_path, starts)[0].message
+
+
+def test_a_bridged_road_meets_the_channel_with_no_easing():
+    from cubist.world.sample import heights
+
+    p = _demo_palette()
+    bridged = load_world(_crossing_world(True), p, seed=0)
+    ford = load_world(_crossing_world(False), p, seed=0)
+    z = np.array([55.9, 56.1])
+    at = np.full(2, 40.0)
+    # Up to the channel's edge the road is levelled as a ford's is; inside, the river's bed.
+    assert heights(bridged, at, z)[0] == pytest.approx(heights(ford, at, z)[0])
+    h = heights(bridged, at, z)
+    assert 0.3 < h[0] - h[1] < 1.0  # the step to the bed, with no easing: the abutment
