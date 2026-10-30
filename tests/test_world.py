@@ -776,6 +776,44 @@ def test_region_renders_draw_props_where_kiln_stamps_them(tmp_path):
     assert at(200, 79, 200) != 0 and at(200, 80, 200) == 0  # the ground below them
 
 
+def test_region_renders_keep_the_ground_beside_a_tall_prop_outside_the_area(tmp_path):
+    import json
+
+    from cubist.core.grid import VoxelGrid
+    from cubist.io.vox import VoxPart, VoxScene, write_vox
+    from cubist.world import place
+    from cubist.world.region import region_grid
+
+    project = _project(tmp_path)
+    # A tower 1 voxel square and 400 high (25 m, a five-storey townhouse's height), its origin at
+    # its base. Its reach (400 voxels) puts it within the area's prop search when it stands 10 m
+    # off, but none of its voxels is in the area, so it mustn't move the render's window off the
+    # ground (Brassford's street came out empty at level 0, 3 m from a townhouse).
+    # In two parts: a .vox model is at most 256 a side.
+    low = VoxelGrid(np.full((1, 200, 1), 5, dtype=np.uint8))
+    high = VoxelGrid(np.full((1, 200, 1), 5, dtype=np.uint8), origin=(0, 200, 0))
+    write_vox(
+        project / "export" / "tower.vox",
+        VoxScene([VoxPart("low", low), VoxPart("high", high)], _demo_palette().rgba_table()),
+    )
+    (project / "export" / "tower.cubist.json").write_text(
+        json.dumps(
+            {"cubist_manifest": 1, "name": "tower", "size": [1, 400, 1], "glb_origin": [0, 0, 0]}
+        )
+    )
+
+    @world(name="towers", size_m=(64, 64))
+    def towers(p):
+        return World(ground=flat(5), surface=[p.leaf.mid], props=[place("tower", at=(34, 16))])
+
+    loaded = load_world(towers, _demo_palette(), seed=0)
+    grid, level, corner = region_grid(loaded, (16, 16), size_m=16, export=project / "export")
+    assert level == 0
+    y0 = int(round(corner[1] * 16))
+    assert y0 <= 79  # the ground's top voxel (5 m = voxel 80) is in the window
+    assert grid.data[:, 79 - y0, :].min() > 0  # and solid across the area
+
+
 def test_ground_y_stands_the_ground_line_on_the_ground(tmp_path):
     import json
 

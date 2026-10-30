@@ -183,7 +183,9 @@ Props are checked against their exported manifests; until they're exported, lint
 
 `cubist world render worlds/<name>.py --at x,z [--size 64] [--cut y]` draws an area in voxels (iso and top
 views, `out/worlds/<name>/region-x-z.png`), built as the bake builds it, at the finest level that fits 256
-cells. `--cut` removes everything above a height in metres, to look into caves from above. Props are
+cells, and at most 256 cells tall, down from the highest voxel over the area: at level 0 (16 m or less) a
+building taller than 16 m hides its street, so look at a street of townhouses from 17 m (level 1).
+`--cut` removes everything above a height in metres, to look into caves from above. Props are
 drawn from the project's exports, placed and turned as Kiln stamps them (at coarse levels a cell takes one
 of its voxels). A town of 96 m renders in about 30 s, most of it placing the world's scattered props.
 

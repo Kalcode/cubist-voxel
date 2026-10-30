@@ -53,6 +53,13 @@ def region_grid(
         raise WorldError(f"({at[0]:g}, {at[1]:g}) is outside the world")
     top = max(c[1] for c in present) * N
     props = _prop_voxels(loaded, export, level, (x0, z0, x0 + n, z0 + n)) if export else None
+    if props is not None:
+        # Only the voxels over the area: a tall prop beside it mustn't lift the window off the
+        # area's ground (it found the prop by its reach, which counts its height).
+        cells, colors = props
+        cx, cz = cells[:, 0], cells[:, 2]
+        over = (cx >= x0) & (cx < x0 + n) & (cz >= z0) & (cz < z0 + n)
+        props = cells[over], colors[over]
     if props is not None and len(props[0]):
         top = max(top, int(props[0][:, 1].max()) + 1)
     if cut_m is not None:

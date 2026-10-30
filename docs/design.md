@@ -808,7 +808,8 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   at the channel's edges and every 4 m or so over it. The deck is a placed prop; the `bridge` lint warns of
   a crossing no placed prop's footprint spans (middle and 1 m past each bank), or a bridged road that starts
   or ends in the water. The road's level resumes at the channel's edge with no easing (the abutment).
-  `bridges=False` is the old ford, pinned by a tile hash. Not yet: a bridge asset (`stone_bridge_40`).
+  `bridges=False` is the old ford, pinned by a tile hash. The first bridge asset is Kiln's `stone_bridge_40`,
+  placed over Brassford's cross street (Kiln's `docs/city.md`, step 4).
 - **13d. Project modules (Oct 30).** An asset script imports the project's own modules (a `kit/` package
   of shared pieces beside `style.toml`) from any working directory: the build worker puts the project
   directory first on `sys.path`. Before, it worked only from the project directory, by way of `python -m`
@@ -839,6 +840,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   is behind it, a bridge's at its ends. A wrong side, or an empty list, is an error naming the four;
   a `door` with no street side near it says so. `build.json` carries the sides, so export and
   `cubist lint` keep them.
+- **13i. Region renders beside tall buildings (Oct 30).** A region render's window, at most 256 cells
+  tall, takes its top from the props' voxels over the area only. It took it from every prop the
+  search found by its reach, which counts a prop's height, so a level-0 render of Brassford's quay
+  3 m from a five-storey townhouse framed the air over the street and drew nothing. A prop taller
+  than the window over the area still shows only its top 256 cells: a street of townhouses is seen
+  whole from 17 m across (level 1).
 
 ### v1 acceptance targets
 
