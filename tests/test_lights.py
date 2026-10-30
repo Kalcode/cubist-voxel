@@ -135,6 +135,28 @@ def test_light_shorter_than_a_candle_warns_even_when_low():
     assert f.details["min_range"] == 32  # 2 m at 1/16 m
 
 
+def cellared(at, range_):
+    """A building with a 48-voxel cellar under the street (ground_y 48) and a light at y = at."""
+
+    def fn(p):
+        body = Part("body", box((4, 120, 4), color=p.wood.dark), pivot=(2, 0, 2))
+        return Model([body], lights={"lamp": light((2, at, 4.5), p.fire.light, range=range_)})
+
+    spec = asset(name="house", size=(4, 120, 6), tags=["building"], grounded=True, ground_y=48)
+    return spec(fn).build(P)
+
+
+def test_a_building_s_lights_are_measured_from_the_street_or_the_cellar_floor():
+    # A door lamp 40 voxels above the street lights the street with 58: the cellar below the
+    # street doesn't count.
+    assert reach(cellared(88, 58)) == []
+    [f] = reach(cellared(88, 56))
+    assert f.details["min_range"] == 57  # ceil(sqrt(2) * 40)
+    # A light in the cellar is measured from the cellar's floor.
+    [f] = reach(cellared(30, 40))
+    assert f.details["min_range"] == 43  # ceil(sqrt(2) * 30)
+
+
 def test_ungrounded_lights_only_need_a_candle_s_reach():
     assert reach(post(50, 40, grounded=False)) == []  # held or hung: no known floor
     [f] = reach(post(50, 10, grounded=False))

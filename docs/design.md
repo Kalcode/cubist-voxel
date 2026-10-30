@@ -263,7 +263,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
 | Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the street at its door (error), or with no `door` or `floor_0` socket to walk (warning: older buildings no one enters) | Error, Warning |
 | Storeys | A part tagged `upper` or `roof` (its own tag or a parent's) reaching up past the next such part's lowest voxel; the topmost may reach down over the one under it | Error |
-| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height) | Warning |
+| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
 | Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |
@@ -796,6 +796,10 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   putting the working directory there, so a build from elsewhere (or from the MCP server) failed. A
   failure inside such a module reports its frames as well as the script's. Iterations still count the
   script's text only. World scripts don't import project modules yet; nothing needs it.
+- **13e. Lights above the street (Oct 30).** The light-reach lint measures a grounded asset's light from
+  the ground line, as the scale lint does since 13a: a townhouse's door lamp 40 voxels above the street
+  needs a range of 57, where measuring from the cellar's floor asked 125 of it. A light below the line,
+  in the cellar, is measured from the asset's floor.
 
 ### v1 acceptance targets
 

@@ -280,7 +280,9 @@ think in metres and divide by `voxel_size_m`. Typical ranges, with voxels at 1/1
 
 Lint warns (`light_reach`) when a light reaches less than 2 m, a candle's reach, and, on a
 grounded asset, when it can't reach the floor as far out as it is high (`range` under 1.4 times
-its height).
+its height). The floor is the ground line (`ground_y`): a building's door lamp is measured from the
+street, not from its cellar's floor. A light below the ground line (in the cellar) is measured from
+the asset's floor.
 
 ### Fracture and bursts
 

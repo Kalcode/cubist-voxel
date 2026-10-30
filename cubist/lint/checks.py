@@ -319,12 +319,15 @@ def check_occlusion(asset: BuiltAsset) -> list[Finding]:
 
 def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     """A light should reach at least MIN_LIGHT_RANGE_M, and on a grounded asset it should light
-    the floor as far out as it is high (range >= sqrt(2) * height)."""
+    the floor as far out as it is high (range >= sqrt(2) * height). The floor is the ground line
+    (``ground_y``, the street a building's cellar is under), or for a light below it, the
+    asset's own floor."""
     m = style.voxel_size_m
     shortest = math.ceil(MIN_LIGHT_RANGE_M / m)
     out = []
     for name, lt in asset.lights.items():
-        height = float(lt.position[1])
+        y = float(lt.position[1])
+        height = y - asset.ground_y if y >= asset.ground_y else y
         floor = math.ceil(math.sqrt(2) * height) if asset.grounded and height > 0 else 0
         need = max(shortest, floor)
         if lt.range >= need:
