@@ -235,20 +235,39 @@ class Walker:
             self._cxzf = (i + self.origin[0] + half, k + self.origin[2] + half, f + self.origin[1])
         return self._cxzf
 
-    def follows(self, a, b) -> tuple[bool, list, float]:
+    def _stands(self, x, z, y) -> bool:
+        """Some reached state has its footprint's centre within LEG_SLACK of (x, z), its feet within
+        REACH_Y of y: the walker can be there."""
+        cx, cz, feet = self._centres()
+        return bool(((np.hypot(cx - x, cz - z) <= LEG_SLACK) & (np.abs(feet - y) <= REACH_Y)).any())
+
+    def follows(self, a, b) -> dict | None:
         """Whether the walker makes the leg from stop ``a`` to stop ``b`` as Kiln's walk will:
         having arrived anywhere within ARRIVE of ``a`` (x-z), it heads straight for ``b`` until
         within ARRIVE of it. The starts are ``a`` and 8 points ARRIVE round it, turned to the leg
-        so the two square to it, the furthest off any line it may take, are among them; each the
-        walker can stand at must make it, its footprint's centre within LEG_SLACK of its straight
-        line and its feet between the stops' heights (REACH_Y to spare). Returns that, and for a
-        start that doesn't, the farthest point along its line it gets to and how far short of
-        ``b``."""
+        so the two square to it, the furthest off any line it may take, are among them. Each must
+        make it, its footprint's centre within LEG_SLACK of its straight line and its feet between
+        the stops' heights (REACH_Y to spare). None if it does; else what fails:
+
+        - ``{"way": "arrival", ...}``: the walker can't stand at a start. The goblin is narrower
+          than the walker, so it might arrive there and walk a line never tried; the stop must
+          move (``move`` voxels ``toward``), so the lint stays the stricter of the two.
+        - ``{"way": "leg", "nearest", "distance"}``: from a start, the farthest point along its line
+          the walker gets to, and how far short of ``b``.
+
+        A short leg (``b`` within ARRIVE of ``a``) is walked too: the walker may arrive 2 from ``a``
+        and so up to 4 from ``b``. A leg of length 0 is turned to +x for its starts."""
         a, b = np.asarray(a, float), np.asarray(b, float)
         d = b[[0, 2]] - a[[0, 2]]
         length = float(np.hypot(*d))
-        if length <= ARRIVE:
-            return True, [_num(v) for v in b], 0.0
+        ux, uz = (d / length) if length > 0 else (1.0, 0.0)
+        starts = [(a[0], a[2])]
+        for angle in range(0, 360, 45):
+            c, s_ = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+            starts.append((a[0] + ARRIVE * (c * ux - s_ * uz), a[2] + ARRIVE * (s_ * ux + c * uz)))
+        blocked = [(sx, sz) for sx, sz in starts if not self._stands(sx, sz, a[1])]
+        if blocked:
+            return self._room(a, blocked)
         cx, cz, feet = self._centres()
         ylo, yhi = min(a[1], b[1]) - REACH_Y, max(a[1], b[1]) + REACH_Y
 
@@ -267,21 +286,12 @@ class Walker:
         esrc, edst = pos[self._src[keep]], pos[self._dst[keep]]
         px, pz, pf = cx[cand], cz[cand], feet[cand]
         goal = (np.hypot(px - b[0], pz - b[2]) <= ARRIVE) & (np.abs(pf - b[1]) <= REACH_Y)
-        ux, uz = d / length
-        stood, worst = False, None
-        for angle in (None, *range(0, 360, 45)):
-            if angle is None:
-                sx, sz = a[0], a[2]
-            else:
-                c, s_ = math.cos(math.radians(angle)), math.sin(math.radians(angle))
-                sx, sz = a[0] + ARRIVE * (c * ux - s_ * uz), a[2] + ARRIVE * (s_ * ux + c * uz)
+        worst = None
+        for sx, sz in starts:
             lateral, t = off(px, pz, sx, sz, b[0], b[2])
             near = lateral <= LEG_SLACK
             at_start = (np.hypot(px - sx, pz - sz) <= LEG_SLACK) & (np.abs(pf - a[1]) <= REACH_Y)
             start = near & at_start
-            if not start.any():
-                continue  # the walker can't stand there, so it doesn't arrive there
-            stood = True
             m = len(cand)
             ok = near[esrc] & near[edst]
             rows = np.concatenate([esrc[ok], np.full(int(start.sum()), m)])
@@ -293,15 +303,29 @@ class Walker:
             if (seen[:m] & goal & near).any():
                 continue
             walked = np.flatnonzero(seen[:m])
-            j = walked[np.argmax(t[walked])]
-            short = float((1 - t[j]) * np.hypot(b[0] - sx, b[2] - sz))
-            if worst is None or short > worst[1]:
-                worst = ([_num(v) for v in (px[j], pf[j], pz[j])], short)
-        if not stood:
-            return False, [_num(v) for v in a], length
-        if worst is None:
-            return True, [_num(v) for v in b], 0.0
-        return False, worst[0], worst[1]
+            j = walked[np.argmax(t[walked])] if len(walked) else None
+            point = [_num(v) for v in ((px[j], pf[j], pz[j]) if j is not None else (sx, a[1], sz))]
+            short = float((1 - (t[j] if j is not None else 0)) * np.hypot(b[0] - sx, b[2] - sz))
+            if worst is None or short > worst["distance"]:
+                worst = {"way": "leg", "nearest": point, "distance": round(short, 2)}
+        return worst
+
+    def _room(self, a, blocked) -> dict:
+        """What to say of a stop the walker can't stand all round: the start points it can't, and
+        how far (whole voxels) to move the stop away from them so it can."""
+        move = 0
+        sumx = sumz = 0.0
+        for sx, sz in blocked:
+            wx, wz = (sx - a[0]) / ARRIVE, (sz - a[2]) / ARRIVE  # toward the obstacle (0 at a)
+            sumx, sumz = sumx + wx, sumz + wz
+            k = next((k for k in range(1, 9) if self._stands(sx - k * wx, sz - k * wz, a[1])), None)
+            move = None if k is None or move is None else max(move, k)
+        n = math.hypot(sumx, sumz) or 1.0
+        away = (("x", -sumx / n), ("z", -sumz / n))
+        toward = "".join(f"{'+' if v > 0 else '-'}{axis}" for axis, v in away if abs(v) > 0.38)
+        sx, sz = blocked[0]
+        at = [_num(sx), _num(a[1]), _num(sz)]
+        return {"way": "arrival", "at": at, "move": move, "toward": toward}
 
     def reaches(self, pos) -> bool:
         i, f, k = self._around(pos)
@@ -423,8 +447,29 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
         if prev in failed or name in failed:
             continue  # already an error: it isn't reached, or there's no way back from it
         a, b = sockets[prev], sockets[name]
-        ok, point, short = walker.follows(a, b)
-        if ok:
+        fails = walker.follows(a, b)
+        if fails is None:
+            continue
+        if fails["way"] == "arrival":
+            failed.add(prev)
+            move = fails["move"]
+            fix = (
+                f"move it at least {move} voxel{'s' if move != 1 else ''} toward {fails['toward']}"
+                if move
+                else "clear room round it"
+            )
+            out.append(
+                Finding(
+                    "walk",
+                    "error",
+                    f"{prev!r} {_at(a)} is too close to an obstacle for a {ARRIVE:g}-voxel "
+                    f"arrival: Kiln's walk is to arrive anywhere within {ARRIVE:g} voxels of a "
+                    f"stop and head on to the next ({name!r}), and the walker can't stand at "
+                    f"{_at(fails['at'])}. The goblin is narrower and might, then walk a line the "
+                    f"lint never tried, so {fix}: {walker.needs()}",
+                    {"socket": prev, "to": name, **fails, **details},
+                )
+            )
             continue
         total = math.hypot(b[0] - a[0], b[2] - a[2])
         out.append(
@@ -433,19 +478,12 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
                 "error",
                 f"the tour can't walk a straight line from {prev!r} {_at(a)} to {name!r} "
                 f"{_at(b)}: arriving within {ARRIVE:g} voxels of {prev!r} and heading straight "
-                f"for {name!r}, the walker gets as far as {_at(point)}, {short:.0f} voxels short "
-                f"of its {total:.0f}. A tour's walk (Kiln's) arrives within {ARRIVE:g} of each "
-                "stop and steers straight for the next ('door', then tour_01, tour_02, ...), so "
-                "put a stop where the way turns, give the line room either side, or clear it: "
-                f"{walker.needs()}",
-                {
-                    "socket": name,
-                    "from": prev,
-                    "way": "leg",
-                    "nearest": point,
-                    "distance": round(short, 2),
-                    **details,
-                },
+                f"for {name!r}, the walker gets as far as {_at(fails['nearest'])}, "
+                f"{fails['distance']:.0f} voxels short of its {total:.0f}. A tour's walk (Kiln's) "
+                f"is to arrive within {ARRIVE:g} of each stop and steer straight for the next "
+                "('door', then tour_01, tour_02, ...), so put a stop where the way turns, give the "
+                f"line room either side, or clear it: {walker.needs()}",
+                {"socket": name, "from": prev, **fails, **details},
             )
         )
     return out

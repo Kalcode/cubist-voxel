@@ -96,11 +96,12 @@ character's box and the ledge it climbs, in voxels), lint walks them:
   `door` and `floor_0` at its deck ends.
 - `cellar`: a standing point in the cellar.
 - `tour_01` … `tour_NN`: the stops of a walk through the building, in order (the door, the foot and
-  head of each flight, each floor, the cellar). A walk (Kiln's) arrives within 2 voxels of a stop
-  and steers straight for the next, so from `door` to `tour_01` and from each stop to the next the
-  walker must follow a straight line from anywhere within 2 voxels of the stop it leaves: lint
-  errors on a leg that turns, runs through a wall or has no room either side of the line, and a stop
-  where the way turns mends it.
+  head of each flight, each floor, the cellar). Kiln's walk will arrive within 2 voxels of a stop
+  and steer straight for the next (it arrives within 12 today, and changes with the town's first
+  street), so from `door` to `tour_01` and from each stop to the next the walker must follow a
+  straight line from anywhere within 2 voxels of the stop it leaves: lint errors on a leg that
+  turns, runs through a wall or has no room either side of the line (a stop where the way turns
+  mends it), and on a stop too close to an obstacle for the walker to stand all round it, 2 out.
 
 Without `door` or `floor_0` lint warns that it can't walk the building. The walker, two voxels
 wider and taller than the character, must reach every one of them from the street (which runs on

@@ -340,6 +340,38 @@ def test_a_leg_starts_anywhere_within_2_voxels_of_the_stop_before():
     assert through(10) == {"tour_03"}  # the walker fits, but not from 2 to the side
 
 
+def test_a_stop_needs_room_for_the_walker_anywhere_within_2_voxels():
+    # Kiln's walk may arrive anywhere within 2 voxels of a stop. Where the walker (the goblin with
+    # its margin) can't stand there, a narrower goblin might, and would walk a line the lint never
+    # tried: so that's an error on the stop, saying how far to move it. 4.5 off the back wall the
+    # walker stands, but not 2 nearer the wall; 2 further out, it stands anywhere round it. (Its
+    # footprint's centre is on half voxels: a voxel out, x = 50 is still half a voxel off one.)
+    site = house(storeys=1)
+    site.sockets["tour_01"] = (50, WALL, 62)
+    site.sockets["tour_02"] = (50, WALL, WALL + 4.5)
+    site.sockets["tour_03"] = (80, WALL, WALL + 4.5)
+    [f] = walk_errors(site.built())
+    assert f.details["socket"] == "tour_02" and f.details["way"] == "arrival"
+    assert f.details["move"] == 2 and f.details["toward"] == "+z"
+    assert "too close to an obstacle for a 2-voxel arrival" in f.message
+    assert "at least 2 voxels toward +z" in f.message
+    site.sockets["tour_02"] = (50, WALL, WALL + 6.5)
+    site.sockets["tour_03"] = (80, WALL, WALL + 6.5)
+    assert walk_errors(site.built()) == []
+
+
+def test_a_leg_of_2_voxels_or_less_is_walked_too():
+    # The walker may arrive 2 from one stop and so up to 4 from the next: even a short leg is
+    # walked, from every start round the stop it leaves.
+    site = house(storeys=1)
+    site.sockets["tour_01"] = (50, WALL, 62)
+    site.sockets["tour_02"] = (50, WALL, WALL + 4.5)
+    site.sockets["tour_03"] = (51, WALL, WALL + 4.5)  # a voxel on
+    assert {(f.details["socket"], f.details["way"]) for f in walk_errors(site.built())} == {
+        ("tour_02", "arrival")
+    }
+
+
 def test_a_cellared_footprint_has_no_ground():
     # Kiln carves the x-z bounds of the voxels below ground_y (here the walls and floor, from
     # y = 0 under a ground line at 4), so a building with no floor of its own over that drops the
