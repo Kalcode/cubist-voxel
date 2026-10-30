@@ -5,6 +5,7 @@ import math
 import time
 from dataclasses import dataclass, field
 
+import goblin
 import numpy as np
 import pytest
 
@@ -130,6 +131,16 @@ def walk_errors(a, style=STYLE):
     return found
 
 
+def walk_findings(a, style=STYLE):
+    return {(f.severity, f.details["socket"]) for f in check_walk(a, style)}
+
+
+def widened(site, z):
+    """The site with z more voxels of air in front of it (+z), for street-side pieces."""
+    site.solid = np.pad(site.solid, ((0, 0), (0, 0), (0, z)))
+    return site
+
+
 def unreached(a, style=STYLE):
     return {f.details["socket"] for f in walk_errors(a, style)}
 
@@ -160,12 +171,13 @@ def test_lint_runs_the_walk_and_storey_checks():
 
 def test_risers_of_6_are_climbed_and_7_are_not():
     assert walk_errors(house(riser=6).built()) == []
-    [f] = [f for f in walk_errors(house(riser=7).built()) if f.details["socket"] == "floor_1"]
-    assert unreached(house(riser=7).built()) == {"floor_1", "tour_02"}  # the head of the flight too
+    found = walk_errors(house(riser=7).built())
+    assert {f.details["socket"] for f in found} == {"floor_1", "tour_02"}  # the flight's head too
+    [f] = [f for f in found if f.details["socket"] == "floor_1"]
     assert "'floor_1'" in f.message and "8 × 22" in f.message and "climbs 6" in f.message
     assert "stair or doorway" in f.message
     # The nearest point it reaches is on the floor below, a storey under the socket.
-    assert f.details["nearest"][1] == WALL and f.details["distance"] == pytest.approx(48)
+    assert f.details["nearest"][1] == WALL and f.details["distance"] == pytest.approx(48, abs=1)
     assert f.details["walker"] == [8, 22, 6] and f.details["box"] == [10, 24, 10]
     assert f"{f.details['distance']:.0f} voxels away" in f.message
 
@@ -189,6 +201,25 @@ def test_a_step_up_needs_the_box_raised_by_the_climb_to_be_clear():
 
     assert unreached(room(34)) == set()  # 30 voxels of air above the floor
     assert unreached(room(33)) == {"floor_1"}  # it could stand on the platform, but can't step up
+
+
+def test_support_handed_across_the_path_needs_one_footprint_on_both_sides():
+    # A corridor exactly the walker's width, its floor gone but for a rail under each edge: the
+    # left one ends and the right one starts further on. Across its path the goblin covers 9 of the
+    # walker's 10 columns, so it stands toward one rail at a time and moves over only where one of
+    # its footprints holds both: rail ends 7 apart (along the path) it crosses, 8 apart it doesn't.
+    def rails(apart):
+        site = house(storeys=1)
+        site.fill((WALL, WALL, 24), (45, 48, 56))  # the corridor's walls, x 45 to 55 open
+        site.fill((55, WALL, 24), (100 - WALL, 48, 56))
+        site.fill((45, 0, 24), (55, WALL, 56), False)  # its floor
+        site.fill((45, 0, 40), (46, WALL, 56))  # the left rail, from the front
+        site.fill((54, 0, 24), (55, WALL, 40 - apart))  # the right rail, to the back
+        site.sockets["floor_0"] = (50, WALL, 12)  # behind the corridor
+        return site.built()
+
+    assert unreached(rails(7)) == set()
+    assert unreached(rails(8)) == {"floor_0"}
 
 
 def test_a_gap_of_8_is_bridged_and_9_is_not():
@@ -232,6 +263,25 @@ def test_hidden_parts_are_left_out():
     assert unreached(a) == {"floor_0"}
 
 
+def test_the_walk_starts_on_the_street_not_in_the_doorway():
+    # A wall across the front, 4 voxels out and 46 tall: 'door' sits on the house's face, but the
+    # walker comes from the street (outside the asset's x-z bounds), so the wall shuts it out.
+    site = widened(house(storeys=1), 8)
+    site.fill((0, 0, 84), (100, 50, 88))
+    assert unreached(site.built()) == {"door", "floor_0"}
+    site.fill((42, WALL, 84), (58, 40, 88), False)  # a gate in it
+    assert unreached(site.built()) == set()
+
+
+def test_the_street_runs_under_eaves_and_jetties():
+    # Kiln carves only the cellar's footprint (the x-z bounds of the voxels below ground_y), so the
+    # street under a front overhanging it by 1 m is still there.
+    site = widened(house(storeys=1, cellar=True), 16)
+    site.fill((0, 84, 80), (100, 100, 96))  # a jetty over the street, 1 m deep
+    assert site.sockets["door"] == (50, 48, 80)  # on the house's face, under the jetty
+    assert unreached(site.built()) == set()
+
+
 def test_ground_above_the_asset_does_not_break_the_walk():
     # @asset keeps ground_y below the asset's top, but a hand-edited build.json may not.
     site = house(storeys=1)
@@ -240,22 +290,35 @@ def test_ground_above_the_asset_does_not_break_the_walk():
     assert unreached(site.built()) == {"floor_0"}
 
 
-def test_a_missing_door_or_floor_0_is_an_error():
+def test_a_missing_door_or_floor_0_warns_and_an_unreached_socket_errs():
+    # Ruling P-6: buildings older than the kit (Kiln's cottage, smithy, stall and crypt) aren't
+    # enterable and must still export, so a missing door or floor_0 is a warning.
     site = house(storeys=1)
     del site.sockets["floor_0"]
-    [f] = walk_errors(site.built())
-    assert f.details["socket"] == "floor_0" and "no 'floor_0' socket" in f.message
+    [f] = check_walk(site.built(), STYLE)
+    assert (f.severity, f.details["socket"]) == ("warning", "floor_0")
+    assert "no 'floor_0' socket" in f.message and "can't check" in f.message
+    site.sockets["floor_2"] = (50, 52, 40)  # on the roof: still walked, and out of reach
+    assert walk_findings(site.built()) == {("warning", "floor_0"), ("error", "floor_2")}
     del site.sockets["door"]
-    found = walk_errors(site.built())
-    assert {f.details["socket"] for f in found} == {"door", "floor_0"}
+    found = check_walk(site.built(), STYLE)
+    assert {(f.severity, f.details["socket"]) for f in found} == {
+        ("warning", "door"),
+        ("warning", "floor_0"),
+    }
     assert any("no 'door' socket" in f.message for f in found)
+    errors = {f.check for f in lint(site.built(), STYLE).findings if f.severity == "error"}
+    assert "walk" not in errors
 
 
-def test_a_door_socket_where_the_walker_cannot_stand_is_an_error():
+def test_a_door_socket_with_no_street_near_it_is_an_error():
     site = house()
     site.sockets["door"] = (50, 30, 80)  # in the air, above the doorway
     [f] = walk_errors(site.built())
-    assert f.details["socket"] == "door" and "can't stand" in f.message
+    assert f.details["socket"] == "door" and "out on the street" in f.message
+    site.sockets["door"] = (50, WALL, 40)  # inside the house, 40 from the street
+    [f] = walk_errors(site.built())
+    assert f.details["socket"] == "door" and "out on the street" in f.message
 
 
 def test_only_the_walk_sockets_are_walked():
@@ -271,8 +334,8 @@ def test_buildings_and_walkable_assets_are_walked_when_the_style_has_a_walker():
     site.tags = ("walkable",)  # a bridge: door and floor_0 at its deck ends
     assert unreached(site.built()) == {"floor_0"}
     del site.sockets["door"]
-    [f] = walk_errors(site.built())
-    assert "one end of a bridge's deck" in f.message
+    [f] = check_walk(site.built(), STYLE)
+    assert f.severity == "warning" and "one end of a bridge's deck" in f.message
     site.sockets["door"] = (50, WALL, 80)
     site.tags = ("prop",)
     assert walk_errors(site.built()) == []
@@ -293,6 +356,69 @@ def test_a_townhouse_sized_asset_walks_in_under_5_seconds():
     elapsed = time.perf_counter() - start
     assert found == []
     assert elapsed < 5.0, f"the walk and storey lints took {elapsed:.2f} s"
+    start = time.perf_counter()
+    report = lint(a, STYLE)  # all of it, as an export pays it
+    elapsed = time.perf_counter() - start
+    assert report.ok and not [f for f in report.findings if f.check in ("walk", "storeys")]
+    assert elapsed < 5.0, f"the whole lint took {elapsed:.2f} s"
+
+
+def strip(kind, n):
+    """A walled strip 120 long (x) and 32 wide on a floor 4 thick, walked from 'door' at its -x
+    end to 'floor_0' at its +x end, with one obstacle at x = 50: a riser of n, a gap of n across
+    it, a doorway n wide (and 30 tall) or n tall (and 16 wide) in a wall, or a step of 4 under a
+    ceiling n above the floor. Returns the site and the y the far end stands at."""
+    site = Site(np.zeros((120, 84, 40), bool), ground_y=WALL)
+    site.fill((0, 0, 0), (120, WALL, 40))
+    for lo, hi in [((0, 0, 0), (120, 84, WALL)), ((0, 0, 36), (120, 84, 40))]:
+        site.fill(lo, hi)  # walls along it, and across its far end: the street can't go round
+    site.fill((116, 0, 0), (120, 84, 40))
+    far = WALL
+    if kind == "riser":
+        site.fill((50, WALL, 0), (120, WALL + n, 40))
+        far = WALL + n
+    elif kind == "gap":
+        site.fill((50, 0, 0), (50 + n, WALL, 40), False)
+    elif kind in ("wide", "tall"):
+        wide, tall = (n, 30) if kind == "wide" else (16, n)
+        site.fill((50, WALL, 0), (54, 84, 40))
+        site.fill((50, WALL, 20 - wide // 2), (54, WALL + tall, 20 - wide // 2 + wide), False)
+    elif kind == "ceiling":
+        site.fill((50, WALL, 0), (120, WALL + 4, 40))
+        site.fill((0, WALL + n, 0), (120, WALL + n + 4, 40))
+        far = WALL + 4
+    site.sockets = {"door": (0, WALL, 20), "floor_0": (110, far, 20)}
+    return site, far
+
+
+def goblin_passes(site, far) -> bool:
+    """Kiln's goblin (tests/goblin.py) walking +x down the strip, from a few places across it
+    (it fits an 8-wide doorway only centred on a whole voxel), gets past x = 60 at the far end's
+    height."""
+    for z in (20.0, 20.25, 20.5, 19.5):
+        x, y, _ = goblin.walk(site.solid, (10.3, WALL, z), (1, 0, 0), 4)
+        if x > 60 and y == far:
+            return True
+    return False
+
+
+def test_the_walker_stays_pinned_to_kiln_s_goblin():
+    # The same strips through the goblin's port and through the walk lint. Risers and gaps: the
+    # same limit. Doorways and headroom: the walker needs its two voxels to spare.
+    for kind, sizes, goblin_limit, walker_limit in [
+        ("riser", range(4, 9), 6, 6),  # the most it climbs
+        ("gap", range(6, 11), 8, 8),  # the widest it stays up over
+        ("wide", range(7, 12), 8, 10),  # the narrowest doorway
+        ("tall", range(20, 26), 22, 24),  # the lowest doorway
+        ("ceiling", range(26, 33), 28, 30),  # the least air over a step of 4
+    ]:
+        most = kind in ("riser", "gap")
+        for n in sizes:
+            site, far = strip(kind, n)
+            want_goblin = n <= goblin_limit if most else n >= goblin_limit
+            want_walker = n <= walker_limit if most else n >= walker_limit
+            assert goblin_passes(site, far) == want_goblin, (kind, n, "goblin")
+            assert (not walk_errors(site.built())) == want_walker, (kind, n, "walker")
 
 
 # --- the storey bands ----------------------------------------------------------------------------

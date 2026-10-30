@@ -291,3 +291,9 @@ def test_building_shorter_than_a_door_warns_as_a_doll_house():
 def test_no_scale_section_or_untagged_assets_are_not_checked():
     assert scale_findings(tall(20, ["building", "door"]), scaled()) == []
     assert scale_findings(tall(20, ["prop"]), scaled(door_height=34)) == []
+
+
+def test_the_walker_keys_are_not_scale_heights():
+    # walker_height is the walk lint's walker, not the height of assets tagged "walker".
+    style = scaled(walker_width=8, walker_height=22, walker_climb=6)
+    assert scale_findings(tall(60, ["walker"]), style) == []

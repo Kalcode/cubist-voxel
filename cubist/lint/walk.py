@@ -1,9 +1,10 @@
 """The walk lint and the storey lint, for buildings an engine's character walks through.
 
-The walk lint flood-fills a building from its ``door`` socket with a walker the size of the
-game's character (``[scale]`` ``walker_width``, ``walker_height`` and ``walker_climb``, plus
-MARGIN) and errors on each storey, cellar or tour socket it never reaches. The storey lint keeps
-each hideable part a horizontal band, because an engine hides the storeys above the character by y.
+The walk lint flood-fills a building from the street at its ``door`` socket with a walker the
+size of the game's character (``[scale]`` ``walker_width``, ``walker_height`` and
+``walker_climb``, plus MARGIN) and errors on each door, storey, cellar or tour socket it never
+reaches. The storey lint keeps each hideable part a horizontal band, because an engine hides the
+storeys above the character by y.
 """
 
 from __future__ import annotations
@@ -20,9 +21,10 @@ from cubist.lint.checks import Finding
 WALK_TAGS = ("building", "walkable")  # a bridge is walkable: door and floor_0 at its deck ends
 MARGIN = 2  # voxels added to the walker's width and height, so what passes has room to spare
 GROUND_PAD = 16  # voxels of ground around the asset's footprint
+DOOR_REACH = 16  # voxels from 'door' the walk may start on the street (eaves or a jetty over it)
 REACH_Y = 2  # a socket is reached by feet within this many voxels of its y
 STOREY_TAGS = ("upper", "roof")
-_MOVES = ((1, 0), (-1, 0), (0, 1), (0, -1))
+_MOVES = ((0, 1), (0, -1), (2, 1), (2, -1))  # (axis, step)
 
 
 def walked(name: str) -> bool:
@@ -61,80 +63,110 @@ def _tops(foot: np.ndarray) -> np.ndarray:
 
 
 class Walker:
-    """Kiln's character on a grid: a box W × H × W (``W = width + MARGIN``, ``H = height +
-    MARGIN``) that moves a voxel at a time in x or z as the goblin's ``MoveAxis`` does. Where the
-    box fits at the new spot it moves there and drops onto the highest voxel under it; where it
-    doesn't, it steps up if the box raised by ``climb`` fits there, onto the highest voxel under
-    it; else it stops.
+    """Kiln's goblin (``Goblin.cs``) walking a grid, checked with MARGIN voxels to spare.
 
-    Halfway between two spots the goblin's box covers width + 1 columns along the move (W - 1,
-    one fewer than the walker's), and it falls if nothing is under them. So a move needs
-    something under that footprint at the walker's height before a step up, and a drop must land
-    where the walker's does: a gap the goblin would fall into stops the walk.
+    **Where it stands.** Between whole voxels the goblin's box covers ``width + 1`` columns on
+    each axis (``foot``); on a whole voxel, for an instant, ``width``. A state is that footprint's
+    corner (i, k) and the feet's height F, in local coordinates (they start at ``origin``): the
+    footprint is columns i to i + foot - 1 and k to k + foot - 1, and it stands on the highest
+    voxel under them, as ``GroundBelow`` finds it. ``ground`` holds the top of the highest voxel
+    under each footprint at each row or below (0: none), so feet dropping from F land at
+    ``ground[i, F - 1, k]``.
 
-    The world is the asset's voxels at rest (hidden parts left out) and, outside the asset's x-z
-    bounds and up to GROUND_PAD voxels past them, solid ground below ``ground_y``. Inside the
-    bounds there is no ground: Kiln carves a cellared building's footprint.
+    **Its box.** The margin box is W × H × W (``W = width + MARGIN``, ``H = height + MARGIN``), one
+    column wider than the footprint. ``clear[X, F, Z]`` says the box with its corner at (X, F, Z)
+    holds no voxel. Along a move the box must hold both footprints (X = the smaller i); across it,
+    either box holding the footprint will do (Z = k - 1 or k), as the walker may keep its spare
+    column on either side.
 
-    A state is a cell (X, F, Z) in local coordinates (they start at ``origin``): the box spans
-    columns X to X + W - 1 and Z to Z + W - 1 and rows F to F + H - 1. ``clear`` says the box
-    holds no voxel. ``ground`` is the top of the highest voxel under the footprint at each row or
-    below (0: none), so feet dropping from F land at ``ground[X, F - 1, Z]``; ``half_x`` and
-    ``half_z`` are the same for the footprint halfway through a move in x or z, indexed by the
-    larger of the two cells' X or Z."""
+    **A move** goes one voxel in x or z as ``MoveAxis`` does. Where the box fits it moves and drops
+    to the ground under the new footprint; where it doesn't, it steps up if the box raised by
+    ``climb`` fits, onto the highest voxel under the new footprint (it must be higher). Where it
+    lands, some box holding the footprint must fit. The instant on a whole voxel's line (the
+    narrower footprint) doesn't count: the goblin passes it within a frame.
 
-    def __init__(self, asset: BuiltAsset, width: int, height: int, climb: int):
+    **The world** is the asset's voxels at rest (hidden parts left out) and, up to GROUND_PAD
+    voxels past the asset's x-z bounds, solid ground below ``ground_y``, except over the x-z
+    bounds of the voxels below ``ground_y``: Kiln carves that (a cellar's footprint), and leaves
+    the street under eaves and jetties. The walk starts out on the street: footprints wholly
+    outside the asset's x-z bounds, within DOOR_REACH voxels of 'door'."""
+
+    def __init__(self, asset: BuiltAsset, grid, width: int, height: int, climb: int):
         self.width, self.height, self.climb = width, height, climb
-        self.W, self.H = width + MARGIN, height + MARGIN
-        grid = asset.visible_grid()
+        self.foot, self.W, self.H = width + 1, width + MARGIN, height + MARGIN
         (x0, y0, z0), (x1, y1, z1) = grid.bounds()
-        bottom = min(y0, asset.ground_y) - 1  # at least one row of ground
-        # Room to raise the box over the highest place to stand (ground_y is below y1 when built).
-        top = max(y1, asset.ground_y) + climb + self.H
+        line = asset.ground_y
+        bottom = min(y0, line) - 1  # at least one row of ground
+        top = max(y1, line) + climb + self.H  # room to raise the box over the highest standing
         self.origin = np.array((x0 - GROUND_PAD, bottom, z0 - GROUND_PAD))
         pad = 2 * GROUND_PAD
         solid = np.zeros((x1 - x0 + pad, top - bottom, z1 - z0 + pad), bool)
-        solid[:, : asset.ground_y - bottom] = True
-        solid[GROUND_PAD:-GROUND_PAD, :, GROUND_PAD:-GROUND_PAD] = False
+        solid[:, : line - bottom] = True
         o = np.subtract(grid.origin, self.origin)
+        below = grid.data[:, : max(line - grid.origin[1], 0)] > 0
+        if below.any():
+            xs = np.flatnonzero(below.any(axis=(1, 2))) + o[0]
+            zs = np.flatnonzero(below.any(axis=(0, 1))) + o[2]
+            solid[xs[0] : xs[-1] + 1, :, zs[0] : zs[-1] + 1] = False
         s = grid.shape
         solid[o[0] : o[0] + s[0], o[1] : o[1] + s[1], o[2] : o[2] + s[2]] |= grid.data > 0
+        self.bounds = (o[0], o[0] + s[0], o[2], o[2] + s[2])  # local x-z bounds, half-open
 
-        along_x = _any_in_window(solid, self.W, 0)
-        foot = _any_in_window(along_x, self.W, 2)
-        self.clear = ~_any_in_window(foot, self.H, 1)
-        self.ground = _tops(foot)
-        self.half_x = _tops(_any_in_window(_any_in_window(solid, self.W - 1, 0), self.W, 2))
-        self.half_z = _tops(_any_in_window(along_x, self.W - 1, 2))
-        self.reached = np.zeros(self.clear.shape, bool)
+        box = _any_in_window(_any_in_window(solid, self.W, 0), self.W, 2)
+        self.clear = ~_any_in_window(box, self.H, 1)
+        self.ground = _tops(_any_in_window(_any_in_window(solid, self.foot, 0), self.foot, 2))
+        shape = self.ground.shape
+        self.reached = np.zeros((shape[0], self.clear.shape[1], shape[2]), bool)
 
-    def _around(self, pos) -> tuple[slice, slice, slice]:
-        """The cells whose footprint holds pos's x and z (edges included), with their feet within
-        REACH_Y of its y."""
-        lx, ly, lz = np.asarray(pos, float) - self.origin
-
-        def span(lo, hi, n):
-            lo, hi = max(math.ceil(lo), 0), min(math.floor(hi), n - 1) + 1
-            return slice(lo, max(lo, hi))
-
-        nx, nf, nz = self.clear.shape
-        return (
-            span(lx - self.W, lx, nx),
-            span(max(ly - REACH_Y, 1), ly + REACH_Y, nf),
-            span(lz - self.W, lz, nz),
+    def _span(self, lo, hi, axis: int) -> np.ndarray:
+        """The whole numbers from lo to hi (rounded inward) that index ``reached`` on axis."""
+        floor = 1 if axis == 1 else 0  # feet stand on a row below them
+        return np.arange(
+            max(math.ceil(lo), floor), min(math.floor(hi), self.reached.shape[axis] - 1) + 1
         )
 
-    def start(self, pos) -> bool:
-        """Flood-fill from the places the walker can stand at ``pos``; False if there are none."""
-        sx, sf, sz = self._around(pos)
-        feet = np.arange(sf.start, sf.stop)[None, :, None]
-        under = self.ground[sx, sf.start - 1 : sf.stop - 1, sz]
-        xs, fs, zs = np.nonzero(self.clear[sx, sf, sz] & (under == feet))
-        if len(xs) == 0:
+    def _around(self, pos, reach: float = 0) -> tuple[np.ndarray, ...]:
+        """Every state whose footprint is within ``reach`` of pos's x and z (0: holds them, edges
+        included), with its feet within REACH_Y of its y."""
+        lx, ly, lz = np.asarray(pos, float) - self.origin
+        a = self.foot
+        i, f, k = np.meshgrid(
+            self._span(lx - a - reach, lx + reach, 0),
+            self._span(ly - REACH_Y, ly + REACH_Y, 1),
+            self._span(lz - a - reach, lz + reach, 2),
+            indexing="ij",
+        )
+        i, f, k = i.ravel(), f.ravel(), k.ravel()
+        dx = np.maximum(np.maximum(i - lx, lx - (i + a)), 0)
+        dz = np.maximum(np.maximum(k - lz, lz - (k + a)), 0)
+        near = dx * dx + dz * dz <= reach * reach
+        return i[near], f[near], k[near]
+
+    def _fits(self, i, f, k) -> np.ndarray:
+        """Some box holding each footprint is clear at its feet."""
+        nx, _, nz = self.clear.shape
+        out = np.zeros(len(i), bool)
+        for x in (i - 1, i):
+            for z in (k - 1, k):
+                ok = (x >= 0) & (x < nx) & (z >= 0) & (z < nz)
+                out[ok] |= self.clear[x[ok], f[ok], z[ok]]
+        return out
+
+    def start(self, door) -> bool:
+        """Flood-fill from where the walker stands on the street near ``door``: footprints wholly
+        outside the asset's x-z bounds, within DOOR_REACH of it, its feet within REACH_Y of its y.
+        False if there are none."""
+        i, f, k = self._around(door, DOOR_REACH)
+        x0, x1, z0, z1 = self.bounds
+        a = self.foot
+        street = (i + a <= x0) | (i >= x1) | (k + a <= z0) | (k >= z1)
+        i, f, k = i[street], f[street], k[street]
+        standing = (self.ground[i, f - 1, k] == f) & self._fits(i, f, k)
+        if not standing.any():
             return False
         shape = self.reached.shape
         flat = self.reached.reshape(-1)
-        cells = np.ravel_multi_index((xs + sx.start, fs + sf.start, zs + sz.start), shape)
+        cells = np.unique(np.ravel_multi_index((i[standing], f[standing], k[standing]), shape))
         while len(cells):
             flat[cells] = True
             cells = np.unique(np.concatenate(self._moves(*np.unravel_index(cells, shape))))
@@ -142,38 +174,40 @@ class Walker:
         return True
 
     def _moves(self, xs, fs, zs) -> list[np.ndarray]:
-        """Where each cell's four moves land, as flat indices: Goblin.cs's MoveAxis, then its
-        gravity."""
+        """Where each state's four moves land, as flat indices: Goblin.cs's MoveAxis, then its
+        gravity, once for each box that may hold the move."""
         nx, _, nz = self.clear.shape
         out = []
-        for dx, dz in _MOVES:
-            x, z = xs + dx, zs + dz
-            ok = (x >= 0) & (x < nx) & (z >= 0) & (z < nz)
-            x, f, z = x[ok], fs[ok], z[ok]
-            if dx:
-                half = self.half_x[np.maximum(x, xs[ok]), f - 1, z]
-            else:
-                half = self.half_z[x, f - 1, np.maximum(z, zs[ok])]
-            level = self.clear[x, f, z]
-            land = self.ground[x, f - 1, z]
-            raised = ~level & (half == f) & self.clear[x, f + self.climb, z]
-            to = np.where(level & (land == half), land, 0)
-            to = np.where(raised, self.ground[x, f + self.climb - 1, z], to).astype(np.intp)
-            keep = to > 0  # 0: it stopped, fell where the walker can't follow, or left the world
-            out.append(np.ravel_multi_index((x[keep], to[keep], z[keep]), self.reached.shape))
+        for axis, step in _MOVES:
+            i, k = (xs + step, zs) if axis == 0 else (xs, zs + step)
+            along = np.minimum(xs, i) if axis == 0 else np.minimum(zs, k)
+            for side in (-1, 0):
+                x, z = (along, zs + side) if axis == 0 else (xs + side, along)
+                ok = (x >= 0) & (x < nx) & (z >= 0) & (z < nz)
+                x, z, f, ni, nk = x[ok], z[ok], fs[ok], i[ok], k[ok]
+                level = self.clear[x, f, z]
+                raised = ~level & self.clear[x, f + self.climb, z]
+                up = self.ground[ni, f + self.climb - 1, nk]
+                to = np.where(level, self.ground[ni, f - 1, nk], 0)
+                to = np.where(raised & (up > f), up, to).astype(np.intp)
+                keep = to > 0  # 0: it stopped, or fell out of the world
+                moved = keep & (to != f)  # where it dropped or stepped, a box must fit too
+                keep[moved] = self._fits(ni[moved], to[moved], nk[moved])
+                out.append(np.ravel_multi_index((ni[keep], to[keep], nk[keep]), self.reached.shape))
         return out
 
     def reaches(self, pos) -> bool:
-        return bool(self.reached[self._around(pos)].any())
+        i, f, k = self._around(pos)
+        return bool(self.reached[i, f, k].any())
 
     def nearest(self, pos) -> tuple[list, float]:
-        """The reached place nearest to ``pos`` (the middle of the walker's feet), and how far."""
+        """The reached place nearest to ``pos`` (the middle of the goblin's feet), and how far."""
         cells = np.argwhere(self.reached).astype(float)
-        cells[:, [0, 2]] += self.W / 2
+        cells[:, [0, 2]] += self.foot / 2
         cells += self.origin
         d = np.linalg.norm(cells - np.asarray(pos, float), axis=1)
-        k = int(np.argmin(d))
-        return [_num(v) for v in cells[k]], float(d[k])
+        j = int(np.argmin(d))
+        return [_num(v) for v in cells[j]], float(d[j])
 
     def needs(self) -> str:
         return (
@@ -185,15 +219,17 @@ class Walker:
 
 
 def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
-    """A building (or a walkable asset, like a bridge) must let the walker in at its ``door``
-    and up to every ``floor_N``, ``cellar`` and ``tour_NN`` socket."""
+    """A building (or a walkable asset, like a bridge) must let the walker in from the street at
+    its ``door`` and up to every ``floor_N``, ``cellar`` and ``tour_NN`` socket. Without a
+    ``door`` or ``floor_0`` it can't be checked, and lint warns (an older building no one
+    enters)."""
     if not set(WALK_TAGS) & set(asset.tags) or not all(k in style.scale for k in WALKER_KEYS):
         return []
     width, height, climb = (int(style.scale[k]) for k in WALKER_KEYS)
     sockets = {n: Socket.from_value(v, n).position for n, v in asset.sockets.items()}
     ground = f"on the ground (y = ground_y, {asset.ground_y} here)"
     if "building" in asset.tags:
-        door_at = f"outside the main entrance, {ground}"
+        door_at = f"out on the street in front of the main entrance, {ground}"
         floor_at = "on the ground floor, where someone would stand"
     else:
         door_at = f"where the walk starts, {ground}: one end of a bridge's deck"
@@ -204,15 +240,17 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
             out.append(
                 Finding(
                     "walk",
-                    "error",
-                    f"{asset.name} has no {name!r} socket; add one {where}: the walk lint walks "
-                    "from 'door' to every floor_N, cellar and tour_NN socket",
+                    "warning",
+                    f"{asset.name} has no {name!r} socket, so the walk lint can't check it can be "
+                    f"entered; add one {where}. The walk goes from the street at 'door' to every "
+                    "floor_N, cellar and tour_NN socket",
                     {"socket": name},
                 )
             )
-    if "door" not in sockets or asset.visible_grid().count() == 0:
+    grid = asset.visible_grid()
+    if "door" not in sockets or grid.count() == 0:
         return out
-    walker = Walker(asset, width, height, climb)
+    walker = Walker(asset, grid, width, height, climb)
     details = {"walker": [width, height, climb], "box": [walker.W, walker.H, walker.W]}
     door = sockets["door"]
     if not walker.start(door):
@@ -220,25 +258,25 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
             Finding(
                 "walk",
                 "error",
-                f"the walker can't stand at 'door' {_at(door)}: no spot there fits its "
-                f"{walker.W} × {walker.H} × {walker.W} box on something solid with its feet "
-                f"within {REACH_Y} voxels of y = {_num(door[1])}. Put 'door' {door_at}, clear of "
-                "the walls; nothing else was walked",
+                f"the walker has nowhere to start at 'door' {_at(door)}: it stands on the street "
+                f"(outside the asset's x-z bounds) within {DOOR_REACH} voxels of 'door', on "
+                f"something solid with its feet within {REACH_Y} voxels of y = {_num(door[1])}, "
+                f"and finds no such place. Put 'door' {door_at}; nothing was walked",
                 {"socket": "door", **details},
             )
         )
         return out
     for name, pos in sorted(sockets.items()):
-        if name == "door" or not walked(name) or walker.reaches(pos):
+        if not walked(name) or walker.reaches(pos):
             continue
         point, distance = walker.nearest(pos)
         out.append(
             Finding(
                 "walk",
                 "error",
-                f"the walker can't reach {name!r} {_at(pos)} from 'door': the nearest it gets is "
-                f"{_at(point)}, {distance:.0f} voxels away. Check the stair or doorway between "
-                f"them: {walker.needs()}",
+                f"the walker can't reach {name!r} {_at(pos)} from the street at 'door': the "
+                f"nearest it gets is {_at(point)}, {distance:.0f} voxels away. Check the stair or "
+                f"doorway between them: {walker.needs()}",
                 {"socket": name, "nearest": point, "distance": round(distance, 2), **details},
             )
         )

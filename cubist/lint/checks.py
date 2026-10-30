@@ -11,7 +11,7 @@ from scipy import ndimage
 from cubist.core.grid import VoxelGrid
 from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
-from cubist.core.style import StyleBible
+from cubist.core.style import WALKER_KEYS, StyleBible
 from cubist.core.topology import SIX, hidden_mask, outside_air
 from cubist.io.mesh import greedy_mesh
 
@@ -253,7 +253,8 @@ SCALE_TOLERANCE = (0.8, 1.25)
 
 def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     """Heights against the style bible's ``[scale]``: a ``<tag>_height`` key applies to assets
-    tagged ``<tag>`` (within SCALE_TOLERANCE), and a building must be tall enough for a door."""
+    tagged ``<tag>`` (within SCALE_TOLERANCE), and a building must be tall enough for a door. The
+    walk lint's ``walker_height`` isn't one."""
     b = asset.visible_grid().bounds()
     if b is None or not style.scale:
         return []
@@ -266,7 +267,8 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     out = []
     lo, hi = SCALE_TOLERANCE
     for tag in asset.tags:
-        want = style.scale.get(f"{tag}_height")
+        key = f"{tag}_height"
+        want = None if key in WALKER_KEYS else style.scale.get(key)
         if want and not lo * want <= height <= hi * want:
             out.append(
                 Finding(
