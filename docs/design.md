@@ -300,12 +300,18 @@ game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height
   out from) and its distance, and saying to check the stair or doorway between them; an error
   when there's no street near `door` to start from. With no `door` or `floor_0` there's nothing to
   walk, and lint warns: older buildings that no one enters still export.
-- **The tour's legs:** Kiln's walk steers straight from one tour stop to the next, so from `door`
-  to `tour_01` and from each `tour_NN` to the next (name order) the walker must get there keeping
-  its footprint's centre within a voxel of the line, its feet between the two stops' heights (2 to
-  spare), over the moves the walk kept. A leg that can't is an error on the stop it ends at,
-  naming the one it starts from and how far along the line the walker got; a leg whose ends are
-  already errors isn't walked again.
+- **The tour's legs:** Kiln's walk is to arrive within 2 voxels (x-z) of a stop and steer straight
+  for the next (`ARRIVE`; Kiln adopts it with Brassford's first street, its Task 9). So from `door`
+  to `tour_01` and from each `tour_NN` to the next (name order), from the stop and from 8 points 2
+  voxels round it, turned to the leg so the two square to it are among them (the walker may have
+  arrived anywhere within 2: these are the furthest off any line it may take), the walker must get
+  within 2 of the next stop over the moves the walk kept, keeping its footprint's centre within a
+  voxel of its straight line (`LEG_SLACK`, the grid's rounding of a line) and its feet between the
+  stops' heights (2 to spare). Starts it can't stand at are skipped. A leg that can't is an error
+  on the stop it ends at, naming the one it starts from and how far along its line the walker got;
+  a leg whose ends are already errors isn't walked again. A slack of 2 instead would not be the
+  same: it lets the lint weave round an obstacle within 2 of the line that a straight walk from an
+  arrival off the line meets, so it passes legs Kiln's walk fails.
 - **Against the goblin:** `tests/goblin.py` ports `Goblin.Tick` and `VoxelCollision`, and
   `test_walk_lint.py` runs the same strips through it and the walker. It climbs a riser of 6 and
   not 7 and stays up over a gap of 8 but falls into 9, as the walker does. It steps up with 28
@@ -806,11 +812,14 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   the ground line, as the scale lint does since 13a: a townhouse's door lamp 40 voxels above the street
   needs a range of 57, where measuring from the cellar's floor asked 125 of it. A light below the line,
   in the cellar, is measured from the asset's floor.
-- **13f. Tour legs (Oct 30).** The walk lint walks a building's tour as Kiln does, in straight legs:
-  from `door` to `tour_01` and from each stop to the next, the walker must follow the line (its
-  footprint's centre within a voxel of it, its feet between the stops' heights) over the moves the
-  flood kept. A leg that turns or runs through a wall errors. The test fixture's tour gained corner
-  stops; the 160 × 368 × 192 case still lints in under 5 s.
+- **13f. Tour legs (Oct 30).** The walk lint walks a building's tour in straight legs, as Kiln's walk
+  will once it arrives within 2 voxels of each stop (ruling P-16; Kiln's walk advanced at 12 and cut
+  corners): from anywhere within 2 of a stop, the walker must follow the straight line to within 2
+  of the next (its footprint's centre within a voxel of it, its feet between the stops' heights) over
+  the moves the flood kept. A leg that turns, runs through a wall or has no room either side errors:
+  a doorway just past a stop must be 12 wide where a walk from the stop itself needs 10 (pinned by a
+  test). The test fixture's tour gained corner stops; the 160 × 368 × 192 case still lints in under
+  5 s.
 - **13g. One asset of a family (Oct 30).** `cubist build --only NAME` (repeatable; the MCP
   `build_asset` tool's `only`) builds just the named assets of a script that defines several, so
   one variant of a family rebuilds alone, under its own timeout, and only its iteration counts.

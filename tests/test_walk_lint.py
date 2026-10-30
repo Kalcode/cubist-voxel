@@ -319,6 +319,27 @@ def test_a_tour_starts_from_the_door():
     assert walk_errors(site.built()) == []
 
 
+def test_a_leg_starts_anywhere_within_2_voxels_of_the_stop_before():
+    # Kiln's walk arrives at a stop within 2 voxels (x-z) and heads straight for the next one, so
+    # the walker must make each leg from anywhere it may have arrived: here 2 to the side of the
+    # stop just in front of a doorway, which it then meets off centre. Its footprint keeps within
+    # LEG_SLACK (1) of that line; the doorway it needs is 12 wide where a walk from the stop itself
+    # would pass 10.
+    def through(wide):
+        site = house(storeys=1)
+        site.fill((WALL, WALL, 40), (100 - WALL, 48, 44))  # a wall across the room
+        x = 50 - wide // 2
+        site.fill((x, WALL, 40), (x + wide, 40, 44), False)  # and a doorway in it, 36 tall
+        site.sockets["tour_01"] = (50, WALL, 62)
+        site.sockets["tour_02"] = (50, WALL, 50)  # 6 in front of the doorway
+        site.sockets["tour_03"] = (50, WALL, 12)  # through it
+        return {f.details["socket"] for f in walk_errors(site.built())}
+
+    assert through(12) == set()
+    assert through(11) == {"tour_03"}
+    assert through(10) == {"tour_03"}  # the walker fits, but not from 2 to the side
+
+
 def test_a_cellared_footprint_has_no_ground():
     # Kiln carves the x-z bounds of the voxels below ground_y (here the walls and floor, from
     # y = 0 under a ground line at 4), so a building with no floor of its own over that drops the

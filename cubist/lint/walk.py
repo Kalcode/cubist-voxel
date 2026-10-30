@@ -26,7 +26,8 @@ MARGIN = 2  # voxels added to the walker's width and height, so what passes has 
 GROUND_PAD = 16  # voxels of ground around the asset's footprint
 DOOR_REACH = 16  # voxels from 'door' the walk may start on the street (eaves or a jetty over it)
 REACH_Y = 2  # a socket is reached by feet within this many voxels of its y
-LEG_SLACK = 1.0  # a tour's leg: the footprint's centre stays this close to the straight line
+ARRIVE = 2.0  # Kiln's walk arrives at a stop within this many voxels (x-z), then heads for the next
+LEG_SLACK = 1.0  # a straight walk on the grid: the footprint's centre stays this close to the line
 STOREY_TAGS = ("upper", "roof")
 _MOVES = ((0, 1), (0, -1), (2, 1), (2, -1))  # (axis, step)
 
@@ -226,50 +227,81 @@ class Walker:
                 tos.append(np.ravel_multi_index((ni[keep], to[keep], nk[keep]), self.reached.shape))
         return np.concatenate(froms), np.concatenate(tos)
 
+    def _centres(self):
+        """Each reached state's footprint centre (x, z) and feet, in the asset's coordinates."""
+        if not hasattr(self, "_cxzf"):
+            i, f, k = np.unravel_index(self._states, self.reached.shape)
+            half = self.foot / 2
+            self._cxzf = (i + self.origin[0] + half, k + self.origin[2] + half, f + self.origin[1])
+        return self._cxzf
+
     def follows(self, a, b) -> tuple[bool, list, float]:
-        """Whether the walker, from where it stands at stop ``a``, walks to stop ``b`` keeping its
-        footprint's centre within LEG_SLACK of the straight line between them (in x-z), its feet
-        between their heights (REACH_Y to spare): a walk that steers straight from stop to stop.
-        Returns that, the farthest point along the line it gets to, and how far short of ``b``."""
+        """Whether the walker makes the leg from stop ``a`` to stop ``b`` as Kiln's walk will:
+        having arrived anywhere within ARRIVE of ``a`` (x-z), it heads straight for ``b`` until
+        within ARRIVE of it. The starts are ``a`` and 8 points ARRIVE round it, turned to the leg
+        so the two square to it, the furthest off any line it may take, are among them; each the
+        walker can stand at must make it, its footprint's centre within LEG_SLACK of its straight
+        line and its feet between the stops' heights (REACH_Y to spare). Returns that, and for a
+        start that doesn't, the farthest point along its line it gets to and how far short of
+        ``b``."""
         a, b = np.asarray(a, float), np.asarray(b, float)
-        states, shape = self._states, self.reached.shape
-        i, f, k = np.unravel_index(states, shape)
-        cx = i + self.origin[0] + self.foot / 2
-        cz = k + self.origin[2] + self.foot / 2
-        feet = f + self.origin[1]
         d = b[[0, 2]] - a[[0, 2]]
         length = float(np.hypot(*d))
-        t = np.zeros(len(states))
-        if length > 0:
-            t = np.clip(((cx - a[0]) * d[0] + (cz - a[2]) * d[1]) / length**2, 0, 1)
-        lateral = np.hypot(cx - (a[0] + t * d[0]), cz - (a[2] + t * d[1]))
-        ylo, yhi = min(a[1], b[1]) - REACH_Y, max(a[1], b[1]) + REACH_Y
-        near = (lateral <= LEG_SLACK) & (feet >= ylo) & (feet <= yhi)
-
-        def on_line(pos):
-            cells = np.ravel_multi_index(self._around(pos), shape)
-            at = np.searchsorted(states, cells).clip(0, len(states) - 1)
-            at = at[states[at] == cells]
-            return at[near[at]]
-
-        start, goal = on_line(a), on_line(b)
-        if len(start) == 0:
-            return False, [_num(v) for v in a], length
-        ids = np.cumsum(near) - 1  # each state near the line, numbered from 0
-        m = int(near.sum())
-        keep = near[self._src] & near[self._dst]
-        rows = np.concatenate([ids[self._src[keep]], np.full(len(start), m)])
-        cols = np.concatenate([ids[self._dst[keep]], ids[start]])
-        graph = csr_matrix((np.ones(len(rows), np.int8), (rows, cols)), shape=(m + 1, m + 1))
-        order = breadth_first_order(graph, m, directed=True, return_predecessors=False)
-        seen = np.zeros(m + 1, bool)
-        seen[order] = True
-        if seen[ids[goal]].any():
+        if length <= ARRIVE:
             return True, [_num(v) for v in b], 0.0
-        walked = np.flatnonzero(near)[seen[:m]]
-        j = walked[np.argmax(t[walked])]
-        point = [_num(v) for v in (cx[j], feet[j], cz[j])]
-        return False, point, float((1 - t[j]) * length)
+        cx, cz, feet = self._centres()
+        ylo, yhi = min(a[1], b[1]) - REACH_Y, max(a[1], b[1]) + REACH_Y
+
+        def off(px, pz, sx, sz, ex, ez):
+            """Distance from (px, pz) to the segment s-e, and how far along it (0..1)."""
+            vx, vz = ex - sx, ez - sz
+            t = np.clip(((px - sx) * vx + (pz - sz) * vz) / max(vx * vx + vz * vz, 1e-9), 0, 1)
+            return np.hypot(px - (sx + t * vx), pz - (sz + t * vz)), t
+
+        # The states any start's line may use, and the moves between them.
+        band, _ = off(cx, cz, a[0], a[2], b[0], b[2])
+        cand = np.flatnonzero((band <= ARRIVE + LEG_SLACK) & (feet >= ylo) & (feet <= yhi))
+        pos = np.full(len(self._states), -1)
+        pos[cand] = np.arange(len(cand))
+        keep = (pos[self._src] >= 0) & (pos[self._dst] >= 0)
+        esrc, edst = pos[self._src[keep]], pos[self._dst[keep]]
+        px, pz, pf = cx[cand], cz[cand], feet[cand]
+        goal = (np.hypot(px - b[0], pz - b[2]) <= ARRIVE) & (np.abs(pf - b[1]) <= REACH_Y)
+        ux, uz = d / length
+        stood, worst = False, None
+        for angle in (None, *range(0, 360, 45)):
+            if angle is None:
+                sx, sz = a[0], a[2]
+            else:
+                c, s_ = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+                sx, sz = a[0] + ARRIVE * (c * ux - s_ * uz), a[2] + ARRIVE * (s_ * ux + c * uz)
+            lateral, t = off(px, pz, sx, sz, b[0], b[2])
+            near = lateral <= LEG_SLACK
+            at_start = (np.hypot(px - sx, pz - sz) <= LEG_SLACK) & (np.abs(pf - a[1]) <= REACH_Y)
+            start = near & at_start
+            if not start.any():
+                continue  # the walker can't stand there, so it doesn't arrive there
+            stood = True
+            m = len(cand)
+            ok = near[esrc] & near[edst]
+            rows = np.concatenate([esrc[ok], np.full(int(start.sum()), m)])
+            cols = np.concatenate([edst[ok], np.flatnonzero(start)])
+            graph = csr_matrix((np.ones(len(rows), np.int8), (rows, cols)), shape=(m + 1, m + 1))
+            order = breadth_first_order(graph, m, directed=True, return_predecessors=False)
+            seen = np.zeros(m + 1, bool)
+            seen[order] = True
+            if (seen[:m] & goal & near).any():
+                continue
+            walked = np.flatnonzero(seen[:m])
+            j = walked[np.argmax(t[walked])]
+            short = float((1 - t[j]) * np.hypot(b[0] - sx, b[2] - sz))
+            if worst is None or short > worst[1]:
+                worst = ([_num(v) for v in (px[j], pf[j], pz[j])], short)
+        if not stood:
+            return False, [_num(v) for v in a], length
+        if worst is None:
+            return True, [_num(v) for v in b], 0.0
+        return False, worst[0], worst[1]
 
     def reaches(self, pos) -> bool:
         i, f, k = self._around(pos)
@@ -400,10 +432,12 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
                 "walk",
                 "error",
                 f"the tour can't walk a straight line from {prev!r} {_at(a)} to {name!r} "
-                f"{_at(b)}: keeping to the line, the walker gets {total - short:.0f} of the "
-                f"{total:.0f} voxels, as far as {_at(point)}. A tour's walk steers straight from "
-                "each stop to the next (from 'door', then tour_01, tour_02, ...), so put a stop "
-                f"where the way turns, or clear the line: {walker.needs()}",
+                f"{_at(b)}: arriving within {ARRIVE:g} voxels of {prev!r} and heading straight "
+                f"for {name!r}, the walker gets as far as {_at(point)}, {short:.0f} voxels short "
+                f"of its {total:.0f}. A tour's walk (Kiln's) arrives within {ARRIVE:g} of each "
+                "stop and steers straight for the next ('door', then tour_01, tour_02, ...), so "
+                "put a stop where the way turns, give the line room either side, or clear it: "
+                f"{walker.needs()}",
                 {
                     "socket": name,
                     "from": prev,
