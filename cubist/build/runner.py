@@ -194,10 +194,29 @@ def iteration_count(asset_dir: str | os.PathLike) -> int:
 # --- worker -----------------------------------------------------------------
 
 
-def _script_traceback(exc: BaseException, script: Path) -> str:
-    frames = [f for f in traceback.extract_tb(exc.__traceback__) if Path(f.filename) == script]
+def _script_traceback(exc: BaseException, script: Path, project: Path | None = None) -> str:
+    """The traceback's frames in the script and in the project's own modules (``kit/`` beside
+    ``style.toml``), not Cubist's or the libraries'."""
+
+    def ours(filename: str) -> bool:
+        path = Path(filename)
+        if path == script:
+            return True
+        inside = project is not None and path.is_relative_to(project)
+        return inside and "site-packages" not in path.parts
+
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if ours(f.filename)]
     lines = traceback.format_list(frames)
     return "".join(lines) + "".join(traceback.format_exception_only(exc)).strip()
+
+
+def _import_project(style_path: Path) -> Path:
+    """Let scripts import the project's own modules (a ``kit/`` package of shared pieces beside
+    ``style.toml``), whatever directory the build runs from. Returns the project directory."""
+    project = style_path.resolve().parent
+    if str(project) not in sys.path:
+        sys.path.insert(0, str(project))
+    return project
 
 
 def write_outputs(built: BuiltAsset, style: StyleBible, asset_dir: Path, script: Path) -> dict:
@@ -316,10 +335,11 @@ def _build_in_process(
     script: Path, style_path: Path, out: Path, seed: int, check: bool = False
 ) -> list[dict]:
     style = load_project_style(style_path)
+    project = _import_project(style_path)
     try:
         namespace = runpy.run_path(str(script), run_name="__cubist_asset__")
     except Exception as e:
-        message = f"{script.name} failed to load:\n{_script_traceback(e, script)}"
+        message = f"{script.name} failed to load:\n{_script_traceback(e, script, project)}"
         if not check:
             _append_history(out / script.stem, script, ok=False, error=message, seed=seed)
         raise BuildError(message) from e
@@ -336,7 +356,8 @@ def _build_in_process(
         try:
             built = a.build(style.palette, seed=seed, glow=style.glow, cycles=style.cycles)
         except Exception as e:
-            message = f"{script.name}: asset {a.name!r} failed:\n{_script_traceback(e, script)}"
+            trace = _script_traceback(e, script, project)
+            message = f"{script.name}: asset {a.name!r} failed:\n{trace}"
             _append_history(out / a.name, script, ok=False, error=message, seed=seed)
             raise BuildError(message) from e
         results.append(write_outputs(built, style, out / a.name, script))

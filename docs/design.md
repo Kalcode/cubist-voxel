@@ -74,7 +74,7 @@ build until the asset passes.
 | --- | --- |
 | `core` | Voxel grids, parts, models, palettes, coordinate conventions |
 | `dsl` | Primitives, CSG, transforms, painting, selections (what asset scripts import) |
-| `build` | Runs a script in a subprocess with a timeout, a seed, and the project style bible |
+| `build` | Runs a script in a subprocess with a timeout, a seed, and the project style bible; scripts import the project's own modules (13d) |
 | `render` | Headless CPU renderer: contact sheet of orthographic + isometric views, ASCII slices |
 | `lint` | Palette, bounds, connectivity, symmetry, and budget checks; JSON report |
 | `io` | `.vox` read/write, glTF/GLB export, optional vengi bridge for other formats |
@@ -790,6 +790,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   a crossing no placed prop's footprint spans (middle and 1 m past each bank), or a bridged road that starts
   or ends in the water. The road's level resumes at the channel's edge with no easing (the abutment).
   `bridges=False` is the old ford, pinned by a tile hash. Not yet: a bridge asset (`stone_bridge_40`).
+- **13d. Project modules (Oct 30).** An asset script imports the project's own modules (a `kit/` package
+  of shared pieces beside `style.toml`) from any working directory: the build worker puts the project
+  directory first on `sys.path`. Before, it worked only from the project directory, by way of `python -m`
+  putting the working directory there, so a build from elsewhere (or from the MCP server) failed. A
+  failure inside such a module reports its frames as well as the script's. Iterations still count the
+  script's text only. World scripts don't import project modules yet; nothing needs it.
 
 ### v1 acceptance targets
 

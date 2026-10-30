@@ -122,6 +122,70 @@ def test_script_exception_reports_the_script_line(project):
         build_script(script)
 
 
+def write_kit(project, body):
+    """A module of the project's own, beside style.toml, for its scripts to import."""
+    (project / "kit").mkdir()
+    (project / "kit" / "__init__.py").write_text(textwrap.dedent(body))
+
+
+def test_scripts_import_the_projects_own_modules_from_any_directory(project, tmp_path_factory):
+    write_kit(
+        project,
+        """
+        from cubist import *
+
+        def crate(p):
+            return box((4, 4, 4), color=p.wood.dark)
+    """,
+    )
+    script = write_script(
+        project,
+        "crate",
+        """
+        from cubist import *
+        import kit
+
+        @asset(name="crate", size=(4, 4, 4), tags=["prop"])
+        def crate(p):
+            return kit.crate(p)
+    """,
+    )
+    elsewhere = tmp_path_factory.mktemp("elsewhere")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.chdir(elsewhere)  # the worker inherits the cwd: not the project's
+        [result] = build_script(script)
+    assert read_vox(result.vox_path).parts[0].grid.count() == 64
+
+
+def test_an_error_in_a_project_module_reports_its_line(project):
+    write_kit(
+        project,
+        """
+        from cubist import *
+
+        def crate(p):
+            raise RuntimeError("kaboom")
+    """,
+    )
+    script = write_script(
+        project,
+        "crate",
+        """
+        from cubist import *
+        import kit
+
+        @asset(name="crate", size=(4, 4, 4), tags=["prop"])
+        def crate(p):
+            return kit.crate(p)
+    """,
+    )
+    with pytest.raises(
+        BuildError,
+        match=r"(?s)crate\.py\", line 7, in crate.*__init__\.py\", line 5, in crate.*kaboom",
+    ):
+        build_script(script)
+
+
 def test_script_without_assets_is_an_error(project):
     script = write_script(project, "empty", "x = 1\n")
     with pytest.raises(BuildError, match="@asset"):

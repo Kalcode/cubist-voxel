@@ -12,6 +12,12 @@ def crate(p):
     return box((12, 12, 12), color=p.wood.mid).highlight_edges()
 ```
 
+A family of assets can share pieces through the project's own modules: a package beside
+`style.toml` (say `kit/`) that scripts `import`, whatever directory the build runs from. Its
+functions take `p` and return shapes like any script's. An error inside one shows its lines too.
+A build counts an iteration by the script's text alone, so a change to a shared module alone
+isn't counted: say so when you report iterations.
+
 ## Conventions
 
 - **Axes.** Y-up, right-handed, integer voxel cells. +X is the viewer's right in the front view,
