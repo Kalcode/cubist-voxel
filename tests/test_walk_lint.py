@@ -435,8 +435,8 @@ def test_ground_above_the_asset_does_not_break_the_walk():
 
 
 def test_a_missing_door_or_floor_0_warns_and_an_unreached_socket_errs():
-    # Ruling P-6: buildings older than the kit (Kiln's cottage, smithy, stall and crypt) aren't
-    # enterable and must still export, so a missing door or floor_0 is a warning.
+    # Buildings older than the kit (Kiln's cottage, smithy, stall and crypt) aren't enterable and
+    # must still export, so a missing door or floor_0 is a warning.
     site = house(storeys=1)
     del site.sockets["floor_0"]
     [f] = check_walk(site.built(), STYLE)
