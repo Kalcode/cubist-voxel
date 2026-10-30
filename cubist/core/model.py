@@ -305,6 +305,7 @@ class BuiltAsset:
             "grounded": self.grounded,
             "symmetric": self.symmetric,
             "allow_floating": self.allow_floating,
+            "ground_y": self.ground_y,
             "voxels": self.merged_grid().count(),
             "part_voxels": self.voxel_count(),
             "parts": [part_info(p) for p in self.parts],
@@ -368,6 +369,7 @@ class BuiltAsset:
             cycles=[Cycle.from_dict(c) for c in summary.get("cycles", ())],
             lights={k: Light.from_summary(v) for k, v in summary.get("lights", {}).items()},
             emitters={k: Emitter.from_summary(v) for k, v in summary.get("emitters", {}).items()},
+            ground_y=int(summary.get("ground_y", 0)),
         )
 
 

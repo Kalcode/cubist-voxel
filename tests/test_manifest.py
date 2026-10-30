@@ -128,6 +128,23 @@ def project(tmp_path):
     return tmp_path
 
 
+def test_export_keeps_the_ground_line_of_the_build(project):
+    # Export reads the asset back from out/, so build.json must carry ground_y.
+    script = project / "assets" / "house.py"
+    script.write_text(
+        textwrap.dedent("""\
+        from cubist import *
+
+        @asset(name="house", size=(8, 64, 6), ground_y=48)
+        def house(p):
+            return box((8, 64, 6), color=p.wood.dark)
+        """)
+    )
+    [r] = build_script(script)
+    m = json.loads(Path(export_asset(r.vox_path.parent)["manifest"]).read_text())
+    assert m["glb_origin"] == [4, 48, 3]
+
+
 def test_export_writes_manifest_beside_glb(project):
     [r] = build_script(project / "assets" / "chest.py")
     out = export_asset(r.vox_path.parent)

@@ -130,3 +130,19 @@ def test_ground_y_defaults_to_zero_and_must_sit_inside_the_asset():
         make(-1).build(P)
     with pytest.raises(ModelError, match="ground_y.*height"):
         make(4).build(P)
+
+
+def test_ground_y_survives_the_vox_and_build_json():
+    # Export and `cubist lint` rebuild the asset from out/ (its .vox and build.json).
+    from cubist.core.model import BuiltAsset
+    from cubist.io.vox import decode_vox, encode_vox
+
+    @asset(name="house", size=(4, 64, 4), ground_y=48)
+    def house(p):
+        return box((4, 64, 4), color=p.wood.dark)
+
+    a = house.build(P)
+    assert a.summary()["ground_y"] == 48
+    scene = decode_vox(encode_vox(a.to_vox_scene()))
+    assert BuiltAsset.from_vox(scene, a.summary(), P).ground_y == 48
+    assert BuiltAsset.from_vox(scene, {}, P).ground_y == 0  # a .vox with no build.json
