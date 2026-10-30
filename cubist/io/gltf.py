@@ -389,7 +389,7 @@ def encode_glb(
     root = {"name": asset.name, "children": []}
     if center:
         cx, cy, cz = glb_origin(asset)
-        root["translation"] = [-cx * s, -cy * s, -cz * s]
+        root["translation"] = [-cx * s, 0.0 - cy * s, -cz * s]  # 0.0 - : never -0.0
     nodes: list[dict] = [root]
     meshes: list[dict] = []
     index_of: dict[str, int] = {}

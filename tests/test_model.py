@@ -123,6 +123,9 @@ def test_ground_y_defaults_to_zero_and_must_sit_inside_the_asset():
         return asset(name="crate", size=(4, 4, 4), ground_y=ground_y)(crate.fn)
 
     assert make(3).build(P).ground_y == 3
+    import numpy as np
+
+    assert make(np.int64(2)).build(P).ground_y == 2  # numpy whole numbers count too
     with pytest.raises(ModelError, match="ground_y"):
         make(-1).build(P)
     with pytest.raises(ModelError, match="ground_y.*height"):

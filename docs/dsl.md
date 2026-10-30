@@ -51,7 +51,8 @@ center plane `size / 2`) or `("x", 15.5)` for another plane. `allow_floating`: d
 pieces detached from the main body. `ground_y`: the asset-space y (a whole number of voxels, below
 the asset's height) where the ground meets the asset: a townhouse with a cellar sets it to the
 cellar's depth, so the export's `glb_origin` sits at street level and a placement puts the street
-there. The scale lint measures a building's height from it. A bare shape becomes one part named after the asset.
+there. The scale lint measures a building's height from it. A bare shape becomes one part named
+after the asset.
 
 ```python
 Model(parts, sockets=None)

@@ -261,7 +261,7 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     m = style.voxel_size_m
     tall = f"{height} voxels ({height * m:.1f} m) tall"
     # A building's cellar doesn't count toward its door: measure from the ground line.
-    above = b[1][1] - max(asset.ground_y, b[0][1])
+    above = max(0, b[1][1] - max(asset.ground_y, b[0][1]))
     above_tall = f"{above} voxels ({above * m:.1f} m) above its ground_y of {asset.ground_y}"
     out = []
     lo, hi = SCALE_TOLERANCE

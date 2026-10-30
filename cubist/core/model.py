@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import numbers
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 
@@ -400,7 +401,7 @@ class AssetDef:
         ground_y: int = 0,
     ):
         check_symmetric(symmetric, "symmetric")
-        if isinstance(ground_y, bool) or not isinstance(ground_y, int) or ground_y < 0:
+        if isinstance(ground_y, bool) or not isinstance(ground_y, numbers.Integral) or ground_y < 0:
             raise ModelError(
                 f"asset {name!r}: ground_y must be a whole number of voxels, 0 or more, "
                 f"got {ground_y!r}; it is the asset-space y where the ground meets the "
@@ -408,7 +409,7 @@ class AssetDef:
             )
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
         self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
-        self.ground_y = ground_y
+        self.ground_y = int(ground_y)
 
     def build(
         self,

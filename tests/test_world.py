@@ -813,6 +813,8 @@ def test_ground_y_stands_the_ground_line_on_the_ground(tmp_path):
     # The ground is 10 m = voxel 160: asset y = 16 lands there, y = 15 a voxel under.
     assert at(160, 160, 160) == 200 and at(160, 159, 160) == 200
     assert at(160, 160 - 16, 160) == 200 and at(160, 160 - 17, 160) != 200
+    assert at(160, 160 + 15, 160) == 200  # its top, asset y = 31 (the render's window ends there)
+    # carve=True is Kiln's to apply when it stamps: the region render shows placement only.
     assert at(160, 160 + 15, 160) == 200  # its top, 16 above the street
 
 
