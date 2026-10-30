@@ -1,7 +1,13 @@
-"""Kiln's goblin, ported from Kiln's ``demos/Diorama/Goblin.cs`` (``Update``'s moves and gravity,
-``MoveAxis``) and ``src/Kiln.Voxel/World/VoxelCollision.cs`` (``Blocked``, ``GroundBelow``), so the
-walk lint's walker can be tested against the character it stands for. Voxels are a numpy bool
-array indexed [x, y, z]; outside it is empty."""
+"""Kiln's goblin, ported from Kiln's ``demos/Diorama/Goblin.cs`` (``Tick``'s moves, ``MoveAxis``)
+and ``src/Kiln.Voxel/World/VoxelCollision.cs`` (``Blocked``, ``GroundBelow``), so the walk lint's
+walker can be tested against the character it stands for. Voxels are a numpy bool array indexed
+[x, y, z]: the world's bounds, outside which it is empty.
+
+Ported: the acceleration toward the stick's speed, ``MoveAxis`` (a blocked axis loses its
+speed), gravity onto ``GroundBelow``, the clamp to the world's bounds and the drop back in from
+the top after falling out. Left out, as they don't move it: the turn toward its heading and the
+walk clip's blend. Kiln's walking speed is the walk clip's travel (19 voxels a second without a
+clip); ``walk`` takes it as ``speed``."""
 
 from __future__ import annotations
 
@@ -13,6 +19,7 @@ HALF_WIDTH = 4.0  # Goblin.cs: HalfWidth, Height, StepUp, Gravity
 HEIGHT = 22.0
 STEP_UP = 6.0
 GRAVITY = 400.0
+ACCEL = 260.0
 WALK_SPEED = 19.0  # voxels a second, its walk with no clip
 DT = 1 / 60
 
@@ -44,16 +51,28 @@ def _box(feet):
     return (x - HALF_WIDTH, y + 0.05, z - HALF_WIDTH), (x + HALF_WIDTH, y + HEIGHT, z + HALF_WIDTH)
 
 
-def walk(solid: np.ndarray, start, direction, seconds: float) -> list[float]:
-    """Walk from ``start`` (feet, standing) at walking speed along ``direction`` (a unit x or z
-    vector) for ``seconds``; where the feet end up."""
-    pos, fall, grounded = [float(v) for v in start], 0.0, True
+def walk(
+    solid: np.ndarray, start, move, seconds: float, speed: float = WALK_SPEED, run: bool = False
+) -> tuple[list[float], float]:
+    """Goblin.Tick at 60 a second for ``seconds``, from rest at ``start`` (feet, standing), the
+    stick held at ``move`` (x, z, length 1 at most). Where the feet end up, and the lowest they
+    went."""
+    pos, vel, grounded = [float(v) for v in start], [0.0, 0.0, 0.0], True
+    lowest = pos[1]
+    target = np.array([move[0], move[1]], float) * speed * (2 if run else 1)
     for _ in range(round(seconds / DT)):
+        horizontal = np.array([vel[0], vel[2]])
+        delta = target - horizontal
+        step = ACCEL * DT
+        n = float(np.linalg.norm(delta))
+        horizontal = target if n <= step else horizontal + delta / n * step
+        vel[0], vel[2] = float(horizontal[0]), float(horizontal[1])
         for axis in (0, 2):  # MoveAxis, x then z
-            if not direction[axis]:
+            d = vel[axis] * DT
+            if d == 0:
                 continue
             nxt = list(pos)
-            nxt[axis] += direction[axis] * WALK_SPEED * DT
+            nxt[axis] += d
             if not blocked(solid, *_box(nxt)):
                 pos = nxt
                 continue
@@ -62,11 +81,18 @@ def walk(solid: np.ndarray, start, direction, seconds: float) -> list[float]:
                 top = ground_below(solid, nxt[0], nxt[2], HALF_WIDTH, raised[1], STEP_UP + 0.5)
                 if top is not None:
                     pos = [nxt[0], top, nxt[2]]
+                    continue
+            vel[axis] = 0.0
         ground = ground_below(solid, pos[0], pos[2], HALF_WIDTH, pos[1] + 0.5, 256)
-        fall -= GRAVITY * DT
-        y = pos[1] + fall * DT
+        vel[1] -= GRAVITY * DT
+        y = pos[1] + vel[1] * DT
         if ground is not None and y <= ground:
-            pos[1], fall, grounded = ground, 0.0, True
+            pos[1], vel[1], grounded = ground, 0.0, True
         else:
             pos[1], grounded = y, False
-    return pos
+        lowest = min(lowest, pos[1])
+        pos[0] = min(max(pos[0], HALF_WIDTH), solid.shape[0] - HALF_WIDTH)
+        pos[2] = min(max(pos[2], HALF_WIDTH), solid.shape[2] - HALF_WIDTH)
+        if pos[1] < -64:
+            pos[1] = float(solid.shape[1])  # fell out of the world: drop back in from the top
+    return pos, lowest

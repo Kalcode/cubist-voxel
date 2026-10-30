@@ -80,9 +80,9 @@ Buildings (tagged `building`, or `walkable` for a bridge) name the points a walk
 the style's `[scale]` gives `walker_width`, `walker_height` and `walker_climb` (the game
 character's box and the ledge it climbs, in voxels), lint walks them:
 
-- `door`: out on the street in front of the main entrance, on the ground (y = `ground_y`). The
-  walk starts on the street within 16 voxels of it, outside the asset's x–z bounds, and must reach
-  it.
+- `door`: at the main entrance, on the ground (y = `ground_y`): on the front face, or under the
+  overhang, within 16 voxels of the street (sockets stay inside the model's bounds). The walk
+  starts on the street there, outside the asset's x–z bounds, and must reach it.
 - `floor_0` … `floor_n`: a standing point on each storey, `floor_0` the ground floor. A bridge puts
   `door` and `floor_0` at its deck ends.
 - `cellar`: a standing point in the cellar.
@@ -91,12 +91,13 @@ character's box and the ledge it climbs, in voxels), lint walks them:
 
 Without `door` or `floor_0` lint warns that it can't walk the building. The walker, two voxels
 wider and taller than the character, must reach every one of them from the street (which runs on
-under eaves and jetties), its feet within 2 voxels of the socket's y: so doorways at least
-`walker_width + 2` wide and `walker_height + 2` tall, risers of `walker_climb` at most, and
-stairwells open `walker_climb + walker_height + 2` above each tread. Give each storey its own
-part tagged `upper` and the roof its own `roof` part, split by y bands (stair steps above a line
-belong to the storey above): lint errors when one reaches up past the next one's lowest voxel,
-save the roof coming down over the top storey.
+under eaves and jetties) and walk back out, its feet within 2 voxels of the socket's y; a stair it
+can only drop down, or a hatch, doesn't count. So doorways at least `walker_width + 2` wide and
+`walker_height + 2` tall, risers of `walker_climb` at most, and stairwells open
+`walker_climb + walker_height + 2` above each tread. Give each storey its own part tagged `upper`
+and the roof its own `roof` part, split by y bands (stair steps above a line belong to the
+storey above): lint errors when one reaches up past the next one's lowest voxel, save the roof
+coming down over the top storey.
 
 ## Joints and clips
 

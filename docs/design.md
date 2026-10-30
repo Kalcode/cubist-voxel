@@ -286,15 +286,21 @@ game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height
   footprint; where it doesn't, it steps up if the box raised by the climb fits, onto the highest
   voxel under the new footprint. Where it lands a box must fit.
 - **The walk** starts on the street: the places it stands with its footprint wholly outside the
-  asset's x–z bounds, within 16 voxels of `door` and its feet within 2 of the door's y. A socket
-  is reached when a reached footprint holds its x–z (edges included), the feet within 2 voxels of
-  its y; `door` is checked like the rest, so a wall between the street and the doorway shows.
-- **Findings:** an error for each `door`, `floor_N`, `cellar` or `tour_NN` socket out of reach,
-  naming the socket and the walker, the reached place nearest to it and its distance, and saying
-  to check the stair or doorway between them; an error when there's no street near `door` to
-  start from. With no `door` or `floor_0` there's nothing to walk, and lint warns: older
-  buildings that no one enters still export.
-- **Against the goblin:** `tests/goblin.py` ports `Goblin.Update` and `VoxelCollision`, and
+  asset's x–z bounds, within 16 voxels of `door` and its feet within 2 of the door's y. (`door`
+  itself, like every socket, stays inside the model's bounds: on the front face, or under the
+  overhang.) A socket is reached when a reached footprint holds its x–z (edges included), the feet
+  within 2 voxels of its y; `door` is checked like the rest, so a wall between the street and the
+  doorway shows.
+- **The way back:** going down is a drop, so a flight walked down is never climbed on the way
+  in. Each move is kept, and a flood from the street over the moves turned round marks the places
+  with a way back out; a socket reached only where there's none (a cellar down a stair of 7-voxel
+  risers, or through a hatch) errors.
+- **Findings:** an error for each `door`, `floor_N`, `cellar` or `tour_NN` socket out of reach or
+  with no way back, naming the socket and the walker, the nearest place reached (or walked back
+  out from) and its distance, and saying to check the stair or doorway between them; an error
+  when there's no street near `door` to start from. With no `door` or `floor_0` there's nothing to
+  walk, and lint warns: older buildings that no one enters still export.
+- **Against the goblin:** `tests/goblin.py` ports `Goblin.Tick` and `VoxelCollision`, and
   `test_walk_lint.py` runs the same strips through it and the walker. It climbs a riser of 6 and
   not 7 and stays up over a gap of 8 but falls into 9, as the walker does. It steps up with 28
   voxels of air above the tread it leaves (the walker needs 30), and passes a doorway 9 wide (8
@@ -302,8 +308,10 @@ game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height
   than the goblin everywhere but two places it can't see: the instant the goblin's footprint is
   `w` wide as it crosses a whole voxel's line (it passes within a frame), and falls, which it
   takes straight down where the goblin keeps some of its speed (a player can let go of the stick:
-  it stops within a voxel). Support handed across the path from one edge column to the other is
-  exact: the goblin covers `w + 1` of the walker's `w + 2` columns there, and so does the walker.
+  it stops within a voxel). Support handed across the path from one edge column to the other
+  needs one footprint (`w + 1`, the goblin's) holding both; the goblin can also cross with a
+  diagonal step that crosses both whole-voxel lines in one frame (`MoveAxis` x, then z, then the
+  ground check), so there the walker, a move at a time, is the stricter: the safe way round.
 
 ## Style bible and example library
 
@@ -769,11 +777,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
 - **13b. Walk lint (Oct 30).** The walk and storey lints (above, "Linting and validation"): a
   `building` or `walkable` asset walks from the street at `door` to every `floor_N`, `cellar` and
   `tour_NN` socket when `[scale]` names the walker, and `upper` and `roof` parts are y bands. A
-  160 × 368 × 192 townhouse (a cellar, five storeys and their stairs) walks and checks its bands
-  in 0.51–0.52 s over three runs, of 1.35 s for its whole lint (M1 Max; the test holds both under
-  5 s). Review round 1: the walk starts on the street, not in the doorway; the ground follows
-  Kiln's carve; the walker stands on the goblin's own footprint (exact across its path too); a
-  missing `door` or `floor_0` warns.
+  160 × 368 × 192 townhouse (a cellar, five storeys and their stairs) walks in and back out and
+  checks its bands in 0.61–0.65 s over three runs, of 1.48 s for its whole lint (M1 Max; the test
+  holds both under 5 s). Review rounds: the walk starts on the street, not in the doorway; the
+  ground follows Kiln's carve; the walker stands on the goblin's own footprint (its spare column
+  either side across a move); every socket needs a way back to the street; a missing `door` or
+  `floor_0` warns.
 - **13c. Bridges**: not started.
 
 ### v1 acceptance targets

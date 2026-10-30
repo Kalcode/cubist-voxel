@@ -3,8 +3,8 @@
 The walk lint flood-fills a building from the street at its ``door`` socket with a walker the
 size of the game's character (``[scale]`` ``walker_width``, ``walker_height`` and
 ``walker_climb``, plus MARGIN) and errors on each door, storey, cellar or tour socket it never
-reaches. The storey lint keeps each hideable part a horizontal band, because an engine hides the
-storeys above the character by y.
+reaches, or reaches but can't walk back to the street from. The storey lint keeps each hideable
+part a horizontal band, because an engine hides the storeys above the character by y.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import breadth_first_order
 
 from cubist.core.model import BuiltAsset
 from cubist.core.socket import Socket
@@ -89,7 +91,11 @@ class Walker:
     voxels past the asset's x-z bounds, solid ground below ``ground_y``, except over the x-z
     bounds of the voxels below ``ground_y``: Kiln carves that (a cellar's footprint), and leaves
     the street under eaves and jetties. The walk starts out on the street: footprints wholly
-    outside the asset's x-z bounds, within DOOR_REACH voxels of 'door'."""
+    outside the asset's x-z bounds, within DOOR_REACH voxels of 'door'.
+
+    **The way back.** A drop is a move too, so a flight walked down is never climbed. ``back``
+    marks the reached states that can walk back to the street: a flood from the starts over the
+    moves reversed."""
 
     def __init__(self, asset: BuiltAsset, grid, width: int, height: int, climb: int):
         self.width, self.height, self.climb = width, height, climb
@@ -153,9 +159,9 @@ class Walker:
         return out
 
     def start(self, door) -> bool:
-        """Flood-fill from where the walker stands on the street near ``door``: footprints wholly
-        outside the asset's x-z bounds, within DOOR_REACH of it, its feet within REACH_Y of its y.
-        False if there are none."""
+        """Flood-fill from where the walker stands on the street near ``door`` (footprints wholly
+        outside the asset's x-z bounds, within DOOR_REACH of it, its feet within REACH_Y of its
+        y), then find the way back. False if there's nowhere to start."""
         i, f, k = self._around(door, DOOR_REACH)
         x0, x1, z0, z1 = self.bounds
         a = self.foot
@@ -166,18 +172,38 @@ class Walker:
             return False
         shape = self.reached.shape
         flat = self.reached.reshape(-1)
-        cells = np.unique(np.ravel_multi_index((i[standing], f[standing], k[standing]), shape))
+        starts = np.unique(np.ravel_multi_index((i[standing], f[standing], k[standing]), shape))
+        cells, moves = starts, []
         while len(cells):
             flat[cells] = True
-            cells = np.unique(np.concatenate(self._moves(*np.unravel_index(cells, shape))))
+            src, dst = self._moves(cells)
+            moves.append((src, dst))
+            cells = np.unique(dst)
             cells = cells[~flat[cells]]
+        self._way_back(starts, moves)
         return True
 
-    def _moves(self, xs, fs, zs) -> list[np.ndarray]:
-        """Where each state's four moves land, as flat indices: Goblin.cs's MoveAxis, then its
-        gravity, once for each box that may hold the move."""
+    def _way_back(self, starts, moves) -> None:
+        """``back``: the reached states with a way to the street, by a breadth-first flood from
+        the starts over every move turned round."""
+        states = np.flatnonzero(self.reached)
+        n = len(states)
+        src = np.searchsorted(states, np.concatenate([m[0] for m in moves]))
+        dst = np.searchsorted(states, np.concatenate([m[1] for m in moves]))
+        # Node n stands for the street, with an edge to each start.
+        rows = np.concatenate([dst, np.full(len(starts), n)])
+        cols = np.concatenate([src, np.searchsorted(states, starts)])
+        turned = csr_matrix((np.ones(len(rows), np.int8), (rows, cols)), shape=(n + 1, n + 1))
+        order = breadth_first_order(turned, n, directed=True, return_predecessors=False)
+        self.back = np.zeros(self.reached.shape, bool)
+        self.back.reshape(-1)[states[order[order < n]]] = True
+
+    def _moves(self, cells) -> tuple[np.ndarray, np.ndarray]:
+        """Each state's four moves (Goblin.cs's MoveAxis, then its gravity, once for each box that
+        may hold the move), as flat indices: where from and where to."""
+        xs, fs, zs = np.unravel_index(cells, self.reached.shape)
         nx, _, nz = self.clear.shape
-        out = []
+        froms, tos = [], []
         for axis, step in _MOVES:
             i, k = (xs + step, zs) if axis == 0 else (xs, zs + step)
             along = np.minimum(xs, i) if axis == 0 else np.minimum(zs, k)
@@ -193,16 +219,23 @@ class Walker:
                 keep = to > 0  # 0: it stopped, or fell out of the world
                 moved = keep & (to != f)  # where it dropped or stepped, a box must fit too
                 keep[moved] = self._fits(ni[moved], to[moved], nk[moved])
-                out.append(np.ravel_multi_index((ni[keep], to[keep], nk[keep]), self.reached.shape))
-        return out
+                froms.append(cells[ok][keep])
+                tos.append(np.ravel_multi_index((ni[keep], to[keep], nk[keep]), self.reached.shape))
+        return np.concatenate(froms), np.concatenate(tos)
 
     def reaches(self, pos) -> bool:
         i, f, k = self._around(pos)
         return bool(self.reached[i, f, k].any())
 
-    def nearest(self, pos) -> tuple[list, float]:
-        """The reached place nearest to ``pos`` (the middle of the goblin's feet), and how far."""
-        cells = np.argwhere(self.reached).astype(float)
+    def returns(self, pos) -> bool:
+        """Some state the walker reaches at ``pos`` has a way back to the street."""
+        i, f, k = self._around(pos)
+        return bool(self.back[i, f, k].any())
+
+    def nearest(self, pos, among: np.ndarray) -> tuple[list, float]:
+        """The state of ``among`` nearest to ``pos`` (the middle of the goblin's feet), and how
+        far."""
+        cells = np.argwhere(among).astype(float)
         cells[:, [0, 2]] += self.foot / 2
         cells += self.origin
         d = np.linalg.norm(cells - np.asarray(pos, float), axis=1)
@@ -228,11 +261,14 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     width, height, climb = (int(style.scale[k]) for k in WALKER_KEYS)
     sockets = {n: Socket.from_value(v, n).position for n, v in asset.sockets.items()}
     ground = f"on the ground (y = ground_y, {asset.ground_y} here)"
+    street = f"within {DOOR_REACH} voxels of the street (sockets stay inside the model's bounds)"
     if "building" in asset.tags:
-        door_at = f"out on the street in front of the main entrance, {ground}"
+        door_at = (
+            f"at the main entrance, {ground}: on the front face, or under the overhang, {street}"
+        )
         floor_at = "on the ground floor, where someone would stand"
     else:
-        door_at = f"where the walk starts, {ground}: one end of a bridge's deck"
+        door_at = f"where the walk starts, {ground}: one end of a bridge's deck, {street}"
         floor_at = "where it ends: the other end of the deck"
     out = []
     for name, where in (("door", door_at), ("floor_0", floor_at)):
@@ -267,17 +303,37 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
         )
         return out
     for name, pos in sorted(sockets.items()):
-        if not walked(name) or walker.reaches(pos):
+        if not walked(name):
             continue
-        point, distance = walker.nearest(pos)
+        if not walker.reaches(pos):
+            way = "in"
+            point, distance = walker.nearest(pos, walker.reached)
+            what = (
+                f"the walker can't reach {name!r} {_at(pos)} from the street at 'door': the "
+                f"nearest it gets is {_at(point)}, {distance:.0f} voxels away"
+            )
+        elif not walker.returns(pos):
+            way = "out"
+            point, distance = walker.nearest(pos, walker.back)
+            what = (
+                f"the walker can't get back from {name!r} {_at(pos)} to the street: it gets "
+                "there only by dropping down what it can't climb back up, and the nearest place "
+                f"it walks back out from is {_at(point)}, {distance:.0f} voxels away"
+            )
+        else:
+            continue
         out.append(
             Finding(
                 "walk",
                 "error",
-                f"the walker can't reach {name!r} {_at(pos)} from the street at 'door': the "
-                f"nearest it gets is {_at(point)}, {distance:.0f} voxels away. Check the stair or "
-                f"doorway between them: {walker.needs()}",
-                {"socket": name, "nearest": point, "distance": round(distance, 2), **details},
+                f"{what}. Check the stair or doorway between them: {walker.needs()}",
+                {
+                    "socket": name,
+                    "way": way,
+                    "nearest": point,
+                    "distance": round(distance, 2),
+                    **details,
+                },
             )
         )
     return out

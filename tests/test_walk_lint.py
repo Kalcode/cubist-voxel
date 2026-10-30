@@ -206,8 +206,11 @@ def test_a_step_up_needs_the_box_raised_by_the_climb_to_be_clear():
 def test_support_handed_across_the_path_needs_one_footprint_on_both_sides():
     # A corridor exactly the walker's width, its floor gone but for a rail under each edge: the
     # left one ends and the right one starts further on. Across its path the goblin covers 9 of the
-    # walker's 10 columns, so it stands toward one rail at a time and moves over only where one of
-    # its footprints holds both: rail ends 7 apart (along the path) it crosses, 8 apart it doesn't.
+    # walker's 10 columns, so it stands toward one rail at a time, and the walker moves over only
+    # where one footprint holds both: rail ends 7 apart (along the path) it crosses, 8 apart it
+    # doesn't. Kiln's goblin can cross 8 with a diagonal step that crosses both whole-voxel lines
+    # in one frame (MoveAxis x, then z, then the ground check); the walker, a move at a time, is
+    # the stricter there, the safe way round.
     def rails(apart):
         site = house(storeys=1)
         site.fill((WALL, WALL, 24), (45, 48, 56))  # the corridor's walls, x 45 to 55 open
@@ -242,14 +245,51 @@ def test_a_sealed_cellar_is_out_of_reach():
     assert walk_errors(house(cellar=True).built()) == []
     [f] = walk_errors(house(cellar=True, cellar_stair=False).built())
     assert f.details["socket"] == "cellar" and "'cellar'" in f.message
+    assert f.details["way"] == "in"
 
 
-def test_inside_the_footprint_there_is_no_ground():
-    # Kiln carves a cellared building's footprint, so a building with no floor of its own drops the
+def test_the_walker_must_get_back_out():
+    # Going down is a fall, so a flight walked down isn't climbed: the walk back to the street
+    # checks it. A cellar stair of 7-voxel risers, and a hatch with no stair, drop the walker
+    # into a cellar it can't leave.
+    def way_out(a):
+        return {(f.details["socket"], f.details["way"]) for f in walk_errors(a)}
+
+    assert way_out(house(storeys=1, cellar=True).built()) == set()  # 4-voxel risers
+    found = walk_errors(house(storeys=1, cellar=True, riser=7).built())
+    assert {(f.details["socket"], f.details["way"]) for f in found} == {
+        ("cellar", "out"),
+        ("tour_01", "out"),  # the foot of the flight
+    }
+    [f] = [f for f in found if f.details["socket"] == "cellar"]
+    assert "can't get back from 'cellar'" in f.message and "to the street" in f.message
+    assert "stair or doorway" in f.message
+    assert f.details["nearest"][1] == 48 and f.details["distance"] == pytest.approx(44, abs=1)
+    hatch = house(storeys=1, cellar=True, cellar_stair=False)
+    hatch.fill((40, 44, 40), (60, 48, 60), False)  # 20 × 20 through the ground floor
+    assert way_out(hatch.built()) == {("cellar", "out")}
+
+
+def test_a_cellared_footprint_has_no_ground():
+    # Kiln carves the x-z bounds of the voxels below ground_y (here the walls and floor, from
+    # y = 0 under a ground line at 4), so a building with no floor of its own over that drops the
     # walker.
     site = house(storeys=1)
     site.fill((WALL, 0, WALL), (100 - WALL, WALL, 80 - WALL), False)
     assert unreached(site.built()) == {"floor_0"}
+
+
+def test_with_nothing_below_the_ground_line_the_ground_runs_under_the_footprint():
+    # Nothing to carve: a shell standing on the ground (ground_y 0) with no floor of its own is
+    # walked on the ground inside it.
+    site = Site(np.zeros((60, 40, 60), bool), ground_y=0)
+    site.fill((0, 0, 0), (WALL, 40, 60))
+    site.fill((60 - WALL, 0, 0), (60, 40, 60))
+    site.fill((0, 0, 0), (60, 40, WALL))
+    site.fill((0, 0, 60 - WALL), (60, 40, 60))
+    site.fill((22, 0, 60 - WALL), (38, 34, 60), False)  # the doorway
+    site.sockets = {"door": (30, 0, 60), "floor_0": (30, 0, 30)}
+    assert walk_errors(site.built()) == []
 
 
 def test_hidden_parts_are_left_out():
@@ -315,10 +355,12 @@ def test_a_door_socket_with_no_street_near_it_is_an_error():
     site = house()
     site.sockets["door"] = (50, 30, 80)  # in the air, above the doorway
     [f] = walk_errors(site.built())
-    assert f.details["socket"] == "door" and "out on the street" in f.message
+    assert f.details["socket"] == "door" and "within 16 voxels of the street" in f.message
+    assert "on the front face, or under the overhang" in f.message
+    assert "sockets stay inside the model's bounds" in f.message
     site.sockets["door"] = (50, WALL, 40)  # inside the house, 40 from the street
     [f] = walk_errors(site.built())
-    assert f.details["socket"] == "door" and "out on the street" in f.message
+    assert f.details["socket"] == "door" and "within 16 voxels of the street" in f.message
 
 
 def test_only_the_walk_sockets_are_walked():
@@ -394,10 +436,10 @@ def strip(kind, n):
 def goblin_passes(site, far) -> bool:
     """Kiln's goblin (tests/goblin.py) walking +x down the strip, from a few places across it
     (it fits an 8-wide doorway only centred on a whole voxel), gets past x = 60 at the far end's
-    height."""
+    height without falling on the way."""
     for z in (20.0, 20.25, 20.5, 19.5):
-        x, y, _ = goblin.walk(site.solid, (10.3, WALL, z), (1, 0, 0), 4)
-        if x > 60 and y == far:
+        (x, y, _), lowest = goblin.walk(site.solid, (10.3, WALL, z), (1, 0), 4)
+        if x > 60 and y == far and lowest >= WALL:
             return True
     return False
 
