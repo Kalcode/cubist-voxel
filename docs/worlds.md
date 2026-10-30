@@ -86,9 +86,15 @@ them. Rivers and roads follow paths, in `World(rivers=[...], roads=[...])` (rive
   The water level follows the ground along it but never rises downstream. The channel is cut `depth_m`
   under it, the banks ease into the ground over `bank_m` (default: the width), the bed is painted `bed`,
   and the channel fills with `water`. Water is solid voxels of that color for now.
-- `road(path, width_m, color, bank_m=None, smooth_m=30)`: the strip is levelled to the road's own height
-  profile (averaged over `smooth_m` of road), cut and filled into the ground over `bank_m`, and painted
-  `color`. Where a road crosses a river it fills the channel (a ford).
+- `road(path, width_m, color, bank_m=None, smooth_m=30, bridges=False)`: the strip is levelled to the road's
+  own height profile (averaged over `smooth_m` of road), cut and filled into the ground over `bank_m`, and
+  painted `color`. Where a road crosses a river it fills the channel (a ford).
+  With `bridges=True` it leaves the channel alone: the water and the bed stay, the strip isn't painted over
+  them, and the road's `world.json` line gets a point where it enters the channel and one where it leaves
+  (at the road's height on each bank) and a point every 4 m or so between, on the straight line between
+  the two: the deck. Kiln's walks follow that line in x–z and the character rides what's under it, so the
+  deck is a prop: `place()` a bridge asset with its footprint over the middle of each crossing. A road
+  that starts or ends in the water has no bank to carry a deck from and isn't a crossing.
 
 The map draws water in its own color, a little darker where it's deep; the bake fills it as voxels and
 shows it in the far field.
@@ -168,6 +174,7 @@ asset.
 | slope | Ground within 20 m of a landmark steeper than 45°; the share of all ground that steep (info) | Warning |
 | uneven | A placed prop whose footprint's ground falls more than 1 m (it floats on the low side) | Warning |
 | overlap | Placed props overlapping, and scattered props growing into a placed one | Warning |
+| bridge | A bridged road's crossing with no placed prop whose footprint covers the middle of the channel (an unexported prop must stand within 1 m of it) | Warning |
 | cave | A cavern or tunnel with no way in from the surface; a tunnel whose floor rises or drops more than 1 m in a metre (a step no one climbs: vale's worm pit showed as "rises 3.7 m") | Warning |
 
 Props are checked against their exported manifests; until they're exported, lint says so and skips them.

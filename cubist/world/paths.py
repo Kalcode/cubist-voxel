@@ -274,9 +274,65 @@ class River(PathEdit):
 
 
 class Road(PathEdit):
-    def __init__(self, line, width_m, color, bank_m, smooth_m):
+    def __init__(self, line, width_m, color, bank_m, smooth_m, bridges=False):
         super().__init__(line, width_m, bank_m)
-        self.color, self.smooth = color, float(smooth_m)
+        self.color, self.smooth, self.bridges = color, float(smooth_m), bool(bridges)
+        self.rivers: list[
+            River
+        ] = []  # the world's rivers, set when it loads (a bridge crosses them)
+
+    def in_channel(self, x, z) -> np.ndarray:
+        """Where a bridged road leaves the ground alone: inside any river's channel."""
+        inside = np.zeros(np.shape(x), dtype=bool)
+        if self.bridges:
+            for r in self.rivers:
+                inside |= np.isfinite(r.path.nearest(x, z, r.half)[0])
+        return inside
+
+    def crossings(self) -> list[tuple[float, float]]:
+        """(entry, exit) arc lengths of each stretch of a bridged road over a river's channel,
+        found to a few millimetres. A road that starts or ends in the water has no bank to
+        carry a deck from, so that stretch isn't a crossing."""
+        if not self.bridges or not self.rivers:
+            return []
+        pts = self.path.points
+
+        def over(s):
+            return self.in_channel(
+                np.interp(s, self.path.cum, pts[:, 0]), np.interp(s, self.path.cum, pts[:, 1])
+            )
+
+        s = np.arange(0.0, self.path.length + 0.25, 0.25).clip(max=self.path.length)
+        wet = over(s)
+        out = []
+        edges = np.flatnonzero(np.diff(wet.astype(np.int8)))
+        enter = None
+        for i in edges:
+            lo, hi = float(s[i]), float(s[i + 1])
+            for _ in range(24):  # bisect the edge between a dry and a wet sample
+                mid = (lo + hi) / 2
+                if bool(over(mid)) == bool(wet[i + 1]):
+                    hi = mid
+                else:
+                    lo = mid
+            edge = (lo + hi) / 2
+            if wet[i + 1]:
+                enter = edge
+            elif enter is not None:
+                out.append((enter, edge))
+                enter = None
+        return out
+
+    def at(self, arc: float) -> tuple[float, float]:
+        """The (x, z) at an arc length along the road."""
+        pts = self.path.points
+        return (
+            float(np.interp(arc, self.path.cum, pts[:, 0])),
+            float(np.interp(arc, self.path.cum, pts[:, 1])),
+        )
+
+    def strip(self, x, z) -> np.ndarray:
+        return super().strip(x, z) & ~self.in_channel(x, z)
 
     def _shape(self, along):
         # A moving average over about `smooth_m` of road, so it doesn't follow every bump.
@@ -297,6 +353,9 @@ class Road(PathEdit):
         r = self.level(ground, seed, arc[near])
         dn, hn = d[near], h[near]
         out[near] = r + (hn - r) * _smoothstep((dn - self.half) / max(self.bank, 1e-9))
+        if self.bridges:  # the river's channel stays as it was cut, under the deck
+            dry = ~self.in_channel(x, z)
+            out = np.where(dry, out, h)
         return out
 
 
@@ -331,16 +390,22 @@ def road(
     bank_m: float | None = None,
     smooth_m: float = 30.0,
     name: str | None = None,
+    bridges: bool = False,
 ) -> Road:
     """A road along ``line``.
 
     ``width_m`` of ground levelled to the road's own profile (averaged over ``smooth_m``) and
     painted ``color``, cut and filled into the ground over ``bank_m``. ``name`` names its line in
     the bake's ``world.json`` (default ``road1``, ...): routes for walks and caravans.
+
+    Where it crosses a river it fills the channel (a ford), unless ``bridges``: then the road
+    leaves the channel, its water and bed alone, and its ``world.json`` line crosses at deck height,
+    straight between the road's heights at the two banks. The deck itself is a prop: ``place()`` a
+    bridge asset over each crossing (lint warns of one with none).
     """
     if not isinstance(color, Color):
         raise WorldError(f"road color must be a palette color such as p.stone.light, got {color!r}")
-    r = Road(line, width_m, color, bank_m, smooth_m)
+    r = Road(line, width_m, color, bank_m, smooth_m, bridges)
     r.name = name
     return r
 

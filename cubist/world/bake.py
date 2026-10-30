@@ -579,6 +579,31 @@ def sample_columns_at(
     return h * VOXELS_PER_M, s, surface(loaded, gx, gz, h, s)
 
 
+DECK_SPACING_M = 4.0  # a bridged road's line has a point this often over the water
+
+
+def _deck(loaded: LoadedWorld, road, rows: np.ndarray) -> np.ndarray:
+    """A bridged road's line (x, y, z metres): over each river's channel, points from the road's
+    height at the bank where it enters, straight to its height where it leaves (the ground under
+    them is the river's bed, not the road)."""
+    crossings = road.crossings()
+    if not crossings:
+        return rows
+    cum = road.path.cum
+    keep = np.ones(len(rows), dtype=bool)
+    new = []
+    for s0, s1 in crossings:
+        keep &= ~((cum > s0 - 1e-6) & (cum < s1 + 1e-6))
+        y0, y1 = road.level(loaded.world.ground, loaded.seed, np.array([s0, s1]))
+        n = max(1, math.ceil((s1 - s0) / DECK_SPACING_M))
+        for k in range(n + 1):
+            s = s0 + (s1 - s0) * k / n
+            x, z = road.at(s)
+            new.append((s, x, y0 + (y1 - y0) * k / n, z))
+    ordered = sorted([*zip(cum[keep], *rows[keep].T, strict=True), *new])
+    return np.array([r[1:] for r in ordered])
+
+
 def paths_of(loaded: LoadedWorld) -> list[dict]:
     """The world's roads, rivers and tunnels as named lines for the engine (walks, caravans): points
     every 4 m or so in voxels, on the road or river bed, or along a tunnel's floor."""
@@ -592,7 +617,10 @@ def paths_of(loaded: LoadedWorld) -> list[dict]:
         for i, edit in enumerate(edits, 1):
             p = edit.path.points
             y = heights(loaded, p[:, 0], p[:, 1])
-            line(kind, edit.name or f"{kind}{i}", np.stack([p[:, 0], y, p[:, 1]], axis=-1))
+            rows = np.stack([p[:, 0], y, p[:, 1]], axis=-1)
+            if kind == "road":
+                rows = _deck(loaded, edit, rows)
+            line(kind, edit.name or f"{kind}{i}", rows)
     tunnels = [c for c in loaded.world.caves if isinstance(c, Tunnel)]
     for i, t in enumerate(tunnels, 1):
         line("tunnel", t.label or f"tunnel{i}", t.points - np.array([0.0, t.radius, 0.0]))

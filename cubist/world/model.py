@@ -240,6 +240,8 @@ def load_world(
         for item in items:
             if not isinstance(item, classes):
                 raise WorldError(f"world {defn.name}: {kind} take {wanted}, got {item!r}")
+    for road in result.roads:
+        road.rivers = list(result.rivers)
     edits = [*result.rivers, *result.roads]
     ground = EditedGround(result.ground, edits) if edits else result.ground
     loaded = LoadedWorld(defn, result, palette, mix_seed(defn.seed, seed), directory, ground)

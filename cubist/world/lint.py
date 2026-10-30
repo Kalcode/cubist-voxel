@@ -9,6 +9,7 @@ much ground is too steep to walk.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -106,6 +107,7 @@ def lint_world(loaded: LoadedWorld, slope_map: np.ndarray, export: Path | None) 
             )
 
     out += _props(loaded, export)
+    out += _bridges(loaded, export)
     out += _caves(loaded)
     out += _tunnel_floors(loaded)
     return LintReport(out)
@@ -176,6 +178,34 @@ def _props(loaded: LoadedWorld, export: Path | None) -> list[Finding]:
                         "warning",
                         f"{n} scattered {s.asset} grow into {p.asset} at "
                         f"({p.at[0]:g}, {p.at[-1]:g}); give the scatter avoid=rect(...) around it",
+                    )
+                )
+    return out
+
+
+def _bridges(loaded: LoadedWorld, export: Path | None) -> list[Finding]:
+    """A bridged road's crossing needs a placed prop (the deck) over the middle of the channel. With
+    the prop's export its footprint must cover that point; without, it must stand within a metre."""
+    out: list[Finding] = []
+    placed = [p for p in loaded.world.props if isinstance(p, Place)]
+    for i, road in enumerate(loaded.world.roads, 1):
+        for s0, s1 in road.crossings():
+            x, z = road.at((s0 + s1) / 2)
+            covered = False
+            for prop in placed:
+                if export is not None and (export / f"{prop.asset}.cubist.json").is_file():
+                    x0, z0, x1, z1 = _footprint_box(export, prop)
+                    covered |= x0 <= x <= x1 and z0 <= z <= z1
+                else:
+                    covered |= math.hypot(prop.at[0] - x, prop.at[-1] - z) <= 1.0
+            if not covered:
+                out.append(
+                    _f(
+                        "bridge",
+                        "warning",
+                        f"{road.name or f'road{i}'} crosses a river at ({x:.0f}, {z:.0f}) "
+                        f"({s1 - s0:.0f} m of water) with no bridge: place() an exported bridge "
+                        f"asset there, its footprint over ({x:.0f}, {z:.0f})",
                     )
                 )
     return out

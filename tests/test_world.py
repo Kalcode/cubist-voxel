@@ -892,3 +892,144 @@ def test_coarse_path_distance_stays_close_away_from_the_path():
     for i, j in ((0, 0), (150, 77), (299, 299)):
         alone = coarse.sample(np.array([x[i, j]]), np.array([z[i, j]]), 0)[0]
         assert alone == b[i, j]
+
+
+def _crossing_world(bridges, props=()):
+    """A road along x = 40 over a river at z = 60 (56 to 64); the ground falls 0.1 m/m south."""
+    from cubist.world import path, place, river, road
+    from cubist.world.field import Custom
+
+    @world(name="crossing", size_m=(128, 128))
+    def crossing(p):
+        kwargs = {"bridges": True} if bridges else {}
+        return World(
+            ground=flat(30) + Custom(lambda x, z, s: -np.asarray(z) * 0.1, "fall"),
+            surface=[p.leaf.mid],
+            subsoil=[p.stone.dark],
+            rivers=[
+                river(
+                    path([(10, 60), (120, 60)], smooth=False),
+                    width_m=8,
+                    depth_m=2,
+                    bed=p.stone.light,
+                    water=p.water.mid,
+                )
+            ],  # fmt: skip
+            roads=[
+                road(
+                    path([(40, 10), (40, 110)], smooth=False),
+                    width_m=4,
+                    color=p.cork,
+                    name="street",
+                    **kwargs,
+                )
+            ],
+            props=[place(a, at=at) for a, at in props],
+        )
+
+    return crossing
+
+
+def _tile_hash(loaded, tmp_path):
+    import hashlib
+
+    from cubist.world.bake import bake_tile, layers_of
+
+    bake_tile(loaded, tmp_path, 0, 0, 0, layers_of(loaded))
+    return hashlib.sha256((tmp_path / "L0" / "0_0.tile").read_bytes()).hexdigest()
+
+
+def test_a_road_without_bridges_still_fords_the_river(tmp_path):
+    from cubist.world import path, river, road
+
+    @world(name="ford", size_m=(128, 128))
+    def ford(p):
+        return World(
+            ground=flat(30),
+            surface=[p.leaf.mid],
+            subsoil=[p.stone.dark],
+            rivers=[
+                river(
+                    path([(10, 60), (120, 60)], smooth=False),
+                    width_m=8,
+                    depth_m=2,
+                    bed=p.stone.light,
+                    water=p.water.mid,
+                )
+            ],  # fmt: skip
+            roads=[road(path([(40, 10), (40, 110)], smooth=False), width_m=4, color=p.cork)],
+        )
+
+    # Pinned before bridges existed: the ford's tile must not move.
+    assert (
+        _tile_hash(load_world(ford, _demo_palette(), seed=0), tmp_path)
+        == "94c03774444a9902a7e142b2e4d0cb875db6615f1de3bb8683e116f594a315b2"
+    )
+
+
+def test_a_bridged_road_leaves_the_channel_and_carries_its_line_over_it():
+    from cubist.world.bake import paths_of
+    from cubist.world.sample import heights, surface_names, water
+
+    p = _demo_palette()
+    ford = load_world(_crossing_world(False), p, seed=0)
+    bridged = load_world(_crossing_world(True), p, seed=0)
+    centre = (np.array([40.0]), np.array([60.0]))
+    # The ford fills the channel; the bridge leaves the water and the bed where they were.
+    assert heights(ford, *centre)[0] > heights(bridged, *centre)[0] + 1.5
+    level, color = water(bridged, *centre)
+    assert level[0] == pytest.approx(heights(bridged, np.array([10.0]), np.array([60.0]))[0], abs=2)
+    assert level[0] > heights(bridged, *centre)[0] and color[0] == p.water.mid.index
+    assert heights(bridged, *centre)[0] < level[0] - 1
+    _, _, names = columns(bridged, *centre)
+    assert surface_names(bridged, names) == ["stone.light"]  # the bed, not the road's cork
+    # The road is still there on both banks, painted and level.
+    _, _, banks = columns(bridged, np.array([40.0, 40.0]), np.array([50.0, 70.0]))
+    assert surface_names(bridged, banks) == ["cork", "cork"]
+    # Its line: straight between the road's heights at the banks over the water.
+    line = next(x for x in paths_of(bridged) if x["name"] == "street")
+    pts = np.array(line["points"]) / 16
+    # The road's heights just off the water (it runs 56 to 64).
+    south = heights(bridged, np.array([40.0]), np.array([55.5]))[0]
+    north = heights(bridged, np.array([40.0]), np.array([64.5]))[0]
+    over = pts[(pts[:, 2] > 56.2) & (pts[:, 2] < 63.8)]
+    assert len(over) >= 1
+    want = south + (north - south) * (over[:, 2] - 55.5) / 9
+    assert np.allclose(over[:, 1], want, atol=0.2)
+    assert np.all(over[:, 1] > level[0])  # on the deck, over the water
+    # The line has points where it enters and leaves the channel, even for a two-point road.
+    assert np.any(np.isclose(pts[:, 2], 56, atol=0.1)) and np.any(
+        np.isclose(pts[:, 2], 64, atol=0.1)
+    )
+    # The ford's line is unchanged: on the ground the whole way.
+    old = np.array(next(x for x in paths_of(ford) if x["name"] == "street")["points"]) / 16
+    assert len(old) == 2 or np.allclose(old[:, 1], heights(ford, old[:, 0], old[:, 2]), atol=0.1)
+
+
+def test_lint_warns_of_a_bridged_crossing_until_a_prop_stands_on_it(tmp_path):
+    from cubist.world.lint import lint_world
+
+    project = _project(tmp_path)
+    (project / "export" / "span.cubist.json").write_text(
+        '{"cubist_manifest": 1, "name": "span", "size": [128, 64, 320], "glb_origin": [64, 0, 160]}'
+    )
+    slopes0 = np.zeros((4, 4))
+
+    def lint(world_fn):
+        loaded = load_world(world_fn, _demo_palette(), seed=0)
+        return lint_world(loaded, slopes0, project / "export")
+
+    bare = lint(_crossing_world(True))
+    findings = [f for f in bare.findings if f.check == "bridge"]
+    assert len(findings) == 1 and findings[0].severity == "warning"
+    assert "street" in findings[0].message and "(40, 60)" in findings[0].message
+    assert "place(" in findings[0].message  # says how to fix it
+    # A bridge 8 m by 20 m on the crossing's centre covers it; one beside it doesn't.
+    assert not [
+        f for f in lint(_crossing_world(True, [("span", (40, 60))])).findings if f.check == "bridge"
+    ]
+    assert [
+        f for f in lint(_crossing_world(True, [("span", (80, 60))])).findings if f.check == "bridge"
+    ]
+    # A ford needs no bridge.
+    assert not [f for f in lint(_crossing_world(False)).findings if f.check == "bridge"]
