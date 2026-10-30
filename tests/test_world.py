@@ -1044,6 +1044,43 @@ def test_a_bridged_road_leaves_the_channel_and_carries_its_line_over_it():
     assert len(old) == 2 or np.allclose(old[:, 1], heights(ford, old[:, 0], old[:, 2]), atol=0.1)
 
 
+def test_a_straight_line_has_a_point_every_4_m_on_its_road_or_bed():
+    # Engines join a landmark to a line's nearest point (Kiln's walks, within 64 m), so a straight
+    # road or river given by its two ends still has a point every 4 m or so along it: Brassford's
+    # 208 m quay street, two points, joined none of the landmarks beside it.
+    from cubist.world.bake import paths_of
+    from cubist.world.sample import heights
+
+    for bridges in (False, True):
+        loaded = load_world(_crossing_world(bridges), _demo_palette(), seed=0)
+        lines = {x["name"]: np.array(x["points"]) / 16 for x in paths_of(loaded)}
+        for name in ("street", "river1"):
+            pts = lines[name]
+            gaps = np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 2]))
+            assert gaps.max() <= 4.0 + 1e-6 and gaps.min() > 0, (name, bridges, gaps.max())
+        street, river_line = lines["street"], lines["river1"]
+        assert street[0, 2] == 10 and street[-1, 2] == 110  # its ends kept
+        dry = (street[:, 2] < 55.9) | (street[:, 2] > 64.1)
+        assert np.allclose(
+            street[dry, 1], heights(loaded, street[dry, 0], street[dry, 2]), atol=0.01
+        )
+        assert np.allclose(
+            river_line[:, 1], heights(loaded, river_line[:, 0], river_line[:, 2]), atol=0.01
+        )
+        if bridges:  # the deck still crosses at the banks' height, over the water
+            over = street[(street[:, 2] > 56.2) & (street[:, 2] < 63.8)]
+            assert len(over) >= 2 and np.all(
+                over[:, 1] > heights(loaded, over[:, 0], over[:, 2]) + 1
+            )
+    # A smoothed path's points are about 4 m apart already: its line keeps them (vale's, as baked).
+    from cubist.world import path
+    from cubist.world.bake import _dense
+
+    curve = path([(10, 20), (60, 45), (120, 20)])
+    points, arc = _dense(curve)
+    assert np.array_equal(points, curve.points) and np.array_equal(arc, curve.cum)
+
+
 def test_lint_warns_of_a_bridged_crossing_until_a_prop_stands_on_it(tmp_path):
     from cubist.world.lint import lint_world
 

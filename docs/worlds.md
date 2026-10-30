@@ -203,8 +203,8 @@ map format (Kiln's `docs/engine/formats.md`, "Baked maps") to `export/worlds/<na
   name, color, glow).
 - **`world.json`:** landmarks in voxels, with their ground height (or their prop's base); `paths`, the roads,
   rivers and tunnels as named lines (`road(..., name="cave_road")`; unnamed ones are `road1`, `river1`,
-  `tunnel1`, ...), a point every ~4 m on the road or bed or along a tunnel's floor, for walks and caravans; and
-  props.
+  `tunnel1`, ...), a point every ~4 m on the road or bed (a straight one given by its two ends too) or along a
+  tunnel's floor, for walks and caravans; and props.
 
 The bake prints its progress every 5% of tiles. `--region` re-bakes only the tiles over that area (metres)
 into an existing bake, plus the far grids and the JSON: a minute instead of half an hour while working on

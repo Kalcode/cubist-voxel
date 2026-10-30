@@ -580,16 +580,31 @@ def sample_columns_at(
 
 
 DECK_SPACING_M = 4.0  # a bridged road's line has a point this often over the water
+LINE_SPACING_M = 4.0  # a line's points: a segment longer than 3 times this is split this often
 
 
-def _deck(loaded: LoadedWorld, road, rows: np.ndarray) -> np.ndarray:
-    """A bridged road's line (x, y, z metres): over each river's channel, points from the road's
-    height at the bank where it enters, straight to its height where it leaves (the ground under
-    them is the river's bed, not the road)."""
+def _dense(path) -> tuple[np.ndarray, np.ndarray]:
+    """A path's points (x, z) for its line, with each segment longer than 3 × LINE_SPACING_M (a
+    straight road or river given by its ends) split evenly into parts of at most LINE_SPACING_M,
+    and the arc length of each point. A smoothed path's points are 4 m or so apart already (vale's
+    at most 8.1 m), and keep their lines as they were."""
+    pts, cum, seg = path.points, path.cum, path.seg_len
+    out, arc = [pts[:1]], [cum[:1]]
+    for i in range(len(seg)):
+        n = int(math.ceil(seg[i] / LINE_SPACING_M)) if seg[i] > 3 * LINE_SPACING_M else 1
+        t = np.arange(1, n + 1) / n
+        out.append(pts[i] + (pts[i + 1] - pts[i]) * t[:, None])
+        arc.append(cum[i] + seg[i] * t)
+    return np.concatenate(out), np.concatenate(arc)
+
+
+def _deck(loaded: LoadedWorld, road, rows: np.ndarray, cum: np.ndarray) -> np.ndarray:
+    """A bridged road's line (x, y, z metres; ``cum`` each row's arc length): over each river's
+    channel, points from the road's height at the bank where it enters, straight to its height where
+    it leaves (the ground under them is the river's bed, not the road)."""
     crossings = road.crossings()
     if not crossings:
         return rows
-    cum = road.path.cum
     keep = np.ones(len(rows), dtype=bool)
     new = []
     for s0, s1 in crossings:
@@ -606,7 +621,8 @@ def _deck(loaded: LoadedWorld, road, rows: np.ndarray) -> np.ndarray:
 
 def paths_of(loaded: LoadedWorld) -> list[dict]:
     """The world's roads, rivers and tunnels as named lines for the engine (walks, caravans): points
-    every 4 m or so in voxels, on the road or river bed, or along a tunnel's floor."""
+    every 4 m or so in voxels, on the road or river bed (a straight one's too: see ``_dense``), or
+    along a tunnel's floor."""
     out = []
 
     def line(kind: str, name: str, pts: np.ndarray) -> None:
@@ -615,11 +631,11 @@ def paths_of(loaded: LoadedWorld) -> list[dict]:
 
     for kind, edits in (("road", loaded.world.roads), ("river", loaded.world.rivers)):
         for i, edit in enumerate(edits, 1):
-            p = edit.path.points
+            p, arc = _dense(edit.path)
             y = heights(loaded, p[:, 0], p[:, 1])
             rows = np.stack([p[:, 0], y, p[:, 1]], axis=-1)
             if kind == "road":
-                rows = _deck(loaded, edit, rows)
+                rows = _deck(loaded, edit, rows, arc)
             line(kind, edit.name or f"{kind}{i}", rows)
     tunnels = [c for c in loaded.world.caves if isinstance(c, Tunnel)]
     for i, t in enumerate(tunnels, 1):

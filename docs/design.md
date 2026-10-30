@@ -846,6 +846,11 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   3 m from a five-storey townhouse framed the air over the street and drew nothing. A prop taller
   than the window over the area still shows only its top 256 cells: a street of townhouses is seen
   whole from 17 m across (level 1).
+- **13j. Points along straight lines (Oct 30).** The bake writes a road's or river's line through its
+  path's points, so a straight road given by its two ends had only those: Brassford's 208 m quay
+  street joined none of the landmarks beside it in Kiln's walks, which join a line's nearest point
+  within 64 m. A segment longer than 12 m is now split into parts of at most 4 m. A smoothed path's
+  points are 4 m or so apart already (vale's at most 8.1 m), so its line is as before.
 
 ### v1 acceptance targets
 
