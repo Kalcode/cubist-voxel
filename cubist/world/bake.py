@@ -620,9 +620,10 @@ def _deck(loaded: LoadedWorld, road, rows: np.ndarray, cum: np.ndarray) -> np.nd
 
 
 def paths_of(loaded: LoadedWorld) -> list[dict]:
-    """The world's roads, rivers and tunnels as named lines for the engine (walks, caravans): points
-    every 4 m or so in voxels, on the road or river bed (a straight one's too: see ``_dense``), or
-    along a tunnel's floor."""
+    """The world's roads, rivers and tunnels as named lines for the engine (walks, caravans), in
+    voxels: points every 4 m or so on the road or river bed (a straight one's too: see ``_dense``),
+    and a tunnel's own points along its floor (every 2 m or so where it curves, a straight one's
+    ends)."""
     out = []
 
     def line(kind: str, name: str, pts: np.ndarray) -> None:
