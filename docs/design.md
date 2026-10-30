@@ -274,9 +274,10 @@ The walk lint (13b, `cubist/lint/walk.py`) is the gate that keeps a building ent
 game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height` 22, `StepUp` 6):
 
 - **The world:** the asset's voxels at rest (hidden parts left out), plus solid ground below
-  `ground_y` out to 16 voxels past the asset's x–z bounds. Kiln carves the x–z bounds of the
-  voxels below `ground_y` (a cellar's footprint), so there is no ground there; the street under
-  eaves and jetties stays.
+  `ground_y` out to 16 voxels past the asset's x–z bounds: on every side, or on the sides
+  `@asset(street_sides=...)` names (13h). Kiln carves the x–z bounds of the voxels below
+  `ground_y` (a cellar's footprint), so there is no ground there; the street under eaves and
+  jetties stays.
 - **The walker** is the goblin on a grid. Between whole voxels its box covers `w + 1` columns on
   each axis, and that footprint is what it stands on, as `GroundBelow` finds it. For clearance it
   carries a box `(w + 2) × (h + 2) × (w + 2)` (from `[scale]` `walker_width`, `walker_height` and
@@ -831,6 +832,13 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
 - **13g. One asset of a family (Oct 30).** `cubist build --only NAME` (repeatable; the MCP
   `build_asset` tool's `only`) builds just the named assets of a script that defines several, so
   one variant of a family rebuilds alone, under its own timeout, and only its iteration counts.
+- **13h. Street sides (Oct 30).** `@asset(..., street_sides=("-z",))` names the sides of the asset's
+  x–z box the street lies on; the walk lint lays its ground only there (default: all four, as
+  before). Kiln's quay steps showed why: with ground on the river side too, the walker dropped off
+  it into the flight and reached the landing with the way in from the street shut. A quay's street
+  is behind it, a bridge's at its ends. A wrong side, or an empty list, is an error naming the four;
+  a `door` with no street side near it says so. `build.json` carries the sides, so export and
+  `cubist lint` keep them.
 
 ### v1 acceptance targets
 

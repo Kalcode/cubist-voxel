@@ -205,6 +205,8 @@ class BuiltAsset:
     particle_models: dict = field(default_factory=dict, repr=False)
     cycles: list[Cycle] = field(default_factory=list)
     ground_y: int = 0  # asset-space y where the ground meets the asset (a building's street level)
+    # The sides of the x-z box the street lies on, for the walk lint (None: all four).
+    street_sides: tuple[str, ...] | None = None
 
     def is_animated(self) -> bool:
         return bool(self.clips) or any(p.joint is not None or p.frames for p in self.parts)
@@ -306,6 +308,7 @@ class BuiltAsset:
             "symmetric": self.symmetric,
             "allow_floating": self.allow_floating,
             "ground_y": self.ground_y,
+            "street_sides": list(self.street_sides) if self.street_sides else None,
             "voxels": self.merged_grid().count(),
             "part_voxels": self.voxel_count(),
             "parts": [part_info(p) for p in self.parts],
@@ -370,6 +373,7 @@ class BuiltAsset:
             lights={k: Light.from_summary(v) for k, v in summary.get("lights", {}).items()},
             emitters={k: Emitter.from_summary(v) for k, v in summary.get("emitters", {}).items()},
             ground_y=int(summary.get("ground_y", 0)),
+            street_sides=tuple(summary["street_sides"]) if summary.get("street_sides") else None,
         )
 
 
@@ -388,6 +392,30 @@ def _surviving_clips(clips: Iterable[dict], parts: list[BuiltPart]) -> list[Clip
     return out
 
 
+STREET_SIDES = ("-x", "+x", "-z", "+z")
+
+
+def check_street_sides(sides, name: str) -> tuple[str, ...] | None:
+    """``sides`` as the box's sides in order, once each, or None (every side). Errors name the
+    asset and the sides there are."""
+    if sides is None:
+        return None
+    listed = isinstance(sides, (list, tuple)) and all(isinstance(v, str) for v in sides)
+    if not listed or not sides:
+        raise ModelError(
+            f"asset {name!r}: street_sides is a list of the sides of the asset's x-z box the "
+            f"street lies on, some of {', '.join(STREET_SIDES)} (like ('-z',) for a quay, "
+            f"('-x', '+x') for a bridge), got {sides!r}; leave it out for a street on every side"
+        )
+    unknown = [v for v in sides if v not in STREET_SIDES]
+    if unknown:
+        raise ModelError(
+            f"asset {name!r}: street_sides names {unknown[0]!r}, not a side of the x-z box: use "
+            f"{', '.join(STREET_SIDES)} (the street is level ground, so never -y or +y)"
+        )
+    return tuple(v for v in STREET_SIDES if v in sides)
+
+
 class AssetDef:
     """An asset script function plus its metadata, produced by ``@asset``."""
 
@@ -401,6 +429,7 @@ class AssetDef:
         symmetric: str | None = None,
         allow_floating: bool = False,
         ground_y: int = 0,
+        street_sides: Sequence[str] | None = None,
     ):
         check_symmetric(symmetric, "symmetric")
         if isinstance(ground_y, bool) or not isinstance(ground_y, numbers.Integral) or ground_y < 0:
@@ -412,6 +441,7 @@ class AssetDef:
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
         self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
         self.ground_y = int(ground_y)
+        self.street_sides = check_street_sides(street_sides, name)
 
     def build(
         self,
@@ -490,6 +520,7 @@ class AssetDef:
             lights=dict(result.lights),
             emitters=dict(result.emitters),
             ground_y=self.ground_y,
+            street_sides=self.street_sides,
         )
 
     def __repr__(self) -> str:
@@ -504,6 +535,7 @@ def asset(
     symmetric: str | None = None,
     allow_floating: bool = False,
     ground_y: int = 0,
+    street_sides: Sequence[str] | None = None,
 ):
     """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset (``@asset(...)`` or bare).
 
@@ -511,7 +543,10 @@ def asset(
     the center plane of that axis. ``allow_floating``: pieces may float free of the main body.
     Lint warns when these don't hold. ``ground_y``: the asset-space y where the ground meets the
     asset (a building's street level, with its cellar below); the export's ``glb_origin`` sits
-    there, so a placement's ground lands on it. Default 0: the base.
+    there, so a placement's ground lands on it. Default 0: the base. ``street_sides``: the sides
+    of the asset's x-z box the street lies on (``"-x"``, ``"+x"``, ``"-z"``, ``"+z"``), where the
+    walk lint lays its ground; default all four. A quay's street is behind it, a bridge's at its
+    ends: elsewhere there is water.
     """
 
     def wrap(fn: Callable) -> AssetDef:
@@ -524,6 +559,7 @@ def asset(
             symmetric=symmetric,
             allow_floating=allow_floating,
             ground_y=ground_y,
+            street_sides=street_sides,
         )
 
     if callable(name):  # bare @asset, without parentheses

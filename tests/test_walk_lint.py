@@ -36,6 +36,7 @@ class Site:
     ground_y: int = 0
     bands: list = field(default_factory=list)  # (part name, lowest y, occlusion), bottom up
     tags: tuple = ("building",)
+    street_sides: tuple | None = None
 
     def fill(self, lo, hi, value=True):
         self.solid[lo[0] : hi[0], lo[1] : hi[1], lo[2] : hi[2]] = value
@@ -58,6 +59,7 @@ class Site:
             P,
             sockets={k: Socket(tuple(map(float, v))) for k, v in self.sockets.items()},
             ground_y=self.ground_y,
+            street_sides=self.street_sides,
         )
 
 
@@ -488,6 +490,56 @@ def test_buildings_and_walkable_assets_are_walked_when_the_style_has_a_walker():
         path=None, name="t", voxel_size_m=0.0625, palette=P, scale={"door_height": 34}
     )
     assert walk_errors(site.built(), plain) == []
+
+
+def quay(entry_open=True) -> Site:
+    """A quay: the street behind it (-z), the river in front (+z), and a flight down a slot let into
+    the wall, open to the river, from the quay's top to a landing. A wall along the slot's street
+    side keeps the walker out but for a gap over the first treads (shut by ``entry_open=False``)."""
+    g, top, landing = 40, 46, 14
+    site = Site(np.zeros((64, 70, 32), bool), ground_y=g, tags=("walkable",))
+    site.fill((0, 0, 0), (64, top, 32))
+    site.fill((8, landing, 14), (56, top, 32), False)  # the slot, open to the river
+    for k in range(1, (top - landing) // 4):  # treads of 5 at risers of 4, down toward +x
+        site.fill((8 + 5 * (k - 1), landing, 14), (8 + 5 * k, top - 4 * k, 32))
+    site.fill((0, top, 12), (64, top + 24, 14))  # the wall on the street side of the slot
+    if entry_open:
+        site.fill((0, top, 12), (20, top + 24, 14), False)  # the way in, over the first treads
+    site.sockets = {"door": (14, g, 0), "floor_0": (50, landing, 23)}
+    return site
+
+
+def test_a_quay_s_street_is_on_one_side():
+    # The walk lint's street lies on every side of the asset's box unless street_sides names them.
+    # A quay's river side has no ground: with the way in shut, the walker must not reach the
+    # landing by dropping off a street that isn't there.
+    open_, shut = quay(), quay(entry_open=False)
+    assert unreached(open_.built()) == set()
+    assert unreached(shut.built()) == set()  # all four sides: in from the river side's "street"
+    open_.street_sides = shut.street_sides = ("-z",)
+    assert unreached(open_.built()) == set()
+    assert unreached(shut.built()) == {"floor_0"}
+
+
+def test_a_bridge_s_street_is_at_its_ends():
+    # A deck with a hole too wide to step over: with the street at its ends only, the walker can't
+    # go round the deck to the far end.
+    site = Site(np.zeros((80, 20, 24), bool), ground_y=8, tags=("walkable",))
+    site.fill((0, 0, 0), (80, 8, 24))
+    site.fill((34, 0, 0), (46, 8, 24), False)
+    site.sockets = {"door": (4, 8, 12), "floor_0": (76, 8, 12)}
+    assert unreached(site.built()) == set()  # round the deck on the street beside it
+    site.street_sides = ("-x", "+x")
+    assert unreached(site.built()) == {"floor_0"}
+    site.fill((34, 0, 0), (46, 8, 24))  # the deck mended
+    assert unreached(site.built()) == set()
+
+
+def test_a_door_away_from_the_street_sides_says_so():
+    site = quay()
+    site.street_sides = ("+x",)
+    [f] = walk_errors(site.built())
+    assert f.details["socket"] == "door" and "street_sides" in f.message and "+x" in f.message
 
 
 def test_a_townhouse_sized_asset_walks_in_under_5_seconds():

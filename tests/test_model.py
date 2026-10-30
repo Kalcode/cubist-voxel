@@ -132,6 +132,29 @@ def test_ground_y_defaults_to_zero_and_must_sit_inside_the_asset():
         make(4).build(P)
 
 
+def test_street_sides_name_sides_of_the_box_and_survive_the_vox_and_build_json():
+    # Where the walk lint's street lies: behind a quay, at a bridge's ends.
+    from cubist.core.model import BuiltAsset
+    from cubist.io.vox import decode_vox, encode_vox
+
+    def make(street_sides):
+        return asset(name="quay", size=(4, 4, 4), street_sides=street_sides)(
+            lambda p: box((4, 4, 4), color=p.wood.dark)
+        )
+
+    for bad in (("-y",), (), "-z", ("-z", 3)):
+        with pytest.raises(ModelError, match="street_sides"):
+            make(bad)
+    a = make(("+x", "-x", "+x")).build(P)
+    assert a.street_sides == ("-x", "+x")  # the box's order, once each
+    assert a.summary()["street_sides"] == ["-x", "+x"]
+    scene = decode_vox(encode_vox(a.to_vox_scene()))
+    assert BuiltAsset.from_vox(scene, a.summary(), P).street_sides == ("-x", "+x")
+    plain = make(None).build(P)
+    assert plain.street_sides is None and plain.summary()["street_sides"] is None
+    assert BuiltAsset.from_vox(scene, {}, P).street_sides is None  # every side: a .vox alone
+
+
 def test_ground_y_survives_the_vox_and_build_json():
     # Export and `cubist lint` rebuild the asset from out/ (its .vox and build.json).
     from cubist.core.model import BuiltAsset

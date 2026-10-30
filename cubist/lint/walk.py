@@ -93,8 +93,10 @@ class Walker:
     **The world** is the asset's voxels at rest (hidden parts left out) and, up to GROUND_PAD
     voxels past the asset's x-z bounds, solid ground below ``ground_y``, except over the x-z
     bounds of the voxels below ``ground_y``: Kiln carves that (a cellar's footprint), and leaves
-    the street under eaves and jetties. The walk starts out on the street: footprints wholly
-    outside the asset's x-z bounds, within DOOR_REACH voxels of 'door'.
+    the street under eaves and jetties. Past the bounds the ground (the street) lies on every
+    side, or on the asset's ``street_sides`` only (a quay's river side has none). The walk
+    starts out on the street: footprints wholly outside the asset's x-z bounds, within
+    DOOR_REACH voxels of 'door'.
 
     **The way back.** A drop is a move too, so a flight walked down is never climbed. ``back``
     marks the reached states that can walk back to the street: a flood from the starts over the
@@ -111,6 +113,8 @@ class Walker:
         pad = 2 * GROUND_PAD
         solid = np.zeros((x1 - x0 + pad, top - bottom, z1 - z0 + pad), bool)
         solid[:, : line - bottom] = True
+        if asset.street_sides:  # the street lies on those sides only: no ground on the others
+            solid &= self._street(asset.street_sides, x1 - x0, z1 - z0)[:, None, :]
         o = np.subtract(grid.origin, self.origin)
         below = grid.data[:, : max(line - grid.origin[1], 0)] > 0
         if below.any():
@@ -126,6 +130,23 @@ class Walker:
         self.ground = _tops(_any_in_window(_any_in_window(solid, self.foot, 0), self.foot, 2))
         shape = self.ground.shape
         self.reached = np.zeros((shape[0], self.clear.shape[1], shape[2]), bool)
+
+    @staticmethod
+    def _street(sides, nx: int, nz: int) -> np.ndarray:
+        """Which columns of the padded x-z grid hold ground: under the asset (Kiln's carve comes
+        after), and the pad on each named side, its corners included."""
+        p = GROUND_PAD
+        street = np.zeros((nx + 2 * p, nz + 2 * p), bool)
+        street[p : p + nx, p : p + nz] = True
+        pads = {
+            "-x": (slice(0, p), slice(None)),
+            "+x": (slice(p + nx, None), slice(None)),
+            "-z": (slice(None), slice(0, p)),
+            "+z": (slice(None), slice(p + nz, None)),
+        }
+        for side in sides:
+            street[pads[side]] = True
+        return street
 
     def _span(self, lo, hi, axis: int) -> np.ndarray:
         """The whole numbers from lo to hi (rounded inward) that index ``reached`` on axis."""
@@ -394,12 +415,18 @@ def check_walk(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     details = {"walker": [width, height, climb], "box": [walker.W, walker.H, walker.W]}
     door = sockets["door"]
     if not walker.start(door):
+        sides = (
+            f" on the asset's street_sides ({', '.join(asset.street_sides)}: put 'door' by one of "
+            "them, or name its side)"
+            if asset.street_sides
+            else ""
+        )
         out.append(
             Finding(
                 "walk",
                 "error",
                 f"the walker has nowhere to start at 'door' {_at(door)}: it stands on the street "
-                f"(outside the asset's x-z bounds) within {DOOR_REACH} voxels of 'door', on "
+                f"(outside the asset's x-z bounds{sides}) within {DOOR_REACH} voxels of 'door', on "
                 f"something solid with its feet within {REACH_Y} voxels of y = {_num(door[1])}, "
                 f"and finds no such place. Put 'door' {door_at}; nothing was walked",
                 {"socket": "door", **details},

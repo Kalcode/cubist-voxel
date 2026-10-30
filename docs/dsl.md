@@ -50,7 +50,14 @@ variants), and only that asset's iteration counts.
 
 ```python
 asset(
-    name=None, size=None, tags=(), grounded=False, symmetric=None, allow_floating=False, ground_y=0
+    name=None,
+    size=None,
+    tags=(),
+    grounded=False,
+    symmetric=None,
+    allow_floating=False,
+    ground_y=0,
+    street_sides=None,
 )
 ```
 
@@ -60,8 +67,11 @@ center plane `size / 2`) or `("x", 15.5)` for another plane. `allow_floating`: d
 pieces detached from the main body. `ground_y`: the asset-space y (a whole number of voxels, below
 the asset's height) where the ground meets the asset: a townhouse with a cellar sets it to the
 cellar's depth, so the export's `glb_origin` sits at street level and a placement puts the street
-there. The scale lint measures a building's height from it. A bare shape becomes one part named
-after the asset.
+there. The scale lint measures a building's height from it. `street_sides`: the sides of the asset's
+x–z box the street lies on, some of `"-x"`, `"+x"`, `"-z"`, `"+z"` (default: all four), where the
+walk lint lays its ground: a quay's street is behind it (`("-z",)`), a bridge's at its ends
+(`("-x", "+x")`), and the river is everywhere else. A bare shape becomes one part named after the
+asset.
 
 ```python
 Model(parts, sockets=None)
@@ -103,15 +113,15 @@ character's box and the ledge it climbs, in voxels), lint walks them:
   turns, runs through a wall or has no room either side of the line (a stop where the way turns
   mends it), and on a stop too close to an obstacle for the walker to stand all round it, 2 out.
 
-Without `door` or `floor_0` lint warns that it can't walk the building. The walker, two voxels
-wider and taller than the character, must reach every one of them from the street (which runs on
-under eaves and jetties) and walk back out, its feet within 2 voxels of the socket's y; a stair it
-can only drop down, or a hatch, doesn't count. So doorways at least `walker_width + 2` wide and
-`walker_height + 2` tall, risers of `walker_climb` at most, and stairwells open
-`walker_climb + walker_height + 2` above each tread. Give each storey its own part tagged `upper`
-and the roof its own `roof` part, split by y bands (stair steps above a line belong to the
-storey above): lint errors when one reaches up past the next one's lowest voxel, save the roof
-coming down over the top storey.
+Without `door` or `floor_0` lint warns that it can't walk the building. The walker, two voxels wider
+and taller than the character, must reach every one of them from the street (on every side of the
+asset, or on its `street_sides`, and on under eaves and jetties) and walk back out, its feet within
+2 voxels of the socket's y; a stair it can only drop down, or a hatch, doesn't count. So doorways at
+least `walker_width + 2` wide and `walker_height + 2` tall, risers of `walker_climb` at most, and
+stairwells open `walker_climb + walker_height + 2` above each tread. Give each storey its own part
+tagged `upper` and the roof its own `roof` part, split by y bands (stair steps above a line belong
+to the storey above): lint errors when one reaches up past the next one's lowest voxel, save the
+roof coming down over the top storey.
 
 ## Joints and clips
 
