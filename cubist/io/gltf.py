@@ -124,14 +124,15 @@ def _quad_geometry(quads: list[Quad], pivot: np.ndarray, scale: float):
 
 
 def glb_origin(asset: BuiltAsset, center: bool = True) -> list[float]:
-    """The DSL point that lands on the GLB origin: the footprint center at y = 0 when
-    centered (the declared size's, else the voxels'), else the DSL origin."""
+    """The DSL point that lands on the GLB origin: the footprint center at the ground line
+    (``ground_y``, default 0) when centered (the declared size's, else the voxels'), else the
+    DSL origin."""
     if not center:
         return [0, 0, 0]
     if asset.size is not None:
-        return [asset.size[0] / 2.0, 0, asset.size[2] / 2.0]
+        return [asset.size[0] / 2.0, asset.ground_y, asset.size[2] / 2.0]
     b = VoxelGrid.merge([p.grid for p in asset.parts]).bounds() or ((0, 0, 0), (0, 0, 0))
-    return [(b[0][0] + b[1][0]) / 2.0, 0, (b[0][2] + b[1][2]) / 2.0]
+    return [(b[0][0] + b[1][0]) / 2.0, asset.ground_y, (b[0][2] + b[1][2]) / 2.0]
 
 
 def nearest_part(asset: BuiltAsset, point: tuple[float, float, float]) -> str | None:
@@ -387,8 +388,8 @@ def encode_glb(
 
     root = {"name": asset.name, "children": []}
     if center:
-        cx, _, cz = glb_origin(asset)
-        root["translation"] = [-cx * s, 0.0, -cz * s]
+        cx, cy, cz = glb_origin(asset)
+        root["translation"] = [-cx * s, -cy * s, -cz * s]
     nodes: list[dict] = [root]
     meshes: list[dict] = []
     index_of: dict[str, int] = {}

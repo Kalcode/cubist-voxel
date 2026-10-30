@@ -28,7 +28,9 @@ can read it before exporting.
 - **Metres:** multiply voxels by `voxel_size_m`.
 - **Rotations** follow the right-hand rule: a positive angle about +X turns +Y toward +Z.
 - **`glb_origin`** is the asset-space point that sits at the `.glb` origin. By default that is
-  the center of the footprint at y = 0. To go from a manifest position to `.glb` scene metres,
+  the center of the footprint at y = `ground_y` (0 unless the asset sets one: a building's street
+  level, with its cellar below). An engine that places an asset on its `glb_origin` stands the ground
+  line on the ground. To go from a manifest position to `.glb` scene metres,
   use `(p - glb_origin) * voxel_size_m`.
 
 ## Top level

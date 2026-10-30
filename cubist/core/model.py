@@ -203,6 +203,7 @@ class BuiltAsset:
     # Particle models for previews and lint, loaded from out/ (None: not built yet); not saved.
     particle_models: dict = field(default_factory=dict, repr=False)
     cycles: list[Cycle] = field(default_factory=list)
+    ground_y: int = 0  # asset-space y where the ground meets the asset (a building's street level)
 
     def is_animated(self) -> bool:
         return bool(self.clips) or any(p.joint is not None or p.frames for p in self.parts)
@@ -396,10 +397,18 @@ class AssetDef:
         grounded: bool = False,
         symmetric: str | None = None,
         allow_floating: bool = False,
+        ground_y: int = 0,
     ):
         check_symmetric(symmetric, "symmetric")
+        if isinstance(ground_y, bool) or not isinstance(ground_y, int) or ground_y < 0:
+            raise ModelError(
+                f"asset {name!r}: ground_y must be a whole number of voxels, 0 or more, "
+                f"got {ground_y!r}; it is the asset-space y where the ground meets the "
+                "asset (the street level of a building with a cellar)"
+            )
         self.fn, self.name, self.size, self.tags = fn, name, size, tuple(tags)
         self.grounded, self.symmetric, self.allow_floating = grounded, symmetric, allow_floating
+        self.ground_y = ground_y
 
     def build(
         self,
@@ -449,6 +458,17 @@ class AssetDef:
                         p.occlusion,
                     )
                 )
+        if self.ground_y:
+            top = self.size[1] if self.size else None
+            if top is None:
+                b = VoxelGrid.merge([p.grid for p in parts]).bounds()
+                top = b[1][1] if b else 0
+            if self.ground_y >= top:
+                raise ModelError(
+                    f"asset {self.name!r}: ground_y={self.ground_y} is not below the asset's "
+                    f"height ({top} voxels), so nothing would stand above the ground; lower "
+                    "ground_y to the voxel row where the ground meets the building"
+                )
         return BuiltAsset(
             self.name,
             self.size,
@@ -466,6 +486,7 @@ class AssetDef:
             cycles=list(cycles or []),
             lights=dict(result.lights),
             emitters=dict(result.emitters),
+            ground_y=self.ground_y,
         )
 
     def __repr__(self) -> str:
@@ -479,12 +500,15 @@ def asset(
     grounded: bool = False,
     symmetric: str | None = None,
     allow_floating: bool = False,
+    ground_y: int = 0,
 ):
     """Mark a function ``fn(p) -> Model | Shape`` as a buildable asset (``@asset(...)`` or bare).
 
     ``grounded``: the asset should touch y = 0. ``symmetric``: the whole asset mirrors across
     the center plane of that axis. ``allow_floating``: pieces may float free of the main body.
-    Lint warns when these don't hold.
+    Lint warns when these don't hold. ``ground_y``: the asset-space y where the ground meets the
+    asset (a building's street level, with its cellar below); the export's ``glb_origin`` sits
+    there, so a placement's ground lands on it. Default 0: the base.
     """
 
     def wrap(fn: Callable) -> AssetDef:
@@ -496,6 +520,7 @@ def asset(
             grounded=grounded,
             symmetric=symmetric,
             allow_floating=allow_floating,
+            ground_y=ground_y,
         )
 
     if callable(name):  # bare @asset, without parentheses

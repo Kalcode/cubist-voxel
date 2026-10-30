@@ -73,6 +73,21 @@ def test_manifest_records_glb_origin_matching_glb_root():
     assert build_manifest(a, voxel_size_m=0.5, center=False)["glb_origin"] == [0, 0, 0]
 
 
+def test_ground_y_lifts_the_glb_origin_in_the_manifest_and_the_glb():
+    from cubist.io.gltf import encode_glb
+
+    @asset(name="house", size=(8, 64, 6), ground_y=48)
+    def house(p):
+        return box((8, 64, 6), color=p.wood.dark)
+
+    a = house.build(P)
+    m = build_manifest(a, voxel_size_m=0.5)
+    assert m["glb_origin"] == [4, 48, 3]
+    g = GLTF2.load_from_bytes(encode_glb(a, P.rgba_table(), voxel_size_m=0.5))
+    assert g.nodes[0].translation == [-2.0, -24.0, -1.5]
+    assert build_manifest(a, voxel_size_m=0.5, center=False)["glb_origin"] == [0, 0, 0]
+
+
 def test_manifest_socket_without_part_names_the_nearest():
     def fn(p):
         m = chest(p)

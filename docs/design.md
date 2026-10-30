@@ -715,6 +715,17 @@ simulated.
        quads at Kiln's level 0 (its gate is 350k for a whole view); the two-tone grass reads as blobs
        from above. Both are look decisions for the next round.
 
+### 13. Town kit (in progress)
+
+A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in steps:
+
+- **13a. Ground lines (Oct 30).** `@asset(..., ground_y=N)` names the asset-space y where the ground meets
+  the building. The manifest's `glb_origin` y and the `.glb` origin move to it, so Kiln, `place()` and
+  region renders (which already place by `glb_origin`) stand the street level on the ground and the cellar
+  below it. The default 0 changes no output. A negative `ground_y`, or one at or above the asset's height,
+  is an error; the scale lint measures a building's height from the ground line.
+- **13b. Walk lint** and **13c. Bridges**: not started.
+
 ### v1 acceptance targets
 
 - At least 80% of prop briefs reach a lint-clean asset the user accepts within 5 iterations.

@@ -260,6 +260,9 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
     height = b[1][1] - b[0][1]
     m = style.voxel_size_m
     tall = f"{height} voxels ({height * m:.1f} m) tall"
+    # A building's cellar doesn't count toward its door: measure from the ground line.
+    above = b[1][1] - max(asset.ground_y, b[0][1])
+    above_tall = f"{above} voxels ({above * m:.1f} m) above its ground_y of {asset.ground_y}"
     out = []
     lo, hi = SCALE_TOLERANCE
     for tag in asset.tags:
@@ -277,16 +280,16 @@ def check_scale(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
                 )
             )
     door = style.scale.get("door_height")
-    if "building" in asset.tags and door and height < door:
+    if "building" in asset.tags and door and above < door:
         out.append(
             Finding(
                 "scale",
                 "warning",
-                f"{asset.name} is a building {tall}, shorter than a door ([scale] door_height "
-                f"{door:g}, {door * m:.1f} m): it will read as a doll house next to the "
-                "characters. Scale it up, or drop the building tag if people don't walk into "
-                "it (a bridge, a fountain, a model)",
-                {"tag": "building", "height": height, "want": door},
+                f"{asset.name} is a building {above_tall if asset.ground_y else tall}, shorter "
+                f"than a door ([scale] door_height {door:g}, {door * m:.1f} m): it will read as "
+                "a doll house next to the characters. Scale it up, or drop the building tag if "
+                "people don't walk into it (a bridge, a fountain, a model)",
+                {"tag": "building", "height": above, "want": door},
             )
         )
     return out

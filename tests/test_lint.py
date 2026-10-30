@@ -251,6 +251,22 @@ def tall(height, tags):
     return build(fn, size=(4, height, 2), tags=tags)
 
 
+def test_a_building_is_measured_from_its_ground_line():
+    style = scaled(door_height=34)
+
+    def cellar_house(above):
+        def fn(p):
+            return box((4, 40 + above, 2), color=p.wood.mid)
+
+        return build(fn, size=(4, 40 + above, 2), tags=["building"], ground_y=40)
+
+    # 40 voxels of cellar: the asset is tall, but only 30 stand above the street.
+    [f] = scale_findings(cellar_house(30), style)
+    assert "shorter than a door" in f.message and "30 voxels" in f.message
+    assert "ground_y" in f.message
+    assert scale_findings(cellar_house(36), style) == []
+
+
 def scale_findings(a, style):
     return [f for f in lint(a, style).findings if f.check == "scale"]
 

@@ -126,6 +126,9 @@ terrain. Export an asset before baking a world that uses it (`cubist export out/
   `below_ground_m` puts its base that far under the ground (a torch on a cavern floor). `name` is how game
   code finds it. `carve` digs it into the rock: Kiln empties the world wherever the asset's box is empty, so
   a crypt or a room placed underground is hollow (vale's crypt, joined to its cavern by a `tunnel`).
+  **Cellars:** an asset with `@asset(..., ground_y=48)` has its `glb_origin` at y = 48, and a placement puts
+  that row on the ground, so `place(house, at=(x, z), carve=True)` stands its upper floors in the air and
+  digs its cellar (the 48 rows below) into the ground. Region renders draw it the same way.
 - `scatter(asset, region, per_ha, seed=0, spacing_m=None, rotate=True, slope_max=None, height_m=None,
   avoid=None, sink_m=0.25)`: about `per_ha` per hectare over `region` (a mask, or `((x0, z0), (x1, z1))`),
   on a jittered grid at least `spacing_m` apart (default from the density), turned by random quarter turns.

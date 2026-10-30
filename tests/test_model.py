@@ -110,3 +110,20 @@ def test_socket_naming_an_unknown_part_is_an_error():
     with pytest.raises(ModelError, match="arm"):
         Model(parts=[body], sockets={"hand": (0, 0, 0, "arm")})
     Model(parts=[body], sockets={"hand": (0, 0, 0, "body")})
+
+
+def test_ground_y_defaults_to_zero_and_must_sit_inside_the_asset():
+    @asset(name="crate", size=(4, 4, 4))
+    def crate(p):
+        return box((4, 4, 4), color=p.wood.dark)
+
+    assert crate.ground_y == 0 and crate.build(P).ground_y == 0
+
+    def make(ground_y):
+        return asset(name="crate", size=(4, 4, 4), ground_y=ground_y)(crate.fn)
+
+    assert make(3).build(P).ground_y == 3
+    with pytest.raises(ModelError, match="ground_y"):
+        make(-1).build(P)
+    with pytest.raises(ModelError, match="ground_y.*height"):
+        make(4).build(P)

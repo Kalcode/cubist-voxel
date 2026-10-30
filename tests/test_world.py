@@ -776,6 +776,46 @@ def test_region_renders_draw_props_where_kiln_stamps_them(tmp_path):
     assert at(200, 79, 200) != 0 and at(200, 80, 200) == 0  # the ground below them
 
 
+def test_ground_y_stands_the_ground_line_on_the_ground(tmp_path):
+    import json
+
+    from cubist.core.grid import VoxelGrid
+    from cubist.io.vox import VoxPart, VoxScene, write_vox
+    from cubist.world import place
+    from cubist.world.region import region_grid
+
+    project = _project(tmp_path)
+    # A post 32 high whose ground line is voxel 16: a cellar of 16 under a street, 16 above.
+    post = VoxelGrid(np.full((2, 32, 1), 200, dtype=np.uint8))
+    write_vox(
+        project / "export" / "post.vox",
+        VoxScene([VoxPart("post", post)], _demo_palette().rgba_table()),
+    )
+    (project / "export" / "post.cubist.json").write_text(
+        json.dumps(
+            {"cubist_manifest": 1, "name": "post", "size": [2, 32, 1], "glb_origin": [0, 16, 0]}
+        )
+    )
+
+    @world(name="cellars", size_m=(64, 64))
+    def cellars(p):
+        props = [place("post", at=(10, 10), carve=True)]
+        return World(ground=flat(10), surface=[p.leaf.mid], props=props)
+
+    loaded = load_world(cellars, _demo_palette(), seed=0)
+    grid, level, corner = region_grid(loaded, (16, 16), size_m=16, export=project / "export")
+    assert level == 0
+    x0, y0, z0 = (int(round(c * 16)) for c in corner)
+
+    def at(x, y, z):
+        return int(grid.data[x - x0, y - y0, z - z0])
+
+    # The ground is 10 m = voxel 160: asset y = 16 lands there, y = 15 a voxel under.
+    assert at(160, 160, 160) == 200 and at(160, 159, 160) == 200
+    assert at(160, 160 - 16, 160) == 200 and at(160, 160 - 17, 160) != 200
+    assert at(160, 160 + 15, 160) == 200  # its top, 16 above the street
+
+
 def test_scattered_points_find_the_same_nearest_point_in_buckets():
     from cubist.world import path
 

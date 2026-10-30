@@ -40,13 +40,18 @@ def crate(p):
 ## Assets, parts, sockets
 
 ```python
-asset(name=None, size=None, tags=(), grounded=False, symmetric=None, allow_floating=False)
+asset(
+    name=None, size=None, tags=(), grounded=False, symmetric=None, allow_floating=False, ground_y=0
+)
 ```
 
 Decorates `fn(p) -> Model | Shape`. `size` is the declared bounding box (lint errors on voxels
 outside it). `grounded`: the asset should touch y = 0. `symmetric`: `"x"` (mirror across the
 center plane `size / 2`) or `("x", 15.5)` for another plane. `allow_floating`: don't warn about
-pieces detached from the main body. A bare shape becomes one part named after the asset.
+pieces detached from the main body. `ground_y`: the asset-space y (a whole number of voxels, below
+the asset's height) where the ground meets the asset: a townhouse with a cellar sets it to the
+cellar's depth, so the export's `glb_origin` sits at street level and a placement puts the street
+there. The scale lint measures a building's height from it. A bare shape becomes one part named after the asset.
 
 ```python
 Model(parts, sockets=None)
