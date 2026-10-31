@@ -517,8 +517,9 @@ joints, sockets with their owning part, clips with their authored keys, easing a
 
 It also names what the asset is and how its colors group: `tags` (the asset's tags, in declared order) and
 `ramps` (each list ramp with a shade in use, as its whole dark-to-light run of `.vox` indices). Kiln
-collapses a building's ramps to one shade in its far copies; it needs `ramps` to know which colors share a
-ramp and `tags` to know which assets are buildings. Both are additive, so the version stays 1.
+collapses a building's ramps to one shade in its coarse copies, from level 1 out; it needs `ramps` to know
+which colors share a ramp and `tags` to know which assets are buildings. Both are additive, so the version
+stays 1.
 
 Clips also become glTF animations: sampled 30 times a second from the same pose evaluator the
 previews use (more often where a part turns fast, so no step between keys turns 60° or more),
