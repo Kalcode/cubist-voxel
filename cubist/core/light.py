@@ -59,8 +59,13 @@ class Light:
 
 
 def _positive(value, what: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
-        raise ModelError(f"light {what} must be a number > 0, got {value!r}")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        or value <= 0
+    ):
+        raise ModelError(f"light {what} must be a finite number > 0, got {value!r}")
     return float(value)
 
 
@@ -86,8 +91,8 @@ def light(
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
         pos = ()
-    if len(pos) != 3:
-        raise ModelError(f"light position must be (x, y, z), got {position!r}")
+    if len(pos) != 3 or not all(math.isfinite(v) for v in pos):
+        raise ModelError(f"light position must be (x, y, z), finite numbers, got {position!r}")
     if not (hasattr(color, "index") and hasattr(color, "rgba")):
         raise ModelError(f"light color must be a palette color like p.fire.light, got {color!r}")
     if isinstance(flicker, bool) or not isinstance(flicker, (int, float)) or not 0 <= flicker <= 1:

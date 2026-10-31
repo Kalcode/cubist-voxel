@@ -75,6 +75,19 @@ def test_bad_flicker_and_unknown_part_are_errors():
         light((0, 0, 0), "#ffffff")
 
 
+def test_range_intensity_and_position_must_be_finite():
+    # NaN passes "<= 0" and json.dumps would write NaN or Infinity into the manifest, which Kiln
+    # then rejects as invalid JSON, far from the cause: refuse it here.
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ModelError, match="range"):
+            light((0, 0, 0), P.fire.light, range=bad)
+        with pytest.raises(ModelError, match="intensity"):
+            light((0, 0, 0), P.fire.light, intensity=bad)
+        with pytest.raises(ModelError, match="position"):
+            light((0, bad, 0), P.fire.light)
+    assert light((0, 0, 0), P.fire.light, range=1e6, intensity=0.01).range == 1e6
+
+
 def test_posed_views_mark_the_light():
     a = built()
     scene = PosedScene(a, P.rgba_table())

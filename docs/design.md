@@ -873,13 +873,16 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   `build.json` carries it, so export and `cubist lint` keep it, and the manifest and `.glb` don't.
   Façade lights stay outdoor, measured from the street.
 - **13m. A light's hold (Oct 31).** `light(..., hold_m=3)` asks the engine to hold the light's level
-  past that many metres, out to where its range fades it. Kiln's room lights needed it: its lights fall
-  as the inverse square and it has no bounce light, so one light per room lit a pool round itself, and
-  the revealed rooms read 2.3–12.4 luma at noon against a floor of 40, 2.6–26.1 at 8× the intensity
-  (Kiln's `docs/city.md`, step 7b). Walls still shadow a held light. The manifest's light has
-  `"hold_m"` only when it is set, so every manifest before is byte-for-byte the same and the version
-  stays 1; `build.json` carries it the same way. A hold that isn't a finite number above 0 is an error
-  naming `hold_m`. The `.glb` has none.
+  past that many metres, out to where its range fades it. Kiln's room lights need it: its lights fall
+  as the inverse square and it has no bounce light. With a draft of the room lights (one per room), each
+  lit a pool round itself, and the revealed rooms read 2.3–12.4 luma at noon against the mean luma of 40
+  the room lights' gate will ask, 2.6–26.1 at 8× the intensity (Kiln's `docs/city.md`, step 7b). Walls
+  still shadow a held light. The manifest's light has `"hold_m"` only when it is set, so every manifest
+  before is byte-for-byte the same and the version stays 1; `build.json` carries it the same way. A
+  hold that isn't a finite number above 0 is an error naming `hold_m`. The `.glb` has none.
+  - `light()` now refuses a `range`, `intensity` or `position` that isn't finite as well. NaN passed
+    their checks (`nan <= 0` is false), and the export's `json.dumps` wrote `NaN` or `Infinity` into
+    the manifest, which an engine's JSON reader rejects far from the cause.
 
 ### v1 acceptance targets
 
