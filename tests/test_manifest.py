@@ -179,3 +179,66 @@ def test_hand_edited_static_vox_still_exports(project):
     scene.parts[1].grid.data[0, 0, 0] = 0
     write_vox(r.vox_path, scene)
     export_asset(r.vox_path.parent)
+
+
+RAMPS = Palette(
+    {
+        "slate": ["#10141c", "#2a3140", "#4a5468", "#7a8699"],
+        "brick": ["#3a1a14", "#7a3a2a", "#b0604a"],
+        "cloth": {"red": "#aa2222", "blue": "#2222aa"},
+        "cork": "#c8a070",
+    }
+)
+
+
+def ramps_asset(fn, tags=()):
+    return asset(name="hut", size=(4, 4, 4), tags=list(tags))(fn).build(RAMPS)
+
+
+def test_manifest_lists_the_asset_tags():
+    def hut(p):
+        return box((4, 4, 4), color=p.cork)
+
+    m = build_manifest(ramps_asset(hut, ["building", "town"]), voxel_size_m=0.0625)
+    assert m["tags"] == ["building", "town"]
+    assert build_manifest(ramps_asset(hut), voxel_size_m=0.0625)["tags"] == []
+
+
+def test_manifest_ramps_list_each_used_list_ramp_dark_to_light():
+    def hut(p):
+        return Model(
+            parts=[
+                Part("a", box((2, 2, 2), color=p.slate.ramp[1]), pivot=(0, 0, 0)),
+                Part("b", box((2, 2, 2), color=p.brick.ramp[2]).at(2, 0, 0), pivot=(2, 0, 0)),
+                Part("c", box((2, 2, 2), color=p.cloth.red).at(0, 2, 0), pivot=(0, 2, 0)),
+                Part("d", box((2, 2, 2), color=p.cork).at(2, 2, 0), pivot=(2, 2, 0)),
+            ]
+        )
+
+    m = build_manifest(ramps_asset(hut), voxel_size_m=0.0625)
+    assert list(m["ramps"]) == ["slate", "brick"]
+    assert (
+        m["ramps"]["slate"] == [c.index for c in RAMPS.slate.ramp] and len(m["ramps"]["slate"]) == 4
+    )
+    assert (
+        m["ramps"]["brick"] == [c.index for c in RAMPS.brick.ramp] and len(m["ramps"]["brick"]) == 3
+    )
+    assert "cloth" not in m["ramps"] and "cork" not in m["ramps"]
+
+
+def test_manifest_ramps_empty_when_no_list_ramp_is_used():
+    def hut(p):
+        return box((4, 4, 4), color=p.cork)
+
+    assert build_manifest(ramps_asset(hut), voxel_size_m=0.0625)["ramps"] == {}
+
+
+def test_manifest_with_tags_and_ramps_validates_against_the_schema():
+    def hut(p):
+        return box((4, 4, 4), color=p.slate.dark)
+
+    m = build_manifest(
+        ramps_asset(hut, ["building"]), voxel_size_m=0.0625, files={"glb": "hut.glb"}
+    )
+    assert m["tags"] == ["building"] and m["ramps"]
+    jsonschema.validate(m, SCHEMA)

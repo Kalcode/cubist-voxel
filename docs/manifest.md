@@ -43,6 +43,8 @@ can read it before exporting.
 | `glb_origin` | See above |
 | `parts` | Parts, parents before children |
 | `sockets` | Named attachment points |
+| `tags` | The asset's tags, in declared order (`[]` for none): what the asset is, e.g. `building` |
+| `ramps` | Each list ramp the asset uses (palette order) with every shade's `.vox` index, dark to light; table ramps and single colors are left out |
 | `clips` | Named motion |
 | `files` | The files written alongside, e.g. `{"glb": "chest.glb", "vox": "chest.vox"}` |
 

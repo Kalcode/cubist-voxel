@@ -57,6 +57,21 @@ def _colors(asset: BuiltAsset, table) -> dict:
     return out
 
 
+def _ramps(asset: BuiltAsset) -> dict:
+    """Each list ramp the asset paints with, name -> every shade's .vox index, dark to light.
+    Table ramps, single colors and ``source`` are left out."""
+    palette = asset.palette
+    if palette is None:
+        return {}
+    used = used_colors(asset)
+    out = {}
+    for name in palette.list_ramps():
+        indices = [int(c.index) for c in getattr(palette, name).ramp]
+        if any(i in used for i in indices):
+            out[name] = indices
+    return out
+
+
 def build_manifest(
     asset: BuiltAsset,
     voxel_size_m: float,
@@ -108,6 +123,8 @@ def build_manifest(
             for name, e in asset.emitters.items()
         },
         "colors": _colors(asset, table),
+        "tags": list(asset.tags),
+        "ramps": _ramps(asset),
         "particles": sorted({e.particle for e in asset.emitters.values()}),
         "lights": {
             name: {

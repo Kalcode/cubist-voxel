@@ -515,6 +515,11 @@ joints, sockets with their owning part, clips with their authored keys, easing a
 (`"cubist_manifest": 1`) and documented in [manifest.md](manifest.md) with a JSON Schema in
 `cubist/schema/`. Builds write the same content to `out/<name>/manifest.json`.
 
+It also names what the asset is and how its colors group: `tags` (the asset's tags, in declared order) and
+`ramps` (each list ramp with a shade in use, as its whole dark-to-light run of `.vox` indices). Kiln
+collapses a building's ramps to one shade in its far copies; it needs `ramps` to know which colors share a
+ramp and `tags` to know which assets are buildings. Both are additive, so the version stays 1.
+
 Clips also become glTF animations: sampled 30 times a second from the same pose evaluator the
 previews use (more often where a part turns fast, so no step between keys turns 60° or more),
 linear, with `step` tracks kept as their keys. Blender imports them and matches Cubist's poses
@@ -856,6 +861,8 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   street joined none of the landmarks beside it in Kiln's walks, which join a line's nearest point
   within 64 m. A segment longer than 12 m is now split into parts of at most 4 m. A smoothed path's
   points are 4 m or so apart already (vale's at most 8.1 m), so its line is as before.
+- **13k. Tags and ramps in the manifest (Oct 30).** The manifest names the asset's `tags` and the list
+  `ramps` it uses (above, "Manifest"), so Kiln can collapse a building's colour ramps in its coarse copies.
 
 ### v1 acceptance targets
 

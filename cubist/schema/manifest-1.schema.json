@@ -52,6 +52,14 @@
         }
       }
     },
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "ramps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "integer", "minimum": 1, "maximum": 255}
+      }
+    },
     "files": {"type": "object", "additionalProperties": {"type": "string"}}
   },
   "$defs": {
