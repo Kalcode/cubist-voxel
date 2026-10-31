@@ -161,3 +161,66 @@ def test_ungrounded_lights_only_need_a_candle_s_reach():
     assert reach(post(50, 40, grounded=False)) == []  # held or hung: no known floor
     [f] = reach(post(50, 10, grounded=False))
     assert f.details["min_range"] == 32
+
+
+# --- indoor lights: measured from the floor under them ---------------------------------
+
+
+def storeyed(at, range_, indoor=True):
+    """A building with a 48-voxel cellar under the street (ground_y 48), a storey's floor whose
+    surface is at y = 150 over x 0..4, and a light at (2, at, 2): over the floor, or at x 6, past
+    it, when ``at`` is a tuple."""
+    x, y = (6, at[0]) if isinstance(at, tuple) else (2, at)
+
+    def fn(p):
+        walls = Part("walls", box((4, 120, 4), color=p.wood.dark), pivot=(2, 0, 2))
+        floor = Part("floor", box((4, 4, 4), color=p.wood.mid).at(0, 146, 0), pivot=(2, 146, 2))
+        lamp = light((x, y, 2), p.fire.light, range=range_, indoor=indoor)
+        return Model([walls, floor], lights={"lamp": lamp})
+
+    spec = asset(name="house", size=(8, 220, 6), tags=["building"], grounded=True, ground_y=48)
+    return spec(fn).build(P)
+
+
+def test_an_indoor_light_is_measured_from_the_floor_under_it():
+    # A hearth's light 9 voxels over an upper floor lights its room with 13; measured from the
+    # street, 111 voxels down, it would need 157.
+    assert reach(storeyed(159, 40)) == []
+    [f] = reach(storeyed(159, 40, indoor=False))
+    assert f.details["min_range"] == 157  # ceil(sqrt(2) * (159 - 48))
+    [f] = reach(storeyed(210, 40))
+    assert "above the floor under it" in f.message
+    assert f.details["min_range"] == 85  # ceil(sqrt(2) * (210 - 150))
+    # The candle's reach still holds indoors.
+    [f] = reach(storeyed(159, 10))
+    assert f.details["min_range"] == 32 and "candle" in f.message
+
+
+def test_an_indoor_light_with_nothing_under_it_warns_and_keeps_the_ground_line():
+    # Past the floor's edge, nothing is under it: it is measured from the street, and says so.
+    findings = reach(storeyed((159,), 160))
+    [f] = findings
+    assert f.severity == "warning" and "'lamp'" in f.message
+    assert "nothing straight under it" in f.message
+    findings = reach(storeyed((159,), 40))
+    assert len(findings) == 2
+    assert {f.details.get("min_range") for f in findings} == {None, 157}
+
+
+def test_indoor_round_trips_through_the_summary_but_not_into_the_manifest():
+    a = storeyed(159, 40)
+    assert a.lights["lamp"].indoor
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), a.summary(), P)
+    assert again.lights == a.lights
+    # A build.json from before the flag reads as outdoor.
+    old = {k: v for k, v in a.lights["lamp"].to_summary().items() if k != "indoor"}
+    assert not type(a.lights["lamp"]).from_summary(old).indoor
+    # Only the lint reads it: the manifest's light is as before.
+    m = build_manifest(a, voxel_size_m=1)
+    jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
+    assert "indoor" not in m["lights"]["lamp"]
+
+
+def test_indoor_must_be_true_or_false():
+    with pytest.raises(ModelError, match="indoor"):
+        light((0, 0, 0), P.fire.light, indoor="yes")

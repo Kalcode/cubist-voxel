@@ -278,7 +278,7 @@ bands dark-to-light in the direction the water should flow. Every voxel of that 
 in every part, so paint spray, foam and flashes from another ramp.
 
 ```python
-light(position, color, range=8, intensity=1.0, flicker=0.0, part=None)
+light(position, color, range=8, intensity=1.0, flicker=0.0, part=None, indoor=False)
 Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=96, flicker=0.35)})
 ```
 
@@ -301,6 +301,12 @@ grounded asset, when it can't reach the floor as far out as it is high (`range` 
 its height). The floor is the ground line (`ground_y`): a building's door lamp is measured from the
 street, not from its cellar's floor. A light below the ground line (in the cellar) is measured from
 the asset's floor.
+
+`indoor=True` marks a light that lights a room, such as a hearth's fire on a building's upper floor:
+lint measures it from the floor straight under it (the top of the first voxel below it in its
+column), grounded asset or not, so it needn't reach the street. An indoor light with nothing under it
+is measured from the ground line as before, and lint warns that it stands over no floor. Only the
+lint reads the flag; it isn't in the manifest or the `.glb`.
 
 ### Fracture and bursts
 

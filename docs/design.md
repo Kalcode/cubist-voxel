@@ -268,7 +268,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
 | Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the street at its door (error), a tour leg (`door` to `tour_01`, then each stop to the next) it can't walk in a straight line (error), or with no `door` or `floor_0` socket to walk (warning: older buildings no one enters) | Error, Warning |
 | Storeys | A part tagged `upper` or `roof` (its own tag or a parent's) reaching up past the next such part's lowest voxel; the topmost may reach down over the one under it | Error |
-| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor) | Warning |
+| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor; an indoor light, above the floor straight under it, which it warns of standing over none) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
 | Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |
@@ -864,6 +864,14 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   points are 4 m or so apart already (vale's at most 8.1 m), so its line is as before.
 - **13k. Tags and ramps in the manifest (Oct 30).** The manifest names the asset's `tags` and the list
   `ramps` it uses (above, "Manifest"), so Kiln can collapse a building's colour ramps in its coarse copies.
+- **13l. Indoor lights (Oct 31).** `light(..., indoor=True)` marks a light that lights a room. The
+  light-reach lint measures it from the floor straight under it (the top of the first voxel below it
+  in its column), not from the ground line. Kiln's townhouses light each storey from its hearth, 9
+  voxels over the floor: measured from the street, the top storey's on a five-storey house asked a
+  range of 307, where 160 lights its room. One with nothing under it keeps the ground line and warns
+  that it stands over no floor, so a misplaced one is still caught. The flag is the lint's alone:
+  `build.json` carries it, so export and `cubist lint` keep it, and the manifest and `.glb` don't.
+  Façade lights stay outdoor, measured from the street.
 
 ### v1 acceptance targets
 

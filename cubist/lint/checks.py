@@ -317,26 +317,44 @@ def check_occlusion(asset: BuiltAsset) -> list[Finding]:
     ]
 
 
-def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
+def check_light_reach(asset: BuiltAsset, style: StyleBible, merged: VoxelGrid) -> list[Finding]:
     """A light should reach at least MIN_LIGHT_RANGE_M, and on a grounded asset it should light
     the floor as far out as it is high (range >= sqrt(2) * height). The floor is the ground line
     (``ground_y``, the street a building's cellar is under), or for a light below it, the
-    asset's own floor."""
+    asset's own floor. An indoor light (``light(..., indoor=True)``) lights a room: its floor is
+    the top of the first voxel of ``merged`` straight under it, grounded asset or not. One with
+    nothing under it is measured as an outdoor light, with a warning of its own."""
     m = style.voxel_size_m
     shortest = math.ceil(MIN_LIGHT_RANGE_M / m)
     out = []
     for name, lt in asset.lights.items():
         y = float(lt.position[1])
-        height = y - asset.ground_y if y >= asset.ground_y else y
-        floor = math.ceil(math.sqrt(2) * height) if asset.grounded and height > 0 else 0
+        under = _floor_under(merged, lt.position) if lt.indoor else None
+        if under is not None:
+            height, grounded, floor_is, lit = y - under, True, "the floor under it", "the floor"
+        else:
+            height = y - asset.ground_y if y >= asset.ground_y else y
+            grounded, floor_is, lit = asset.grounded, "the floor", "the ground"
+        if lt.indoor and under is None:
+            out.append(
+                Finding(
+                    "light_reach",
+                    "warning",
+                    f"indoor light {name!r} at {tuple(lt.position)} has nothing straight under "
+                    "it, so it is measured from the ground line as an outdoor light is; put it "
+                    "over its room's floor, or drop indoor=True if it lights the outside",
+                    {"light": name, "indoor": True},
+                )
+            )
+        floor = math.ceil(math.sqrt(2) * height) if grounded and height > 0 else 0
         need = max(shortest, floor)
         if lt.range >= need:
             continue
         reach = f"range {lt.range:g} ({lt.range * m:.1f} m)"
         if floor > shortest:
             why = (
-                f"light {name!r} is {height:g} voxels ({height * m:.1f} m) above the floor with "
-                f"{reach}, so it barely lights the ground around it"
+                f"light {name!r} is {height:g} voxels ({height * m:.1f} m) above {floor_is} with "
+                f"{reach}, so it barely lights {lit} around it"
             )
         else:
             why = f"light {name!r} has {reach}, less than a candle lights ({MIN_LIGHT_RANGE_M:g} m)"
@@ -350,6 +368,18 @@ def check_light_reach(asset: BuiltAsset, style: StyleBible) -> list[Finding]:
             )
         )
     return out
+
+
+def _floor_under(grid: VoxelGrid, position) -> int | None:
+    """The top of the first voxel straight under ``position`` (in its column, below the voxel it
+    is in), or None if there is none."""
+    x, y, z = (math.floor(float(v)) for v in position)
+    ox, oy, oz = grid.origin
+    sx, sy, sz = grid.shape
+    if not (0 <= x - ox < sx and 0 <= z - oz < sz):
+        return None
+    filled = np.flatnonzero(grid.data[x - ox, : max(0, min(sy, y - oy)), z - oz])
+    return int(filled[-1]) + 1 + oy if len(filled) else None
 
 
 def check_budgets(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> list[Finding]:
