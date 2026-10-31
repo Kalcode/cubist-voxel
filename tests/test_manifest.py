@@ -12,6 +12,7 @@ from cubist import Model, Part, asset, box, clip, hinge
 from cubist.build.runner import build_script
 from cubist.core.palette import Palette
 from cubist.export import ExportBlocked, export_asset
+from cubist.io.gltf import used_colors
 from cubist.io.vox import read_vox, write_vox
 from cubist.manifest import MANIFEST_VERSION, SCHEMA_PATH, build_manifest
 
@@ -185,6 +186,7 @@ RAMPS = Palette(
     {
         "slate": ["#10141c", "#2a3140", "#4a5468", "#7a8699"],
         "brick": ["#3a1a14", "#7a3a2a", "#b0604a"],
+        "moss": ["#1a2a14", "#3a5a2a", "#6a9a4a"],
         "cloth": {"red": "#aa2222", "blue": "#2222aa"},
         "cork": "#c8a070",
     }
@@ -215,15 +217,26 @@ def test_manifest_ramps_list_each_used_list_ramp_dark_to_light():
             ]
         )
 
-    m = build_manifest(ramps_asset(hut), voxel_size_m=0.0625)
+    built_hut = ramps_asset(hut)
+    built_hut.glow = {RAMPS.slate.ramp[1].index: 1.5}
+    m = build_manifest(built_hut, voxel_size_m=0.0625)
     assert list(m["ramps"]) == ["slate", "brick"]
-    assert (
-        m["ramps"]["slate"] == [c.index for c in RAMPS.slate.ramp] and len(m["ramps"]["slate"]) == 4
-    )
-    assert (
-        m["ramps"]["brick"] == [c.index for c in RAMPS.brick.ramp] and len(m["ramps"]["brick"]) == 3
-    )
-    assert "cloth" not in m["ramps"] and "cork" not in m["ramps"]
+    assert m["ramps"]["slate"] == [c.index for c in RAMPS.slate.ramp]
+    assert m["ramps"]["brick"] == [c.index for c in RAMPS.brick.ramp]
+    assert "moss" not in m["ramps"]
+    assert "cloth" not in m["ramps"]
+    assert "cork" not in m["ramps"]
+    # the indices the voxels carry are the ones listed
+    for i in used_colors(built_hut):
+        owners = [n for n in RAMPS.list_ramps() if i in [c.index for c in getattr(RAMPS, n).ramp]]
+        for n in owners:
+            assert i in m["ramps"][n]
+    # and so are the indices the manifest's named colours carry
+    assert m["colors"]
+    for name, entry in m["colors"].items():
+        ramp_name = name.split(".")[0]
+        if ramp_name in m["ramps"]:
+            assert entry["index"] in m["ramps"][ramp_name]
 
 
 def test_manifest_ramps_empty_when_no_list_ramp_is_used():
@@ -240,5 +253,18 @@ def test_manifest_with_tags_and_ramps_validates_against_the_schema():
     m = build_manifest(
         ramps_asset(hut, ["building"]), voxel_size_m=0.0625, files={"glb": "hut.glb"}
     )
-    assert m["tags"] == ["building"] and m["ramps"]
+    assert m["tags"] == ["building"]
+    assert m["ramps"]
     jsonschema.validate(m, SCHEMA)
+
+
+@pytest.mark.parametrize("bad", [0, 256])
+def test_manifest_schema_rejects_a_ramp_index_out_of_range(bad):
+    def hut(p):
+        return box((4, 4, 4), color=p.slate.dark)
+
+    m = build_manifest(ramps_asset(hut), voxel_size_m=0.0625, files={"glb": "hut.glb"})
+    jsonschema.validate(m, SCHEMA)
+    m["ramps"]["slate"][0] = bad
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(m, SCHEMA)
