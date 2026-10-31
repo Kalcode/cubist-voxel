@@ -303,10 +303,13 @@ street, not from its cellar's floor. A light below the ground line (in the cella
 the asset's floor.
 
 `indoor=True` marks a light that lights a room, such as a hearth's fire on a building's upper floor:
-lint measures it from the floor straight under it (the top of the first voxel below it in its
-column), grounded asset or not, so it needn't reach the street. An indoor light with nothing under it
-is measured from the ground line as before, and lint warns that it stands over no floor. Only the
-lint reads the flag; it isn't in the manifest or the `.glb`.
+lint measures it from the floor straight under it, grounded asset or not, so it needn't reach the
+street. The floor is found going down the light's column: past the light's own fixture (the voxels
+it is in or sits on, such as a lantern's glass and foot), past the air under that, to the first
+voxel. Over a stairwell that is what lies below; over furniture, its top. A standing lamp's post runs
+into its floor, so it is measured from the storey below, or with none, from the ground line. An
+indoor light with nothing under it is measured from the ground line as before, and lint warns that it
+stands over no floor. Only the lint reads the flag; it isn't in the manifest or the `.glb`.
 
 `hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
 distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls

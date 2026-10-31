@@ -371,15 +371,30 @@ def check_light_reach(asset: BuiltAsset, style: StyleBible, merged: VoxelGrid) -
 
 
 def _floor_under(grid: VoxelGrid, position) -> int | None:
-    """The top of the first voxel straight under ``position`` (in its column, below the voxel it
-    is in), or None if there is none."""
+    """The top of the floor under ``position``, going straight down its column from the voxel it
+    is in: past the light's own fixture (the run of filled voxels it is in, or that its voxel sits
+    on: a lantern's glass and foot), past the air under that, to the first filled voxel. None if
+    there is none. Over a stairwell that is what lies below the void; over furniture, its top. A
+    standing lamp's post runs down into its floor, one run with it, so it is measured from the
+    floor under that one (the storey below), or with none, from the ground line."""
     x, y, z = (math.floor(float(v)) for v in position)
     ox, oy, oz = grid.origin
     sx, sy, sz = grid.shape
     if not (0 <= x - ox < sx and 0 <= z - oz < sz):
         return None
-    filled = np.flatnonzero(grid.data[x - ox, : max(0, min(sy, y - oy)), z - oz])
-    return int(filled[-1]) + 1 + oy if len(filled) else None
+    column = grid.data[x - ox, :, z - oz]
+
+    def filled(j: int) -> bool:
+        return 0 <= j < sy and column[j] != 0
+
+    i = y - oy
+    if not filled(i):
+        i -= 1  # the light is in air: a fixture can only be the voxel it sits on
+    while filled(i):  # its own fixture
+        i -= 1
+    while i >= 0 and not filled(i):  # the air under it
+        i -= 1
+    return i + 1 + oy if i >= 0 else None
 
 
 def check_budgets(asset: BuiltAsset, merged: VoxelGrid, style: StyleBible) -> list[Finding]:

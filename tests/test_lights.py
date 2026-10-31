@@ -209,6 +209,39 @@ def test_an_indoor_light_is_measured_from_the_floor_under_it():
     assert f.details["min_range"] == 32 and "candle" in f.message
 
 
+def fixture_over_floors(fixture, at, range_):
+    """A floor (its surface at y = 4, x and z 0..8), a light at (2.5, at, 2.5) indoor, and the
+    light's fixture as boxes ((size, corner) pairs) between them."""
+
+    def fn(p):
+        floor = Part("floor", box((8, 4, 8), color=p.wood.dark), pivot=(4, 0, 4))
+        parts = [floor] + [
+            Part(f"fixture_{i}", box(size, color=p.fire.light).at(*corner), pivot=corner)
+            for i, (size, corner) in enumerate(fixture)
+        ]
+        lamp = light((2.5, at, 2.5), p.fire.light, range=range_, indoor=True)
+        return Model(parts, lights={"lamp": lamp})
+
+    return asset(name="lantern", size=(8, 220, 8), grounded=True)(fn).build(P)
+
+
+def test_an_indoor_light_in_its_lantern_is_measured_from_the_floor_under_the_lantern():
+    # The light in the middle of its glass (y 150..158), 150 voxels over the floor: the glass is
+    # its own fixture, not its floor.
+    [f] = reach(fixture_over_floors([((3, 8, 3), (1, 150, 1))], 154, 40))
+    assert "above the floor under it" in f.message
+    assert f.details["min_range"] == 213  # ceil(sqrt(2) * 150)
+    assert reach(fixture_over_floors([((3, 8, 3), (1, 150, 1))], 154, 213)) == []
+
+
+def test_a_standing_lamp_is_measured_from_the_floor_under_its_own():
+    # A lamp on a post standing on an upper floor (its surface at y 104): the post and the floor
+    # are one run under the light, so it is measured from the floor below them (y 4), 126.5 down.
+    standing = [((8, 4, 8), (0, 100, 0)), ((1, 26, 1), (2, 104, 2))]
+    [f] = reach(fixture_over_floors(standing, 130.5, 160))
+    assert f.details["min_range"] == 179  # ceil(sqrt(2) * 126.5)
+
+
 def test_an_indoor_light_with_nothing_under_it_warns_and_keeps_the_ground_line():
     # Past the floor's edge, nothing is under it: it is measured from the street, and says so.
     findings = reach(storeyed((159,), 160))

@@ -268,7 +268,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Occlusion | A `building` with no part tagged `roof` or `upper` (`canopy` and `clutter` don't count) | Info |
 | Walk | A `building` or `walkable` asset (when `[scale]` has the walker keys) with a `door`, `floor_N`, `cellar` or `tour_NN` socket the walker can't reach from the street at its door (error), a tour leg (`door` to `tour_01`, then each stop to the next) it can't walk in a straight line (error), or with no `door` or `floor_0` socket to walk (warning: older buildings no one enters) | Error, Warning |
 | Storeys | A part tagged `upper` or `roof` (its own tag or a parent's) reaching up past the next such part's lowest voxel; the topmost may reach down over the one under it | Error |
-| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor; an indoor light, above the floor straight under it, which it warns of standing over none) | Warning |
+| Light reach | A grounded asset's light whose range can't reach the floor as far out as the light is high (range under sqrt(2) times its height above the ground line; in a cellar, above the asset's floor; an indoor light, above the floor straight under it and its own fixture, which it warns of standing over none) | Warning |
 | Joint limits | Clip keys past a hinge's limits or a slide's distance | Error |
 | Loop closure | A looping clip whose last pose isn't its first | Warning |
 | Motion collision | A moving part passing through another part (sampled 24 times a second; voxels within 1.5 of a turning joint's axis are forgiven) | Warning |
@@ -865,13 +865,21 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
 - **13k. Tags and ramps in the manifest (Oct 30).** The manifest names the asset's `tags` and the list
   `ramps` it uses (above, "Manifest"), so Kiln can collapse a building's colour ramps in its coarse copies.
 - **13l. Indoor lights (Oct 31).** `light(..., indoor=True)` marks a light that lights a room. The
-  light-reach lint measures it from the floor straight under it (the top of the first voxel below it
-  in its column), not from the ground line. Kiln's townhouses light each storey from its hearth, 9
-  voxels over the floor: measured from the street, the top storey's on a five-storey house asked a
-  range of 307, where 160 lights its room. One with nothing under it keeps the ground line and warns
-  that it stands over no floor, so a misplaced one is still caught. The flag is the lint's alone:
-  `build.json` carries it, so export and `cubist lint` keep it, and the manifest and `.glb` don't.
-  Façade lights stay outdoor, measured from the street.
+  light-reach lint measures it from the floor straight under it, not from the ground line. Kiln's
+  townhouses light each storey from its hearth, 9 voxels over the floor: measured from the street, the
+  top storey's on a five-storey house asked a range of 307, where 160 lights its room. One with nothing
+  under it keeps the ground line and warns that it stands over no floor, so a misplaced one is still
+  caught. The flag is the lint's alone: `build.json` carries it, so export and `cubist lint` keep it,
+  and the manifest and `.glb` don't. Façade lights stay outdoor, measured from the street.
+  - **The floor under it** is found going straight down the light's column from the voxel it is in:
+    past its own fixture (the run of filled voxels the light is in, or that its voxel sits on: a
+    lantern's glass and foot), past the air under that, to the first filled voxel. Over a stairwell
+    that is what lies below the void (strict); over furniture, the furniture's top (lenient). A
+    standing lamp's post runs into its floor, one run with it, so it is measured from the floor of the
+    storey below, or with none, from the ground line with the warning.
+  - The first version took the first voxel under the light's own, so a lantern's light, in its glass,
+    was measured from the glass: height 0, the candle's reach the only test, and the no-floor warning
+    unreachable. Tests pin a lantern 150 voxels over its floor (213 needed) and a standing lamp.
 - **13m. A light's hold (Oct 31).** `light(..., hold_m=3)` asks the engine to hold the light's level
   past that many metres, out to where its range fades it. Kiln's room lights need it: its lights fall
   as the inverse square and it has no bounce light. With a draft of the room lights (one per room), each
