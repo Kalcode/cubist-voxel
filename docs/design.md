@@ -876,7 +876,10 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
     lantern's glass and foot), past the air under that, to the first filled voxel. Over a stairwell
     that is what lies below the void (strict); over furniture, the furniture's top (lenient). A
     standing lamp's post runs into its floor, one run with it, so it is measured from the floor of the
-    storey below, or with none, from the ground line with the warning.
+    storey below, or with none, from the ground line with the warning. A light in the air just over a
+    floor sits on it the same way: the floor is taken for its fixture, so it is measured from the storey
+    below (strict; a room light belongs two voxels or more over its floor). A test pins it, one voxel
+    and two over an upper floor and one over the lowest.
   - The first version took the first voxel under the light's own, so a lantern's light, in its glass,
     was measured from the glass: height 0, the candle's reach the only test, and the no-floor warning
     unreachable. Tests pin a lantern 150 voxels over its floor (213 needed) and a standing lamp.

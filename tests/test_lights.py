@@ -242,6 +242,20 @@ def test_a_standing_lamp_is_measured_from_the_floor_under_its_own():
     assert f.details["min_range"] == 179  # ceil(sqrt(2) * 126.5)
 
 
+def test_a_light_one_voxel_over_a_floor_takes_the_floor_for_its_fixture():
+    # A light in the air just over a floor sits on it, so the floor is the run its voxel sits on,
+    # its own fixture as a lantern's foot is, and it is measured from the floor under that: the
+    # storey below, or with none, the ground line with the warning. Two voxels up, the floor is
+    # its floor. Strict on purpose: a room light belongs two voxels or more over its floor.
+    upper = [((8, 4, 8), (0, 100, 0))]  # an upper floor, its surface at y 104
+    [f] = reach(fixture_over_floors(upper, 104.5, 40))
+    assert "above the floor under it" in f.message
+    assert f.details["min_range"] == 143  # ceil(sqrt(2) * 100.5), from the floor at y 4
+    assert reach(fixture_over_floors(upper, 105.5, 40)) == []  # 1.5 over its own floor
+    [f] = reach(fixture_over_floors([], 4.5, 40))  # just over the lowest floor
+    assert f.severity == "warning" and "nothing straight under it" in f.message
+
+
 def test_an_indoor_light_with_nothing_under_it_warns_and_keeps_the_ground_line():
     # Past the floor's edge, nothing is under it: it is measured from the street, and says so.
     findings = reach(storeyed((159,), 160))

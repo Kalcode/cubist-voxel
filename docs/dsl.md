@@ -307,9 +307,11 @@ lint measures it from the floor straight under it, grounded asset or not, so it 
 street. The floor is found going down the light's column: past the light's own fixture (the voxels
 it is in or sits on, such as a lantern's glass and foot), past the air under that, to the first
 voxel. Over a stairwell that is what lies below; over furniture, its top. A standing lamp's post runs
-into its floor, so it is measured from the storey below, or with none, from the ground line. An
-indoor light with nothing under it is measured from the ground line as before, and lint warns that it
-stands over no floor. Only the lint reads the flag; it isn't in the manifest or the `.glb`.
+into its floor, so it is measured from the storey below, or with none, from the ground line. A light
+in the voxel just over a floor sits on it too: the floor is taken for its fixture and the light is
+measured from the storey below, so put a room light two voxels or more over its floor. An indoor
+light with nothing under it is measured from the ground line as before, and lint warns that it stands
+over no floor. Only the lint reads the flag; it isn't in the manifest or the `.glb`.
 
 `hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
 distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls

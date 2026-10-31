@@ -377,7 +377,8 @@ def _floor_under(grid: VoxelGrid, position) -> int | None:
     on: a lantern's glass and foot), past the air under that, to the first filled voxel. None if
     there is none. Over a stairwell that is what lies below the void; over furniture, its top. A
     standing lamp's post runs down into its floor, one run with it, so it is measured from the
-    floor under that one (the storey below), or with none, from the ground line."""
+    floor under that one (the storey below), or with none, from the ground line. A light in the
+    voxel just over a floor sits on it the same way, so it too is measured from the storey below."""
     x, y, z = (math.floor(float(v)) for v in position)
     ox, oy, oz = grid.origin
     sx, sy, sz = grid.shape
