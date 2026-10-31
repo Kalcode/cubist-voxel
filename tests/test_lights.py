@@ -267,7 +267,7 @@ def test_an_indoor_light_with_nothing_under_it_warns_and_keeps_the_ground_line()
     assert {f.details.get("min_range") for f in findings} == {None, 157}
 
 
-def test_indoor_round_trips_through_the_summary_but_not_into_the_manifest():
+def test_indoor_round_trips_through_the_summary():
     a = storeyed(159, 40)
     assert a.lights["lamp"].indoor
     again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), a.summary(), P)
@@ -275,10 +275,32 @@ def test_indoor_round_trips_through_the_summary_but_not_into_the_manifest():
     # A build.json from before the flag reads as outdoor.
     old = {k: v for k, v in a.lights["lamp"].to_summary().items() if k != "indoor"}
     assert not type(a.lights["lamp"]).from_summary(old).indoor
-    # Only the lint reads it: the manifest's light is as before.
-    m = build_manifest(a, voxel_size_m=1)
-    jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
-    assert "indoor" not in m["lights"]["lamp"]
+
+
+def test_indoor_goes_in_the_manifest_only_when_set():
+    # Kiln lights an indoor light's room only: nothing outside the storey its part is in (its
+    # formats.md, "Lights"). The manifest says so with "indoor": true, after every light's keys.
+    m = build_manifest(storeyed(159, 40), voxel_size_m=1)
+    schema = json.loads(SCHEMA_PATH.read_text())
+    jsonschema.validate(m, schema)
+    assert m["lights"]["lamp"]["indoor"] is True
+    assert list(m["lights"]["lamp"])[-1] == "indoor"
+    # With a hold too, the hold comes first, as a held light's manifest already has it.
+    held = {"lamp": light((2, 159, 2), P.fire.light, range=40, indoor=True, hold_m=0.25)}
+    walls = Part("walls", box((4, 120, 4), color=P.wood.dark), pivot=(2, 0, 2))
+    room = asset(name="room", size=(4, 220, 4))(lambda p: Model([walls], lights=held)).build(P)
+    both = build_manifest(room, voxel_size_m=1)
+    jsonschema.validate(both, schema)
+    assert list(both["lights"]["lamp"])[-2:] == ["hold_m", "indoor"]
+    # Unset, the light is as before: no key, so every outdoor light's manifest is byte-for-byte
+    # the same.
+    outdoor = build_manifest(storeyed(159, 40, indoor=False), voxel_size_m=1)
+    assert "indoor" not in outdoor["lights"]["lamp"]
+    assert "indoor" not in build_manifest(built(), voxel_size_m=1)["lights"]["flame"]
+    bad = json.loads(json.dumps(m))
+    bad["lights"]["lamp"]["indoor"] = "yes"
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(bad, schema)
 
 
 def test_indoor_must_be_true_or_false():

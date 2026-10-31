@@ -2,8 +2,9 @@
 
 They become ``KHR_lights_punctual`` point lights in the GLB, on a node that moves with their
 part. Flicker is for the engine (glTF can't animate it portably); previews draw a marker. An
-indoor light lights a room: the reach lint measures it from the floor under it. A hold
-(``hold_m``) is for the engine too: past that many metres the light stops falling off.
+indoor light lights a room: the reach lint measures it from the floor under it, and the engine
+lights nothing outside its part's storey. A hold (``hold_m``) is for the engine too: past that many
+metres the light stops falling off.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ class Light:
     intensity: float = 1.0
     flicker: float = 0.0  # 0 steady .. 1 wild
     part: str | None = None
-    indoor: bool = False  # lights a room: the lint measures it from the floor under it
+    indoor: bool = False  # lights a room: measured from the floor under it, kept to its storey
     hold_m: float | None = None  # metres past which the engine holds its level; None: no hold
 
     def to_summary(self) -> dict:
@@ -83,7 +84,8 @@ def light(
     ``range`` voxels, moving with ``part`` (default: the part with the nearest voxel).
     ``flicker`` from 0 (steady) to 1 tells the engine how much it wavers. ``indoor`` marks a
     light that lights a room (a hearth's on an upper floor): the reach lint measures its height
-    from the floor straight under it, not from the ground line. Only the lint reads it.
+    from the floor straight under it, not from the ground line, and the manifest marks it so the
+    engine lights nothing outside the storey ``part`` is in. In the manifest only when set.
     ``hold_m`` (metres, or None) tells the engine to stop the light falling off past that
     distance: it holds its level out to where its range fades it, as a room's walls would
     pass its light on. Walls still shadow it. In the manifest only when set."""

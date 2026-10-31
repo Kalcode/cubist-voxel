@@ -870,7 +870,8 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   top storey's on a five-storey house asked a range of 307, where 160 lights its room. One with nothing
   under it keeps the ground line and warns that it stands over no floor, so a misplaced one is still
   caught. The flag is the lint's alone: `build.json` carries it, so export and `cubist lint` keep it,
-  and the manifest and `.glb` don't. Façade lights stay outdoor, measured from the street.
+  and the manifest and `.glb` don't. Façade lights stay outdoor, measured from the street. *The
+  manifest has it since 13n.*
   - **The floor under it** is found going straight down the light's column from the voxel it is in:
     past its own fixture (the run of filled voxels the light is in, or that its voxel sits on: a
     lantern's glass and foot), past the air under that, to the first filled voxel. Over a stairwell
@@ -910,6 +911,17 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   - Not yet: the shape modifiers (`smooth_union`, `taper`, `round`, `hollow`, `erode`, `dilate`,
     `displace` and the paint ops' numbers) and the world DSL (`docs/worlds.md`), whose functions
     from `flat` to `scatter`, and `Field` arithmetic, take NaN with no check at all.
+- **13n. Indoor lights in the manifest (Oct 31).** The manifest's light has `"indoor": true` when
+  `light(..., indoor=True)` set it (the schema takes a boolean), after the keys every light has and
+  after `hold_m`; an outdoor light has no key, so its manifest is byte-for-byte as before. Kiln needed
+  it: a room light held past a quarter metre (13m) is as bright everywhere in its range as near it,
+  so a townhouse's lights of the storeys above and below lit the revealed room's pixels as much as its
+  own, each tracing a shadow ray only for the slab to stop it, and the frame of a walk through a house
+  nearly doubled (Kiln's `docs/city.md`, step 7b, "The cost indoors"). Kiln now lights nothing
+  outside the storey an indoor light's part is in, which took two-thirds or more of what the room
+  lights added to that walk's frame ("An indoor light stays in its room"). The `.glb` has none. Give
+  a room light its storey's part: the engine takes the storey from the part, not from where the
+  light stands.
 
 ### v1 acceptance targets
 

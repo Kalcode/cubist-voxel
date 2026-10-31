@@ -136,6 +136,7 @@ def build_manifest(
                 "intensity": lt.intensity,
                 "flicker": lt.flicker,
                 **({"hold_m": lt.hold_m} if lt.hold_m is not None else {}),
+                **({"indoor": True} if lt.indoor else {}),
             }
             for name, lt in asset.lights.items()
         },
