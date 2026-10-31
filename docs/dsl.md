@@ -278,7 +278,7 @@ bands dark-to-light in the direction the water should flow. Every voxel of that 
 in every part, so paint spray, foam and flashes from another ramp.
 
 ```python
-light(position, color, range=8, intensity=1.0, flicker=0.0, part=None, indoor=False)
+light(position, color, range=8, intensity=1.0, flicker=0.0, part=None, indoor=False, hold_m=None)
 Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=96, flicker=0.35)})
 ```
 
@@ -307,6 +307,11 @@ lint measures it from the floor straight under it (the top of the first voxel be
 column), grounded asset or not, so it needn't reach the street. An indoor light with nothing under it
 is measured from the ground line as before, and lint warns that it stands over no floor. Only the
 lint reads the flag; it isn't in the manifest or the `.glb`.
+
+`hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
+distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls
+passing its light on, since Kiln has no bounce light. Walls still shadow it. It goes in the
+manifest's light only when set, and isn't in the `.glb` (glTF has no such falloff).
 
 ### Fracture and bursts
 

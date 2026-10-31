@@ -224,3 +224,44 @@ def test_indoor_round_trips_through_the_summary_but_not_into_the_manifest():
 def test_indoor_must_be_true_or_false():
     with pytest.raises(ModelError, match="indoor"):
         light((0, 0, 0), P.fire.light, indoor="yes")
+
+
+# --- a light's hold: past hold_m metres it stops falling off --------------------------
+
+
+def test_hold_m_goes_in_the_manifest_only_when_set():
+    # Kiln holds the light's level past hold_m metres, out to its range (its formats.md, "Lights").
+    lamp = {"flame": light((0.5, 7, 0.5), P.fire.light, range=6, hold_m=3)}
+    held = built(lambda p: torch(p, lamp))
+    m = build_manifest(held, voxel_size_m=1)
+    jsonschema.validate(m, json.loads(SCHEMA_PATH.read_text()))
+    assert m["lights"]["flame"]["hold_m"] == 3.0
+    assert list(m["lights"]["flame"])[-1] == "hold_m"  # after the keys every manifest already has
+    # Unset, the light is as before: no key, so every existing manifest is byte-for-byte the same.
+    assert "hold_m" not in build_manifest(built(), voxel_size_m=1)["lights"]["flame"]
+    schema = json.loads(SCHEMA_PATH.read_text())
+    bad = json.loads(json.dumps(m))
+    bad["lights"]["flame"]["hold_m"] = 0
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(bad, schema)
+
+
+def test_hold_m_round_trips_through_the_summary():
+    held = built(lambda p: torch(p, {"flame": light((0.5, 7, 0.5), p.fire.light, hold_m=2.5)}))
+    assert held.lights["flame"].hold_m == 2.5
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(held.to_vox_scene())), held.summary(), P)
+    assert again.lights == held.lights
+    # A build.json from before the hold, or a light without one, reads as none.
+    plain = built()
+    assert plain.lights["flame"].hold_m is None
+    assert "hold_m" not in plain.lights["flame"].to_summary()
+    flame = plain.lights["flame"]
+    assert type(flame).from_summary(flame.to_summary()).hold_m is None
+
+
+def test_hold_m_must_be_a_positive_number_or_none():
+    for bad in (0, -1, "3", True, float("nan"), float("inf")):
+        with pytest.raises(ModelError, match="hold_m"):
+            light((0, 0, 0), P.fire.light, hold_m=bad)
+    assert light((0, 0, 0), P.fire.light, hold_m=None).hold_m is None
+    assert light((0, 0, 0), P.fire.light, hold_m=1).hold_m == 1.0

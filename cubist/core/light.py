@@ -2,11 +2,13 @@
 
 They become ``KHR_lights_punctual`` point lights in the GLB, on a node that moves with their
 part. Flicker is for the engine (glTF can't animate it portably); previews draw a marker. An
-indoor light lights a room: the reach lint measures it from the floor under it.
+indoor light lights a room: the reach lint measures it from the floor under it. A hold
+(``hold_m``) is for the engine too: past that many metres the light stops falling off.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from cubist.core.errors import ModelError
@@ -24,9 +26,10 @@ class Light:
     flicker: float = 0.0  # 0 steady .. 1 wild
     part: str | None = None
     indoor: bool = False  # lights a room: the lint measures it from the floor under it
+    hold_m: float | None = None  # metres past which the engine holds its level; None: no hold
 
     def to_summary(self) -> dict:
-        return {
+        summary = {
             "position": list(self.position),
             "color": self.color,
             "rgb": list(self.rgb),
@@ -36,6 +39,9 @@ class Light:
             "part": self.part,
             "indoor": self.indoor,
         }
+        if self.hold_m is not None:
+            summary["hold_m"] = self.hold_m
+        return summary
 
     @classmethod
     def from_summary(cls, d: dict) -> Light:
@@ -48,6 +54,7 @@ class Light:
             float(d["flicker"]),
             d.get("part"),
             bool(d.get("indoor", False)),
+            None if d.get("hold_m") is None else float(d["hold_m"]),
         )
 
 
@@ -58,13 +65,23 @@ def _positive(value, what: str) -> float:
 
 
 def light(
-    position, color, range=8, intensity=1.0, flicker=0.0, part: str | None = None, indoor=False
+    position,
+    color,
+    range=8,
+    intensity=1.0,
+    flicker=0.0,
+    part: str | None = None,
+    indoor=False,
+    hold_m=None,
 ) -> Light:
     """A point light at ``position`` in palette ``color`` (e.g. ``p.fire.light``), reaching
     ``range`` voxels, moving with ``part`` (default: the part with the nearest voxel).
     ``flicker`` from 0 (steady) to 1 tells the engine how much it wavers. ``indoor`` marks a
     light that lights a room (a hearth's on an upper floor): the reach lint measures its height
-    from the floor straight under it, not from the ground line. Only the lint reads it."""
+    from the floor straight under it, not from the ground line. Only the lint reads it.
+    ``hold_m`` (metres, or None) tells the engine to stop the light falling off past that
+    distance: it holds its level out to where its range fades it, as a room's walls would
+    pass its light on. Walls still shadow it. In the manifest only when set."""
     try:
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
@@ -77,6 +94,16 @@ def light(
         raise ModelError(f"light flicker must be between 0 and 1, got {flicker!r}")
     if not isinstance(indoor, bool):
         raise ModelError(f"light indoor must be True or False, got {indoor!r}")
+    if hold_m is not None and (
+        isinstance(hold_m, bool)
+        or not isinstance(hold_m, (int, float))
+        or not math.isfinite(hold_m)
+        or hold_m <= 0
+    ):
+        raise ModelError(
+            f"light hold_m must be a number of metres > 0, or None for a light that falls off "
+            f"all the way, got {hold_m!r}"
+        )
     return Light(
         pos,  # type: ignore[arg-type]
         int(color.index),
@@ -86,4 +113,5 @@ def light(
         float(flicker),
         part,
         indoor,
+        None if hold_m is None else float(hold_m),
     )

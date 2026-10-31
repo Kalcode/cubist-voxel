@@ -142,7 +142,8 @@
         "rgb": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
         "range": {"type": "number", "exclusiveMinimum": 0},
         "intensity": {"type": "number", "exclusiveMinimum": 0},
-        "flicker": {"type": "number", "minimum": 0, "maximum": 1}
+        "flicker": {"type": "number", "minimum": 0, "maximum": 1},
+        "hold_m": {"type": "number", "exclusiveMinimum": 0}
       }
     },
     "track": {

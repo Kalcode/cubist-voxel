@@ -113,7 +113,10 @@ An engine can drive joints directly, such as a door the player pushes, using the
   list, wrapping around. Not in the `.glb`: with a 256×1 palette texture an engine can rotate
   those texels.
 - **`lights`**: point lights in asset space; `range` in voxels; `flicker` 0..1 for the engine.
-  The `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`.
+  The `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`. A light may
+  also have `hold_m` (metres, > 0; only when the script sets it): past that distance the engine
+  holds its level out to where its range fades it, instead of letting it keep falling off. Walls
+  still shadow it. Not in the `.glb`.
 
 ## Emitters and particles
 
