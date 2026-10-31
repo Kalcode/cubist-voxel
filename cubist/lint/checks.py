@@ -322,8 +322,9 @@ def check_light_reach(asset: BuiltAsset, style: StyleBible, merged: VoxelGrid) -
     the floor as far out as it is high (range >= sqrt(2) * height). The floor is the ground line
     (``ground_y``, the street a building's cellar is under), or for a light below it, the
     asset's own floor. An indoor light (``light(..., indoor=True)``) lights a room: its floor is
-    the top of the first voxel of ``merged`` straight under it, grounded asset or not. One with
-    nothing under it is measured as an outdoor light, with a warning of its own."""
+    the one ``_floor_under`` finds straight under it in ``merged`` (past its own fixture and the
+    air below), grounded asset or not. One with nothing under it is measured as an outdoor light,
+    with a warning of its own."""
     m = style.voxel_size_m
     shortest = math.ceil(MIN_LIGHT_RANGE_M / m)
     out = []
