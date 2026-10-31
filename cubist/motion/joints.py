@@ -7,6 +7,7 @@ parent's frame, and the rest pose (as modeled) is joint value 0.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -29,6 +30,8 @@ def parse_axis(value) -> Vec3:
             out[_NAMED[name]] = sign
             return tuple(out)  # type: ignore[return-value]
     else:
+        if not finite_vector(value):
+            raise ModelError(f"joint axis must be finite, like 'x' or (0, 1, 0), got {value!r}")
         try:
             v = np.asarray(value, dtype=np.float64)
         except (TypeError, ValueError):
@@ -46,7 +49,7 @@ def parse_axis(value) -> Vec3:
 def finite_vector(value) -> bool:
     """False only for a vector given with a NaN or infinite component. Names ('+z') and values
     ``parse_axis`` rejects anyway pass, so they keep its message. Sockets and emitters check
-    their directions with it before parsing them."""
+    their directions with it before parsing them, to name the direction in their message."""
     if isinstance(value, str):
         return True
     try:
@@ -57,9 +60,12 @@ def finite_vector(value) -> bool:
 
 def _number(value, what: str) -> float:
     try:
-        return float(value)
+        out = float(value)
     except (TypeError, ValueError):
         raise ModelError(f"{what} must be a number, got {value!r}") from None
+    if not math.isfinite(out):
+        raise ModelError(f"{what} must be a finite number, got {value!r}")
+    return out
 
 
 @dataclass(frozen=True)

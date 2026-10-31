@@ -886,6 +886,19 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
     checks (`nan <= 0` is false), and the export's `json.dumps` wrote `NaN` or `Infinity` into the
     manifest, which an engine's JSON reader rejects far from the cause. A direction is checked before
     it is parsed (`finite_vector`), so a bad one says so instead of warning from numpy.
+  - The rest of the asset DSL refuses them too:
+    - joints: `hinge`, `slide` and `spin` axes (`parse_axis`), `hinge` limits (a hinge is never
+      open: one that turns without limits is a `spin`), `slide` distance, `spin` rps;
+    - every primitive's numbers: sizes, radii and depths (`_positive`), `cone` `r_top`, `capsule`
+      `r_end`, and the points of `capsule`, `line`, `polyline`, `panel`, `lathe`, `extrude` and
+      `heightmap` (`check_finite`, in `cubist/dsl/shape.py`);
+    - the transforms: `.at()` (and `translate`), `rotate`, `scale`, `reflect`, `mirror`, `array`,
+      `radial`, and `Part.mirrored()`'s plane;
+    - a `Part`'s pivot, and `asset(size=)`, which must also be above 0 now (`ground_y` was already
+      a whole number of voxels).
+  - Not yet: the shape modifiers (`smooth_union`, `taper`, `round`, `hollow`, `erode`, `dilate`,
+    `displace` and the paint ops' numbers) and the world DSL (`docs/worlds.md`), whose functions
+    from `flat` to `scatter`, and `Field` arithmetic, take NaN with no check at all.
 
 ### v1 acceptance targets
 

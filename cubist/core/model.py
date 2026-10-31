@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import numbers
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
@@ -416,6 +417,13 @@ def check_street_sides(sides, name: str) -> tuple[str, ...] | None:
     return tuple(v for v in STREET_SIDES if v in sides)
 
 
+def _finite_positive(values) -> bool:
+    try:
+        return all(math.isfinite(float(v)) and float(v) > 0 for v in values)
+    except (TypeError, ValueError):
+        return True  # not numbers: left to the checks that read it
+
+
 class AssetDef:
     """An asset script function plus its metadata, produced by ``@asset``."""
 
@@ -432,6 +440,10 @@ class AssetDef:
         street_sides: Sequence[str] | None = None,
     ):
         check_symmetric(symmetric, "symmetric")
+        if size is not None and not _finite_positive(size):
+            raise ModelError(
+                f"asset {name!r}: size must be three finite numbers > 0 (voxels), got {size!r}"
+            )
         if isinstance(ground_y, bool) or not isinstance(ground_y, numbers.Integral) or ground_y < 0:
             raise ModelError(
                 f"asset {name!r}: ground_y must be a whole number of voxels, 0 or more, "

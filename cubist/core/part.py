@@ -5,6 +5,7 @@ between the camera and the player, or let their follow camera pass through them.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 
 from cubist.core.errors import ModelError
@@ -51,6 +52,16 @@ class Part:
             )
         if self.frames is not None and not isinstance(self.frames, (list, tuple)):
             object.__setattr__(self, "frames", tuple(self.frames))  # generators too
+        if self.pivot is not None:
+            try:
+                finite = all(math.isfinite(float(v)) for v in self.pivot)
+            except (TypeError, ValueError):
+                finite = True  # not numbers: left to the build, which reads it as (x, y, z)
+            if not finite:
+                raise ModelError(
+                    f"part {self.name!r}: pivot must be finite numbers (x, y, z), "
+                    f"got {self.pivot!r}"
+                )
 
     def mirrored(
         self,
@@ -68,6 +79,8 @@ class Part:
         if len(given) != 1:
             raise ShapeError("mirrored() takes exactly one of about_x, about_y, about_z")
         axis, about = given[0]
+        if not math.isfinite(about):
+            raise ShapeError(f"mirrored() about_{axis} must be a finite number, got {about!r}")
         i = "xyz".index(axis)
         pivot = None
         if self.pivot is not None:

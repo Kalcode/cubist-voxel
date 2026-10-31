@@ -38,6 +38,19 @@ class ShapeError(ValueError):
     """A shape cannot be built as written."""
 
 
+def check_finite(what: str, *values) -> None:
+    """Refuse NaN and infinity in ``values`` (numbers or nested sequences of them) with a
+    ShapeError naming ``what``. Values that aren't numbers at all are left to the caller's own
+    checks, which say what shape they should have."""
+    for value in values:
+        try:
+            a = np.asarray(value, dtype=np.float64)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(a).all():
+            raise ShapeError(f"{what} must be finite numbers, got {value!r}")
+
+
 _PACKAGE_DIR = str(Path(__file__).resolve().parent.parent)
 # While sampling a cutter (the right side of - or &), only occupancy matters.
 _occupancy_only: ContextVar[bool] = ContextVar("cubist_occupancy_only", default=False)
@@ -172,6 +185,7 @@ class Shape:
         so ``box(...).at(x, y, z)`` puts the box's min corner at (x, y, z)."""
         from cubist.dsl.ops import transformed, translation
 
+        check_finite("at(x, y, z)", (x, y, z))
         return transformed(self, translation((x, y, z)))
 
     translate = at
@@ -180,18 +194,25 @@ class Shape:
         """Rotate by any angle (right-hand rule) about ``about``, default the bounds center."""
         from cubist.dsl.ops import rotation, transformed
 
+        check_finite("rotate degrees", degrees)
+        if not isinstance(axis, str):
+            check_finite("rotate axis", axis)
+        check_finite("rotate about", about if about is not None else 0.0)
         return transformed(self, rotation(degrees, axis, self._pivot(about)))
 
     def scale(self, factor: float | Vec3, about: Vec3 | None = None) -> Shape:
         """Scale about ``about``, default the bounds center."""
         from cubist.dsl.ops import scaling, transformed
 
+        check_finite("scale factor", factor)
+        check_finite("scale about", about if about is not None else 0.0)
         return transformed(self, scaling(factor, self._pivot(about)))
 
     def reflect(self, axis: str, about: float | None = None) -> Shape:
         """Replace the shape with its reflection across the plane ``axis = about``."""
         from cubist.dsl.ops import reflection, transformed
 
+        check_finite("reflect about", about if about is not None else 0.0)
         return transformed(self, reflection(axis, self._plane(axis, about)))
 
     def mirror(self, axis: str, about: float | None = None) -> Shape:
@@ -201,12 +222,14 @@ class Shape:
         """
         from cubist.dsl.ops import Mirror
 
+        check_finite("mirror about", about if about is not None else 0.0)
         return Mirror(self, axis, self._plane(axis, about))
 
     def array(self, n: int, step: Vec3) -> Shape:
         """``n`` copies, each moved ``step`` further than the last."""
         if n < 1:
             raise ShapeError(f"array needs n >= 1, got {n}")
+        check_finite("array step", step)
         s = np.asarray(step, dtype=np.float64)
         return self.union(*(self.at(*(s * k)) for k in range(1, n)))
 
@@ -214,6 +237,7 @@ class Shape:
         """``n`` copies spaced evenly around ``axis`` through ``about``."""
         if n < 1:
             raise ShapeError(f"radial needs n >= 1, got {n}")
+        check_finite("radial about", about)
         return self.union(*(self.rotate(360.0 * k / n, axis, about) for k in range(1, n)))
 
     def _pivot(self, about: Vec3 | None) -> np.ndarray:

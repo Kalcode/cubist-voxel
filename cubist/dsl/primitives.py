@@ -14,12 +14,14 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from cubist.core.palette import Color
 from cubist.dsl import sdf
 from cubist.dsl.ops import axis_index
-from cubist.dsl.shape import Shape, ShapeError, Vec3
+from cubist.dsl.shape import Shape, ShapeError, Vec3, check_finite
 
 
 def color_index(color: Color | None) -> int:
@@ -31,8 +33,9 @@ def color_index(color: Color | None) -> int:
 
 
 def _positive(name: str, *values: float) -> None:
-    if any(v <= 0 for v in values):
-        raise ShapeError(f"{name} must be > 0, got {values if len(values) > 1 else values[0]}")
+    if any(not math.isfinite(v) or v <= 0 for v in values):
+        got = values if len(values) > 1 else values[0]
+        raise ShapeError(f"{name} must be finite numbers > 0, got {got}")
 
 
 class Primitive(Shape):
@@ -106,8 +109,8 @@ class Cylinder(_Axial):
 class Cone(_Axial):
     def __init__(self, r: float, h: float, axis: str, r_top: float, color: Color | None):
         super().__init__(r, h, axis, color)
-        if r_top < 0:
-            raise ShapeError(f"r_top must be >= 0, got {r_top}")
+        if not math.isfinite(r_top) or r_top < 0:
+            raise ShapeError(f"r_top must be a finite number >= 0, got {r_top}")
         self.r_top = float(r_top)
 
     def _distance(self, p):
@@ -129,12 +132,13 @@ class Capsule(Primitive):
     ):
         super().__init__(color)
         _positive("capsule r", r)
+        check_finite("capsule p0 and p1", p0, p1)
         self.p0 = np.asarray(p0, dtype=np.float64)
         self.p1 = np.asarray(p1, dtype=np.float64)
         self.r = float(r)
         self.r_end = self.r if r_end is None else float(r_end)
-        if self.r_end < 0:
-            raise ShapeError(f"capsule r_end must be >= 0, got {r_end}")
+        if not math.isfinite(self.r_end) or self.r_end < 0:
+            raise ShapeError(f"capsule r_end must be a finite number >= 0, got {r_end}")
 
     def _distance(self, p):
         if self.r_end == self.r or np.allclose(self.p0, self.p1):
@@ -219,6 +223,7 @@ class Line(Primitive):
     def __init__(self, p0: Vec3, p1: Vec3, r: float, color: Color | None):
         super().__init__(color)
         _positive("line r", r)
+        check_finite("line p0 and p1", p0, p1)
         self.p0 = np.asarray(p0, dtype=np.float64)
         self.p1 = np.asarray(p1, dtype=np.float64)
         self.r = float(r)
@@ -236,6 +241,7 @@ class Lathe(Primitive):
         pts = np.asarray(profile, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 2 or len(pts) < 2:
             raise ShapeError("lathe profile needs at least two (height, radius) points")
+        check_finite("lathe profile", profile)
         if np.any(np.diff(pts[:, 0]) < 0) or pts[-1, 0] <= pts[0, 0]:
             raise ShapeError("lathe profile heights must increase from first to last point")
         if np.any(pts[:, 1] < 0):
@@ -268,6 +274,7 @@ class Extrude(Primitive):
         verts = np.asarray(polygon, dtype=np.float64)
         if verts.ndim != 2 or verts.shape[1] != 2 or len(verts) < 3:
             raise ShapeError("extrude needs a polygon of at least three (u, v) points")
+        check_finite("extrude polygon", polygon)
         _positive("extrude depth", depth)
         if axis not in _EXTRUDE_PLANES:
             raise ShapeError(f"extrude axis must be x, y or z, got {axis!r}")
@@ -295,6 +302,7 @@ class Panel(Primitive):
         pts = np.asarray(points, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 3:
             raise ShapeError("panel needs at least three (x, y, z) points")
+        check_finite("panel points", points)
         u = pts[1] - pts[0]
         normal = None
         for q in pts[2:]:

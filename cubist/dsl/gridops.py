@@ -10,7 +10,7 @@ from scipy import ndimage
 
 from cubist.core.grid import VoxelGrid
 from cubist.dsl.context import active
-from cubist.dsl.shape import Shape, ShapeError, _occupancy_only
+from cubist.dsl.shape import Shape, ShapeError, _occupancy_only, check_finite
 
 AXIS_DIRS = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
 
@@ -179,6 +179,7 @@ class Heightmap(GridShape):
         h = np.asarray(heights, dtype=np.float64)
         if h.ndim != 2:
             raise ShapeError(f"heightmap needs a 2D array indexed [x][z], got {h.ndim}D")
+        check_finite("heightmap heights", h)
         if np.any(h < 0):
             raise ShapeError("heightmap heights must be >= 0")
         self.heights = np.rint(h).astype(np.int64)
@@ -240,6 +241,7 @@ class VoxelPath(GridShape):
         pts = np.asarray(points, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 2:
             raise ShapeError("a line needs at least two (x, y, z) points")
+        check_finite("line points", points)
         if connect not in (6, 26):
             raise ShapeError(f"connect must be 6 or 26, got {connect}")
         self.points, self.connect = pts, connect
