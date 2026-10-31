@@ -100,3 +100,19 @@ def test_manifest_carries_socket_orientation():
         "forward": None,
         "up": None,
     }
+
+
+def test_socket_numbers_must_be_finite():
+    # NaN or infinity would reach the manifest as NaN or Infinity, which an engine's JSON reader
+    # rejects far from the cause: refuse them here, in either form of socket.
+    nan, inf = float("nan"), float("inf")
+    for bad in (nan, inf, -inf):
+        with pytest.raises(ModelError, match="position"):
+            socket((0, bad, 0))
+        with pytest.raises(ModelError, match="position"):
+            built({"grip": (1, bad, 1)})
+        with pytest.raises(ModelError, match="forward"):
+            socket((0, 0, 0), forward=(0, 0, bad))
+        with pytest.raises(ModelError, match="up"):
+            socket((0, 0, 0), forward="+z", up=(bad, 1, 0))
+    assert built({"grip": (1, 1, 1)}).sockets["grip"].position == (1.0, 1.0, 1.0)

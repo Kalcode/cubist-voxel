@@ -43,6 +43,18 @@ def parse_axis(value) -> Vec3:
     )
 
 
+def finite_vector(value) -> bool:
+    """False only for a vector given with a NaN or infinite component. Names ('+z') and values
+    ``parse_axis`` rejects anyway pass, so they keep its message. Sockets and emitters check
+    their directions with it before parsing them."""
+    if isinstance(value, str):
+        return True
+    try:
+        return bool(np.isfinite(np.asarray(value, dtype=np.float64)).all())
+    except (TypeError, ValueError):
+        return True
+
+
 def _number(value, what: str) -> float:
     try:
         return float(value)

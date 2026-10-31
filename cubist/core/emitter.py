@@ -8,11 +8,12 @@ particle system plays it for real from the manifest.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
 from cubist.core.errors import ModelError
-from cubist.motion.joints import parse_axis
+from cubist.motion.joints import finite_vector, parse_axis
 
 Vec3 = tuple[float, float, float]
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -71,8 +72,8 @@ class Emitter:
 
 
 def _number(value, what: str, positive: bool = False) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ModelError(f"emitter {what} must be a number, got {value!r}")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ModelError(f"emitter {what} must be a finite number, got {value!r}")
     if positive and value <= 0:
         raise ModelError(f"emitter {what} must be > 0, got {value!r}")
     return float(value)
@@ -99,8 +100,8 @@ def emitter(
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
         pos = ()
-    if len(pos) != 3:
-        raise ModelError(f"emitter position must be (x, y, z), got {position!r}")
+    if len(pos) != 3 or not all(math.isfinite(v) for v in pos):
+        raise ModelError(f"emitter position must be (x, y, z), finite numbers, got {position!r}")
     if not isinstance(particle, str) or not _NAME.match(particle):
         raise ModelError(
             f"emitter particle must be an asset name (lowercase letters, digits, _ and -), got "
@@ -117,6 +118,14 @@ def emitter(
     spread = _number(spread, "spread")
     if not 0 <= spread <= 180:
         raise ModelError(f"emitter spread must be 0 to 180 degrees, got {spread!r}")
+    if not finite_vector(direction):
+        raise ModelError(
+            f"emitter direction must be finite, like '+y' or (0, 1, 0), got {direction!r}"
+        )
+    try:
+        seed = int(seed)
+    except (TypeError, ValueError, OverflowError):
+        raise ModelError(f"emitter seed must be a whole number, got {seed!r}") from None
     return Emitter(
         pos,  # type: ignore[arg-type]
         particle,
@@ -129,6 +138,6 @@ def emitter(
         _number(gravity, "gravity"),
         (g0, g1),
         bool(fade),
-        int(seed),
+        seed,
         part,
     )

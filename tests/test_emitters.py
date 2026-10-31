@@ -188,3 +188,26 @@ def test_build_uses_built_particles_and_warns_when_missing(project):
     build_script(project / "assets" / "puff.py")
     [r] = build_script(project / "assets" / "chimney.py")
     assert "emitter_particle" not in r.summary["lint"]["summary"]
+
+
+def test_emitter_numbers_must_be_finite():
+    # NaN passes "<= 0" and json.dumps would write NaN or Infinity into the manifest, which an
+    # engine's JSON reader rejects far from the cause: refuse them here.
+    def make(**kw):
+        args = {"rate": 4, **kw}
+        return emitter(args.pop("position", (0, 0, 0)), "puff", **args)
+
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        for key in ("rate", "life", "speed", "spread", "gravity"):
+            with pytest.raises(ModelError, match=key):
+                make(**{key: bad})
+        with pytest.raises(ModelError, match="grow"):
+            make(grow=(1, bad))
+        with pytest.raises(ModelError, match="position"):
+            make(position=(0, bad, 0))
+        with pytest.raises(ModelError, match="direction"):
+            make(direction=(0, bad, 0))
+        with pytest.raises(ModelError, match="seed"):
+            make(seed=bad)
+    e = make(speed=-1, gravity=-3, seed=7)
+    assert (e.speed, e.gravity, e.seed) == (-1.0, -3.0, 7)

@@ -7,12 +7,13 @@ GLB an oriented socket's local +Z points forward and +Y up.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
 
 from cubist.core.errors import ModelError
-from cubist.motion.joints import parse_axis
+from cubist.motion.joints import finite_vector, parse_axis
 
 Vec3 = tuple[float, float, float]
 
@@ -55,6 +56,10 @@ class Socket:
             except (TypeError, ValueError):
                 pos = None
             if pos is not None:
+                if not all(math.isfinite(v) for v in pos):
+                    raise ModelError(
+                        f"socket {name!r} position must be finite numbers, got {value[:3]!r}"
+                    )
                 return cls(pos, value[3] if len(value) == 4 else None)  # type: ignore[arg-type]
         raise ModelError(
             f"socket {name!r} must be (x, y, z), (x, y, z, part) or socket(...), got {value!r}"
@@ -73,10 +78,13 @@ def socket(position, part: str | None = None, forward=None, up="+y") -> Socket:
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
         pos = ()
-    if len(pos) != 3:
-        raise ModelError(f"socket position must be (x, y, z), got {position!r}")
+    if len(pos) != 3 or not all(math.isfinite(v) for v in pos):
+        raise ModelError(f"socket position must be (x, y, z), finite numbers, got {position!r}")
     if forward is None:
         return Socket(pos, part)  # type: ignore[arg-type]
+    for what, given in (("forward", forward), ("up", up)):
+        if not finite_vector(given):
+            raise ModelError(f"socket {what} must be finite, like '+z' or (0, 0, 1), got {given!r}")
     f = np.array(parse_axis(forward))
     u = np.array(parse_axis(up))
     u = u - (u @ f) * f

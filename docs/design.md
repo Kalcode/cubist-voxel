@@ -880,9 +880,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   still shadow a held light. The manifest's light has `"hold_m"` only when it is set, so every manifest
   before is byte-for-byte the same and the version stays 1; `build.json` carries it the same way. A
   hold that isn't a finite number above 0 is an error naming `hold_m`. The `.glb` has none.
-  - `light()` now refuses a `range`, `intensity` or `position` that isn't finite as well. NaN passed
-    their checks (`nan <= 0` is false), and the export's `json.dumps` wrote `NaN` or `Infinity` into
-    the manifest, which an engine's JSON reader rejects far from the cause.
+  - `light()` now refuses a `range`, `intensity` or `position` that isn't finite as well, and so do
+    `socket()` (its position in either form, `forward` and `up`) and `emitter()` (its position,
+    `direction`, `rate`, `life`, `speed`, `spread`, `gravity`, `grow` and `seed`). NaN passed their
+    checks (`nan <= 0` is false), and the export's `json.dumps` wrote `NaN` or `Infinity` into the
+    manifest, which an engine's JSON reader rejects far from the cause. A direction is checked before
+    it is parsed (`finite_vector`), so a bad one says so instead of warning from numpy.
 
 ### v1 acceptance targets
 
