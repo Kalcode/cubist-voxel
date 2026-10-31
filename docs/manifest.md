@@ -44,7 +44,7 @@ can read it before exporting.
 | `parts` | Parts, parents before children |
 | `sockets` | Named attachment points |
 | `tags` | The asset's tags, in declared order (`[]` for none): what the asset is, e.g. `building` |
-| `ramps` | Each list ramp the asset uses (palette order) with every shade's `.vox` index, dark to light; table ramps and single colors are left out |
+| `ramps` | Each list ramp the asset uses (palette order) with every shade's `.vox` index, dark to light; table ramps and single colors are left out. A color two ramps share has one index and is listed in both; Kiln gives it the first |
 | `clips` | Named motion |
 | `files` | The files written alongside, e.g. `{"glb": "chest.glb", "vox": "chest.vox"}` |
 
