@@ -130,10 +130,14 @@ Kiln stamps the exported assets (`export/<asset>.vox` and its manifest), so movi
 terrain. Export an asset before baking a world that uses it (`cubist export out/<asset>`).
 
 - `place(asset, at, rotate_y=0, name=None, sink_m=0, below_ground_m=None, carve=False)`: `at` is `(x, z)`
-  to stand it on the ground (the highest point under its footprint) or `(x, y, z)` for its base;
-  `below_ground_m` puts its base that far under the ground (a torch on a cavern floor). `name` is how game
-  code finds it. `carve` digs it into the rock: Kiln empties the world wherever the asset's box is empty, so
-  a crypt or a room placed underground is hollow (vale's crypt, joined to its cavern by a `tunnel`).
+  to stand it on the ground (the highest point under its footprint) or `(x, y, z)` for the height of its
+  `glb_origin`: its ground line (`ground_y`), or its base for an asset without one, so a cellared house's y
+  is the street's. `below_ground_m` puts that point that far under the ground (a torch on a cavern floor).
+  `name` is how game code finds it. `carve` digs it into the rock: Kiln empties the world where the asset is
+  empty inside its footprint, the x–z bounds of its voxels below its ground line over its box's height (its
+  whole box when none is below the line, as for a crypt). So a crypt or a room placed underground is hollow
+  (vale's crypt, joined to its cavern by a `tunnel`), and the street under a house's overhang stays (Kiln's
+  `docs/engine/formats.md`, "Prefabs").
   **Cellars:** an asset with `@asset(..., ground_y=48)` has its `glb_origin` at y = 48, and a placement puts
   that row on the ground, so `place(house, at=(x, z), carve=True)` stands its upper floors in the air and
   digs its cellar (the 48 rows below) into the ground. Region renders draw it the same way.

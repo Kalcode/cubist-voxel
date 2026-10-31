@@ -63,10 +63,14 @@ def place(
 ) -> Place:
     """One ``asset`` (a built, exported asset's name) at ``at``.
 
-    (x, z) metres stands it on the ground (its footprint's highest point); (x, y, z) puts its base
-    at that height. ``sink_m`` lowers it. ``below_ground_m`` puts its base that far under the
-    ground at (x, z) instead: on a cave floor, say. ``carve`` digs it into the rock: Kiln empties
-    the world wherever the asset's box is empty (a crypt or a room underground).
+    (x, z) metres stands it on the ground (its footprint's highest point); (x, y, z) puts its
+    ``glb_origin`` at that height: its ground line (``ground_y``), or its base for an asset
+    without one, so a cellared house's y is the street's. ``sink_m`` lowers it.
+    ``below_ground_m`` puts that point that far under the ground at (x, z) instead: on a cave
+    floor, say. ``carve`` digs it into the rock: Kiln empties the world where the asset is empty
+    inside its footprint, the x-z bounds of its voxels below its ground line over its box's
+    height, or its whole box when none is below the line (a crypt or a room underground). The
+    street under a house's overhang stays (Kiln's ``docs/engine/formats.md``, "Prefabs").
     """
     if len(at) not in (2, 3):
         raise WorldError(f"place {asset}: at is (x, z) or (x, y, z) metres, got {at!r}")
@@ -106,7 +110,8 @@ def scatter(
 
 @dataclass
 class Placement:
-    """One prop as the engine stamps it: the asset file, its base point (voxels) and turn."""
+    """One prop as the engine stamps it: the asset file, its glb_origin's point (voxels: the
+    ground line, or the base without one) and turn."""
 
     asset: str
     at: tuple[float, float, float]

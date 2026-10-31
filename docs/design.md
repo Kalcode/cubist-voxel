@@ -127,6 +127,11 @@ convention, is [dsl.md](dsl.md).** This section records the design decisions beh
   crates). Kiln added `clutter` (Oct 28) after a play report: small objects mustn't squeeze the
   camera, since its see-through cutout and x-ray ghost already show the character. A part
   without a tag takes its nearest tagged ancestor's; the manifest writes the resolved tag.
+  Kiln hides a building by storeys: each `upper` and `roof` part's lowest voxel is a hide line,
+  and the storey lint keeps those on storey boundaries. A `canopy` part isn't a storey, so in a
+  building (an awning on a shopfront) it makes no line and hides with the storey it falls in;
+  only a prop with no `upper` or `roof` part (a tree) takes its lines from its `canopy` parts. So
+  the storey lint needn't check `canopy` (Kiln's `docs/engine/formats.md`, "Hide lines").
 - **Errors point at the script**: every shape records the script line that created it, so a
   lazily evaluated failure (a primitive with no color, a shape too large to sample) names the
   primitive, its line, and the part it belongs to.
@@ -301,10 +306,10 @@ game's character, Kiln's goblin (`Goblin.cs`: `MoveAxis`, `HalfWidth` 4, `Height
   out from) and its distance, and saying to check the stair or doorway between them; an error
   when there's no street near `door` to start from. With no `door` or `floor_0` there's nothing to
   walk, and lint warns: older buildings that no one enters still export.
-- **The tour's legs:** Kiln's walk will arrive within 2 voxels (x-z) of a stop and steer straight
-  for the next (`ARRIVE`; today it arrives within 12 and cuts corners, and it changes with the town's
-  first street, Kiln's `docs/city.md` §8 step 4). So from `door` to `tour_01` and from each
-  `tour_NN` to the next (name order), from the stop and from 8 points 2 voxels round it, turned to
+- **The tour's legs:** Kiln's walk arrives within 2 voxels (x-z) of a stop and steers straight
+  for the next (`ARRIVE`; Kiln's `WalkSteering.SocketReachRadius`, since the town's first street,
+  Kiln's `docs/city.md` §8 step 4). So from `door` to `tour_01` and from each `tour_NN` to the
+  next (name order), from the stop and from 8 points 2 voxels round it, turned to
   the leg so the two square to it are among them (the walker may have arrived anywhere within 2:
   these are the furthest off any line it may take), the walker must get within 2 of the next stop
   over the moves the walk kept, keeping its footprint's centre within a voxel of its straight line
@@ -820,16 +825,16 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   the ground line, as the scale lint does since 13a: a townhouse's door lamp 40 voxels above the street
   needs a range of 57, where measuring from the cellar's floor asked 125 of it. A light below the line,
   in the cellar, is measured from the asset's floor.
-- **13f. Tour legs (Oct 30).** The walk lint walks a building's tour in straight legs, as Kiln's walk
-  will once it arrives within 2 voxels of each stop (it arrives within 12 today and cuts corners;
-  Kiln makes the change with the town's first street): from anywhere within 2 of a stop, the walker
-  must follow the straight line to within 2 of the next (its footprint's centre within a voxel of
-  it, its feet between the stops' heights) over the moves the flood kept. A leg that turns, runs
-  through a wall or has no room either side errors: a doorway just past a stop must be 12 wide where
-  a walk from the stop itself needs 10 (pinned by a test). A stop the walker can't stand all round,
-  2 out, errors too, saying how far to move it: 4.5 off a wall it must move 2. Short legs are
-  walked. The test fixture's tour gained corner stops; the 160 × 368 × 192 case still lints in
-  under 5 s.
+- **13f. Tour legs (Oct 30).** The walk lint walks a building's tour in straight legs, as Kiln's
+  walk will once it arrives within 2 voxels of each stop (it arrived within 12 then and cut corners;
+  Kiln made the change with the town's first street, since shipped): from anywhere within 2 of a
+  stop, the walker must follow the straight line to within 2 of the next (its footprint's centre
+  within a voxel of it, its feet between the stops' heights) over the moves the flood kept. A leg
+  that turns, runs through a wall or has no room either side errors: a doorway just past a stop must
+  be 12 wide where a walk from the stop itself needs 10 (pinned by a test). A stop the walker can't
+  stand all round, 2 out, errors too, saying how far to move it: 4.5 off a wall it must move 2.
+  Short legs are walked. The test fixture's tour gained corner stops; the 160 × 368 × 192 case still
+  lints in under 5 s.
 - **13g. One asset of a family (Oct 30).** `cubist build --only NAME` (repeatable; the MCP
   `build_asset` tool's `only`) builds just the named assets of a script that defines several, so
   one variant of a family rebuilds alone, under its own timeout, and only its iteration counts.
