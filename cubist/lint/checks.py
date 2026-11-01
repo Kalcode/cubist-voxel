@@ -372,30 +372,47 @@ def check_light_reach(asset: BuiltAsset, style: StyleBible, merged: VoxelGrid) -
 
 
 def check_light_fitting(asset: BuiltAsset, merged: VoxelGrid) -> list[Finding]:
-    """A light's fitting (``light(..., fitting=shape)``) should hold a glowing voxel: the engine
-    glows the glowing voxels in its bounds with the light, so one with none does nothing."""
+    """A light's fitting (``light(..., fitting=shape)``) should hold a glowing voxel of its own:
+    the engine glows the glowing voxels in its bounds with the light, the first light in the
+    manifest taking a voxel two fittings hold, so one whose glowing voxels are none, or all in an
+    earlier light's fitting, does nothing."""
     out = []
-    glowing = np.array(sorted(asset.glow), dtype=np.int64)
+    glowing = np.isin(merged.data, np.array(sorted(asset.glow), dtype=np.int64))
+    taken = np.zeros(merged.shape, dtype=bool)
+    owner = np.full(merged.shape, -1, dtype=np.int64)
     origin = np.array(merged.origin)
-    for name, lt in asset.lights.items():
+    names = list(asset.lights)
+    for k, (name, lt) in enumerate(asset.lights.items()):
         if lt.fitting is None:
             continue
         lo = np.maximum(np.array(lt.fitting[0]) - origin, 0)
-        hi = np.minimum(np.array(lt.fitting[1]) - origin, merged.shape)
-        inside = merged.data[lo[0] : hi[0], lo[1] : hi[1], lo[2] : hi[2]]
-        if np.all(hi > lo) and np.isin(inside, glowing).any():
+        hi = np.maximum(np.minimum(np.array(lt.fitting[1]) - origin, merged.shape), lo)
+        box = tuple(slice(a, b) for a, b in zip(lo, hi, strict=True))
+        mine = glowing[box] & ~taken[box]
+        first = owner[box][glowing[box] & taken[box]]
+        taken[box] = True
+        owner[box] = np.where(owner[box] < 0, k, owner[box])
+        if mine.any():
             continue
         lo_, hi_ = list(lt.fitting[0]), list(lt.fitting[1])
-        out.append(
-            Finding(
-                "light_fitting",
-                "warning",
-                f"light {name!r}'s fitting, voxels {tuple(lo_)} to {tuple(hi_)}, holds no glowing "
-                "voxel, so nothing glows with the light; pass the shape of its glowing glass or "
-                "embers as fitting=, or leave fitting out",
-                {"light": name, "min": lo_, "max": hi_},
-            )
+        where = (
+            f"the fitting of light {name!r}, voxels {tuple(lo_)} up to {tuple(hi_)}, "
+            "not including it,"
         )
+        if first.size:
+            before = names[int(first.min())]
+            why = (
+                f"{where} holds only glowing voxels already in the fitting of light {before!r}, "
+                "which comes first, so the engine glows them with that light and nothing with this "
+                "one; give it its own glowing voxels, or leave fitting out"
+            )
+        else:
+            why = (
+                f"{where} holds no glowing voxel, so nothing glows with the light; pass the shape "
+                "of its glowing glass or embers as fitting=, or leave fitting out"
+            )
+        details = {"light": name, "min": lo_, "max": hi_}
+        out.append(Finding("light_fitting", "warning", why, details))
     return out
 
 

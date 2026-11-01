@@ -439,6 +439,12 @@ def test_a_light_reflects_with_its_fitting():
     for axis, about in (("w", 4), ("x", float("nan")), ("x", "4")):
         with pytest.raises(ModelError, match="reflect"):
             lamp.reflect(axis, about)
+    # On a half-voxel plane voxels land on voxels, as a shape's do; anywhere else a shape is
+    # resampled and a box can't follow it, so it is refused.
+    assert lamp.reflect("x", 4.5).fitting == ((7, 6, 0), (9, 9, 2))
+    for about in (4.25, 3.1):
+        with pytest.raises(ModelError, match="whole or half"):
+            lamp.reflect("x", about)
 
     # The asset reflected, glass and all, and its light with it: the fitting still holds the glass.
     def mirrored(p):
@@ -451,3 +457,37 @@ def test_a_light_reflects_with_its_fitting():
     a = asset(name="lantern", size=(8, 9, 2))(mirrored).build(P, glow=GLOW)
     assert a.lights["lamp"].fitting == ((6, 6, 0), (8, 9, 2))
     assert fitting_findings(a) == []
+    # And on a half-voxel plane.
+    half = asset(name="lantern", size=(9, 9, 2))(lambda p: mirror_about(p, 4.5)).build(P, glow=GLOW)
+    assert half.lights["lamp"].fitting == ((7, 6, 0), (9, 9, 2))
+    assert fitting_findings(half) == []
+
+
+def mirror_about(p, about):
+    glass = box((2, 3, 2), color=p.fire.light).at(0, 6, 0)
+    lamp = light((1, 7.5, 1), p.fire.light, range=40, fitting=glass)
+    shape = (box((2, 6, 2), color=p.wood.dark) | glass).reflect("x", about)
+    post = Part("post", shape, pivot=(2 * about - 1, 0, 1))
+    return Model([post], lights={"lamp": lamp.reflect("x", about)})
+
+
+def test_a_fitting_whose_glow_an_earlier_fitting_takes_warns():
+    # Where two fittings overlap the first light in the manifest takes the voxels (Kiln's
+    # formats.md), so a later light whose glowing voxels are all in an earlier one's fitting glows
+    # nothing of its own.
+    def two(p, second):
+        glass = box((2, 3, 2), color=p.fire.light).at(0, 6, 0)
+        post = box((2, 6, 2), color=p.wood.dark)
+        lights = {
+            "lamp": light((1, 7.5, 1), p.fire.light, range=40, fitting=glass),
+            "spare": light((1, 8.5, 1), p.fire.light, range=40, fitting=second),
+        }
+        return Model([Part("post", post | glass, pivot=(1, 0, 1))], lights=lights)
+
+    inside = box((1, 1, 1)).at(0, 8, 0)
+    shadowed = asset(name="lantern", size=(2, 9, 2))(lambda p: two(p, inside)).build(P, glow=GLOW)
+    [f] = fitting_findings(shadowed)
+    assert f.details["light"] == "spare" and "'lamp'" in f.message and "comes first" in f.message
+    # Its message names the box with its end left out.
+    [g] = fitting_findings(lantern("post"))
+    assert "(0, 0, 0) up to (2, 6, 2), not including it" in g.message and "''" not in g.message

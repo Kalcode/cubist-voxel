@@ -52,22 +52,28 @@ class Light:
 
     def reflect(self, axis: str, about: float) -> Light:
         """The light reflected across the plane ``axis = about``, as ``Shape.reflect`` reflects a
-        shape: its position, and its fitting's box with it (the voxels whose centres the reflected
-        box holds). For a mirrored building's lights, say."""
+        shape: its position, and its fitting's box with it. For a mirrored building's lights, say.
+        The plane must lie on a whole or half voxel: there voxels land on voxels, so the box holds
+        the reflected shape's; anywhere else a shape is resampled and a box can't follow it."""
         if axis not in ("x", "y", "z"):
             raise ModelError(f"light reflect axis must be 'x', 'y' or 'z', got {axis!r}")
         number = isinstance(about, (int, float)) and not isinstance(about, bool)
         if not number or not math.isfinite(about):
             raise ModelError(f"light reflect about must be a finite number, got {about!r}")
+        if 2 * about != round(2 * about):
+            raise ModelError(
+                f"light reflect about must be on a whole or half voxel (4 or 4.5), got {about!r}: "
+                "elsewhere a reflected shape is resampled and the fitting's box can't follow it"
+            )
         i = "xyz".index(axis)
         position = list(self.position)
         position[i] = 2 * about - position[i]
         fitting = self.fitting
         if fitting is not None:
-            # The voxels whose centres the reflected box [2a - hi, 2a - lo) holds.
+            # Voxel v's centre v + 0.5 lands on 2a - v - 0.5, voxel 2a - v - 1: [lo, hi) becomes
+            # [2a - hi, 2a - lo).
             lo, hi = list(fitting[0]), list(fitting[1])
-            lo[i] = math.ceil(2 * about - fitting[1][i] - 0.5)
-            hi[i] = math.ceil(2 * about - fitting[0][i] - 0.5)
+            lo[i], hi[i] = round(2 * about) - fitting[1][i], round(2 * about) - fitting[0][i]
             fitting = (tuple(lo), tuple(hi))  # type: ignore[assignment]
         moved = tuple(float(v) for v in position)
         return replace(self, position=moved, fitting=fitting)  # type: ignore[arg-type]

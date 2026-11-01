@@ -942,7 +942,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   voxel, which would do nothing. `build.json` carries it; the `.glb` has none.
   - `Light.reflect(axis, about)` mirrors a light as `Shape.reflect` mirrors a shape, its fitting with
     it. Kiln's mirrored townhouses moved their lights' positions by hand, so their fittings stayed
-    on the unmirrored side: the lint's first run caught it, on every fitting of those variants.
+    on the unmirrored side: the lint's first run caught it, on every fitting of those variants. It
+    takes a plane on a whole or half voxel only: there voxels land on voxels, while elsewhere a
+    reflected shape is resampled and its box could be a voxel off (a review found 10 of 16 cases
+    off at planes like 4.25).
+  - The lint also warns when every glowing voxel of a fitting is in an earlier light's, which takes
+    them in Kiln, and its message says the box's end is left out.
 
 ### v1 acceptance targets
 

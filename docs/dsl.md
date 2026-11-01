@@ -349,7 +349,11 @@ shape with no voxels, or anything else, is an error. Not in the `.glb`.
 `light.reflect(axis, about)` is the light reflected across the plane `axis = about`, as
 `Shape.reflect` reflects a shape: its position and its fitting together. A script that mirrors its
 model (a building with its door on the other side) mirrors its lights with it, so each fitting still
-holds its glass.
+holds its glass. The plane must lie on a whole or half voxel (`W / 2` for a whole-voxel width):
+elsewhere a reflected shape is resampled, and a box can't follow it.
+
+Where two lights' fittings overlap, the light first in the model's `lights` takes the glowing
+voxels both hold; lint warns when a fitting has no glowing voxel of its own.
 
 ### Fracture and bursts
 
