@@ -940,6 +940,9 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   occupancy alone, so an uncoloured shape is fine; one with no voxels, or something that isn't a
   shape, is an error naming `fitting`. Lint warns (`light_fitting`) when a fitting holds no glowing
   voxel, which would do nothing. `build.json` carries it; the `.glb` has none.
+  - `Light.reflect(axis, about)` mirrors a light as `Shape.reflect` mirrors a shape, its fitting with
+    it. Kiln's mirrored townhouses moved their lights' positions by hand, so their fittings stayed
+    on the unmirrored side: the lint's first run caught it, on every fitting of those variants.
 
 ### v1 acceptance targets
 

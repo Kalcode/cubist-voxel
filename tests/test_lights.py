@@ -424,3 +424,30 @@ def test_a_fitting_with_no_glowing_voxel_warns():
     assert f.severity == "warning"
     assert "lamp" in f.message and "no glowing voxel" in f.message
     assert f.details == {"light": "lamp", "min": [0, 0, 0], "max": [2, 6, 2]}
+
+
+def test_a_light_reflects_with_its_fitting():
+    # As Shape.reflect reflects a shape: a mirrored building's lights keep their fixtures.
+    lamp = light((1, 7.5, 1), P.fire.light, range=40, fitting=box((2, 3, 2)).at(0, 6, 0))
+    there = lamp.reflect("x", 4)
+    assert there.position == (7.0, 7.5, 1.0)
+    assert there.fitting == ((6, 6, 0), (8, 9, 2))
+    assert there.reflect("x", 4) == lamp
+    assert lamp.reflect("y", 10).fitting == ((0, 11, 0), (2, 14, 2))
+    plain = light((1, 7.5, 1), P.fire.light, range=40)
+    assert plain.reflect("z", 3) == light((1, 7.5, 5), P.fire.light, range=40)
+    for axis, about in (("w", 4), ("x", float("nan")), ("x", "4")):
+        with pytest.raises(ModelError, match="reflect"):
+            lamp.reflect(axis, about)
+
+    # The asset reflected, glass and all, and its light with it: the fitting still holds the glass.
+    def mirrored(p):
+        glass = box((2, 3, 2), color=p.fire.light).at(0, 6, 0)
+        post = box((2, 6, 2), color=p.wood.dark)
+        lamp = light((1, 7.5, 1), p.fire.light, range=40, fitting=glass)
+        shape = (post | glass).reflect("x", 4)
+        return Model([Part("post", shape, pivot=(7, 0, 1))], lights={"lamp": lamp.reflect("x", 4)})
+
+    a = asset(name="lantern", size=(8, 9, 2))(mirrored).build(P, glow=GLOW)
+    assert a.lights["lamp"].fitting == ((6, 6, 0), (8, 9, 2))
+    assert fitting_findings(a) == []

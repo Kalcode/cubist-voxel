@@ -346,6 +346,11 @@ Pass the shape the glass or embers were built from (`fitting=glass`); its voxels
 manifest's light as `fitting`, and lint warns (`light_fitting`) when they hold no glowing voxel. A
 shape with no voxels, or anything else, is an error. Not in the `.glb`.
 
+`light.reflect(axis, about)` is the light reflected across the plane `axis = about`, as
+`Shape.reflect` reflects a shape: its position and its fitting together. A script that mirrors its
+model (a building with its door on the other side) mirrors its lights with it, so each fitting still
+holds its glass.
+
 ### Fracture and bursts
 
 ```python

@@ -11,7 +11,7 @@ glass, a grate's embers) that glow with the light rather than with the whole ass
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from cubist.core.errors import ModelError
 from cubist.dsl.shape import Shape
@@ -49,6 +49,28 @@ class Light:
         if self.fitting is not None:
             summary["fitting"] = [list(self.fitting[0]), list(self.fitting[1])]
         return summary
+
+    def reflect(self, axis: str, about: float) -> Light:
+        """The light reflected across the plane ``axis = about``, as ``Shape.reflect`` reflects a
+        shape: its position, and its fitting's box with it (the voxels whose centres the reflected
+        box holds). For a mirrored building's lights, say."""
+        if axis not in ("x", "y", "z"):
+            raise ModelError(f"light reflect axis must be 'x', 'y' or 'z', got {axis!r}")
+        number = isinstance(about, (int, float)) and not isinstance(about, bool)
+        if not number or not math.isfinite(about):
+            raise ModelError(f"light reflect about must be a finite number, got {about!r}")
+        i = "xyz".index(axis)
+        position = list(self.position)
+        position[i] = 2 * about - position[i]
+        fitting = self.fitting
+        if fitting is not None:
+            # The voxels whose centres the reflected box [2a - hi, 2a - lo) holds.
+            lo, hi = list(fitting[0]), list(fitting[1])
+            lo[i] = math.ceil(2 * about - fitting[1][i] - 0.5)
+            hi[i] = math.ceil(2 * about - fitting[0][i] - 0.5)
+            fitting = (tuple(lo), tuple(hi))  # type: ignore[assignment]
+        moved = tuple(float(v) for v in position)
+        return replace(self, position=moved, fitting=fitting)  # type: ignore[arg-type]
 
     @classmethod
     def from_summary(cls, d: dict) -> Light:
