@@ -312,9 +312,12 @@ in the voxel just over a floor sits on it too: the floor is taken for its fixtur
 measured from the storey below, so put a room light two voxels or more over its floor. An indoor
 light with nothing under it is measured from the ground line as before, and lint warns that it stands
 over no floor. The manifest's light has `"indoor": true` (only when set), and the engine keeps the
-light to its room: Kiln lights nothing outside the storey its `part` is in (the building's box, from
-that part's lowest voxel up to where the next storey or the roof starts, grown by a voxel), so give a
-room light its storey's part. It isn't in the `.glb`.
+light to its room: Kiln lights nothing outside the storey its `part` is in. That is, from the storey
+line at or below that part's lowest voxel up to the next line (where the next storey or the roof
+starts), over that storey's own voxels' x–z bounds (a cellar, which starts no line, takes the prop's
+box), grown by a voxel. So give a room light its storey's part. On an asset with no storey lines (no
+part tagged for hiding: a stove, a brazier) Kiln doesn't know the room, and the light lights
+wherever its range reaches. It isn't in the `.glb`.
 
 `hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
 distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls
