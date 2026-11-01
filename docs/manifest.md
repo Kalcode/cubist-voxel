@@ -112,16 +112,17 @@ An engine can drive joints directly, such as a door the player pushes, using the
 - **`cycles`**: each tick (`1/fps` s) every voxel of a listed color shows the next color in the
   list, wrapping around. Not in the `.glb`: with a 256×1 palette texture an engine can rotate
   those texels.
-- **`lights`**: point lights in asset space; `range` in voxels; `flicker` 0..1 for the engine.
-  The `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`. A light may
-  also have `hold_m` (metres, > 0; only when the script sets it): past that distance the engine
-  holds its level out to where its range fades it, instead of letting it keep falling off. Walls
-  still shadow it. Not in the `.glb`. And `indoor: true` (only when the script sets it): the light
-  lights a room, and the engine lights nothing outside the storey its `part` is in (Kiln: from the
-  storey line at or below that part's lowest voxel up to the next line, over that storey's own
-  voxels' x–z bounds, or the prop's box for a cellar, which starts no line; grown by a voxel). On an
-  asset with no storey lines (no part tagged for hiding) the engine doesn't know the room, and the
-  light lights wherever its range reaches. Not in the `.glb`.
+- **`lights`**: point lights in asset space; `range` in voxels; `flicker` 0..1 for the engine. The
+  `.glb` has them as `KHR_lights_punctual` point lights on nodes under `part`. A light may also have
+  `hold_m` (metres, > 0; only when the script sets it): past that distance the engine holds its
+  level out to where its range fades it, instead of letting it keep falling off. Walls still shadow
+  it. Not in the `.glb`. And `indoor: true` (only when the script sets it): the light lights a room,
+  and the engine keeps it to the storey its `part` is in (Kiln: from the storey line at or below
+  that part's lowest voxel up to the next line, over that storey's own voxels' x–z bounds, or the
+  prop's box for a cellar, which starts no line; grown by a voxel; past the walls it fades out over
+  1 m, pooling out of doors and windows). On an asset with no storey lines (no part tagged for
+  hiding) the engine doesn't know the room, and the light lights wherever its range reaches. Not in
+  the `.glb`.
 
 ## Emitters and particles
 

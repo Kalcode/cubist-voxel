@@ -918,11 +918,12 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   near it, so a townhouse's lights of the storeys above and below weighed as much at a revealed
   room's pixels as its own, each tracing a shadow ray there for the slab to stop (what they added to
   the room came down the stairwell), and the frame of a walk through a house nearly doubled (Kiln's
-  `docs/city.md`, step 7b, "The cost indoors"). Kiln now lights nothing outside the storey an indoor
-  light's part is in, which took two-thirds or more of what the room lights added to that walk's
-  frame (M1 Max; "An indoor light stays in its room"). The `.glb` has none. Give a room light its
-  storey's part: the engine takes the storey from the part, not from where the light stands. On an
-  asset with no storey lines the engine keeps an indoor light unboxed: it doesn't know the room.
+  `docs/city.md`, step 7b, "The cost indoors"). Kiln now keeps an indoor light to the storey its
+  part is in, fading it out within a metre past the storey's walls so it pools out of a door, which
+  took two-thirds or more of what the room lights added to that walk's frame (M1 Max; "An indoor
+  light stays in its room"). The `.glb` has none. Give a room light its storey's part: the engine
+  takes the storey from the part, not from where the light stands. On an asset with no storey lines
+  the engine keeps an indoor light unboxed: it doesn't know the room.
 
 ### v1 acceptance targets
 
