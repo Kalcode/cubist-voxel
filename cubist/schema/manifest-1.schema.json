@@ -64,6 +64,7 @@
   },
   "$defs": {
     "vec3": {"type": "array", "items": {"type": "number"}, "minItems": 3, "maxItems": 3},
+    "ivec3": {"type": "array", "items": {"type": "integer"}, "minItems": 3, "maxItems": 3},
     "part": {
       "type": "object",
       "required": ["name", "parent", "pivot", "joint", "voxels", "vox_model"],
@@ -143,6 +144,12 @@
         "range": {"type": "number", "exclusiveMinimum": 0},
         "intensity": {"type": "number", "exclusiveMinimum": 0},
         "flicker": {"type": "number", "minimum": 0, "maximum": 1},
+        "fitting": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {"min": {"$ref": "#/$defs/ivec3"}, "max": {"$ref": "#/$defs/ivec3"}}
+        },
         "hold_m": {"type": "number", "exclusiveMinimum": 0},
         "indoor": {"type": "boolean"}
       }

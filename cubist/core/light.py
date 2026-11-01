@@ -4,7 +4,8 @@ They become ``KHR_lights_punctual`` point lights in the GLB, on a node that move
 part. Flicker is for the engine (glTF can't animate it portably); previews draw a marker. An
 indoor light lights a room: the reach lint measures it from the floor under it, and the engine
 lights nothing outside its part's storey. A hold (``hold_m``) is for the engine too: past that many
-metres the light stops falling off.
+metres the light stops falling off. So is a fitting: the box of the glowing voxels (a lantern's
+glass, a grate's embers) that glow with the light rather than with the whole asset.
 """
 
 from __future__ import annotations
@@ -13,8 +14,10 @@ import math
 from dataclasses import dataclass
 
 from cubist.core.errors import ModelError
+from cubist.dsl.shape import Shape
 
 Vec3 = tuple[float, float, float]
+Vec3i = tuple[int, int, int]
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,7 @@ class Light:
     part: str | None = None
     indoor: bool = False  # lights a room: measured from the floor under it, kept to its storey
     hold_m: float | None = None  # metres past which the engine holds its level; None: no hold
+    fitting: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: what glows with it
 
     def to_summary(self) -> dict:
         summary = {
@@ -42,6 +46,8 @@ class Light:
         }
         if self.hold_m is not None:
             summary["hold_m"] = self.hold_m
+        if self.fitting is not None:
+            summary["fitting"] = [list(self.fitting[0]), list(self.fitting[1])]
         return summary
 
     @classmethod
@@ -56,7 +62,29 @@ class Light:
             d.get("part"),
             bool(d.get("indoor", False)),
             None if d.get("hold_m") is None else float(d["hold_m"]),
+            None if d.get("fitting") is None else _box(d["fitting"]),
         )
+
+
+def _box(pair) -> tuple[Vec3i, Vec3i]:
+    lo, hi = pair
+    return tuple(int(v) for v in lo), tuple(int(v) for v in hi)  # type: ignore[return-value]
+
+
+def _fitting(shape) -> tuple[Vec3i, Vec3i]:
+    """The voxel bounds of ``shape``, half-open: what glows with the light."""
+    if not isinstance(shape, Shape):
+        raise ModelError(
+            f"light fitting must be the shape of the light's glowing voxels (its lantern's glass, "
+            f"its grate's embers), or None, got {shape!r}"
+        )
+    bounds = shape.occupancy().bounds()
+    if bounds is None:
+        raise ModelError(
+            f"light fitting has no voxels: no voxel's centre is inside {shape!r}; pass the shape "
+            "of the light's glowing voxels"
+        )
+    return bounds
 
 
 def _positive(value, what: str) -> float:
@@ -79,6 +107,7 @@ def light(
     part: str | None = None,
     indoor=False,
     hold_m=None,
+    fitting=None,
 ) -> Light:
     """A point light at ``position`` in palette ``color`` (e.g. ``p.fire.light``), reaching
     ``range`` voxels, moving with ``part`` (default: the part with the nearest voxel).
@@ -88,7 +117,11 @@ def light(
     engine lights nothing outside the storey ``part`` is in. In the manifest only when set.
     ``hold_m`` (metres, or None) tells the engine to stop the light falling off past that
     distance: it holds its level out to where its range fades it, as a room's walls would
-    pass its light on. Walls still shadow it. In the manifest only when set."""
+    pass its light on. Walls still shadow it. In the manifest only when set. ``fitting`` (a
+    shape, or None) is the light's fixture, the shape of its glowing voxels (its lantern's
+    glass, its grate's embers): the engine glows the glowing voxels in its bounds with the light,
+    so they go dark when it is put out, while the rest of the asset's glow keeps its own switch.
+    In the manifest, as those bounds, only when set."""
     try:
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
@@ -121,4 +154,5 @@ def light(
         part,
         indoor,
         None if hold_m is None else float(hold_m),
+        None if fitting is None else _fitting(fitting),
     )

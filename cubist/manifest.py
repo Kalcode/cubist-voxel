@@ -135,6 +135,11 @@ def build_manifest(
                 "range": lt.range,
                 "intensity": lt.intensity,
                 "flicker": lt.flicker,
+                **(
+                    {"fitting": {"min": list(lt.fitting[0]), "max": list(lt.fitting[1])}}
+                    if lt.fitting is not None
+                    else {}
+                ),
                 **({"hold_m": lt.hold_m} if lt.hold_m is not None else {}),
                 **({"indoor": True} if lt.indoor else {}),
             }

@@ -347,3 +347,80 @@ def test_hold_m_must_be_a_positive_number_or_none():
             light((0, 0, 0), P.fire.light, hold_m=bad)
     assert light((0, 0, 0), P.fire.light, hold_m=None).hold_m is None
     assert light((0, 0, 0), P.fire.light, hold_m=1).hold_m == 1.0
+
+
+# --- a light's fitting: the glowing voxels that glow with it ---------------------------
+
+GLOW = {P.fire.light.index: 1.5}
+
+
+def lantern(fitting="glass"):
+    """A post (wood, y 0..6) under a lantern's glass (glowing fire.light, x 0..2, y 6..9, z
+    0..2), its light in the glass. The light's fitting is the glass, the post, or none."""
+
+    def fn(p):
+        glass = box((2, 3, 2), color=p.fire.light).at(0, 6, 0)
+        post = box((2, 6, 2), color=p.wood.dark)
+        shape = {"glass": glass, "post": post, None: None}[fitting]
+        lamp = light((1, 7.5, 1), p.fire.light, range=40, fitting=shape)
+        return Model([Part("post", post | glass, pivot=(1, 0, 1))], lights={"lamp": lamp})
+
+    return asset(name="lantern", size=(2, 9, 2))(fn).build(P, glow=GLOW)
+
+
+def test_a_fitting_goes_in_the_manifest_as_its_shape_s_voxel_bounds():
+    # Kiln glows the fitting's glowing voxels with the light, not with the prop (its formats.md,
+    # "Props and runtime lighting"): a lantern's glass goes dark with its flame.
+    m = build_manifest(lantern(), voxel_size_m=1)
+    schema = json.loads(SCHEMA_PATH.read_text())
+    jsonschema.validate(m, schema)
+    assert m["lights"]["lamp"]["fitting"] == {"min": [0, 6, 0], "max": [2, 9, 2]}  # max: past it
+    # After the keys every light has, before a hold and indoor (a held indoor lantern's order).
+    held = {
+        "lamp": light(
+            (1, 7.5, 1), P.fire.light, range=40, fitting=box((2, 3, 2)).at(0, 6, 0), hold_m=1
+        )
+    }
+    keys = list(build_manifest(built(lambda p: torch(p, held)), voxel_size_m=1)["lights"]["lamp"])
+    assert keys[keys.index("flicker") + 1 :] == ["fitting", "hold_m"]
+    # Unset, the light is as before: no key, so every existing manifest is byte-for-byte the same.
+    assert "fitting" not in build_manifest(lantern(None), voxel_size_m=1)["lights"]["lamp"]
+    for bad in ({"min": [0, 6, 0]}, {"min": [0, 6, 0], "max": [2, 9]}, [[0, 6, 0], [2, 9, 2]]):
+        wrong = json.loads(json.dumps(m))
+        wrong["lights"]["lamp"]["fitting"] = bad
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(wrong, schema)
+
+
+def test_a_fitting_round_trips_through_the_summary():
+    a = lantern()
+    assert a.lights["lamp"].fitting == ((0, 6, 0), (2, 9, 2))
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), a.summary(), P)
+    assert again.lights == a.lights
+    # A build.json from before fittings, or a light without one, reads as none.
+    plain = built().lights["flame"]
+    assert plain.fitting is None and "fitting" not in plain.to_summary()
+    assert type(plain).from_summary(plain.to_summary()).fitting is None
+
+
+def test_a_fitting_must_be_a_shape_with_voxels():
+    for bad in ("glass", ((0, 6, 0), (2, 9, 2)), 3):
+        with pytest.raises(ModelError, match="fitting"):
+            light((0, 0, 0), P.fire.light, fitting=bad)
+    # A shape no voxel's centre is inside.
+    with pytest.raises(ModelError, match="fitting.*no voxels"):
+        light((0, 0, 0), P.fire.light, fitting=box((0.2, 0.2, 0.2)).at(0.1, 0.1, 0.1))
+
+
+def fitting_findings(a):
+    style = StyleBible(path=None, name="t", voxel_size_m=0.0625, palette=P)
+    return [f for f in lint(a, style).findings if f.check == "light_fitting"]
+
+
+def test_a_fitting_with_no_glowing_voxel_warns():
+    assert fitting_findings(lantern()) == []
+    assert fitting_findings(lantern(None)) == []
+    [f] = fitting_findings(lantern("post"))
+    assert f.severity == "warning"
+    assert "lamp" in f.message and "no glowing voxel" in f.message
+    assert f.details == {"light": "lamp", "min": [0, 0, 0], "max": [2, 6, 2]}

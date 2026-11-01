@@ -371,6 +371,34 @@ def check_light_reach(asset: BuiltAsset, style: StyleBible, merged: VoxelGrid) -
     return out
 
 
+def check_light_fitting(asset: BuiltAsset, merged: VoxelGrid) -> list[Finding]:
+    """A light's fitting (``light(..., fitting=shape)``) should hold a glowing voxel: the engine
+    glows the glowing voxels in its bounds with the light, so one with none does nothing."""
+    out = []
+    glowing = np.array(sorted(asset.glow), dtype=np.int64)
+    origin = np.array(merged.origin)
+    for name, lt in asset.lights.items():
+        if lt.fitting is None:
+            continue
+        lo = np.maximum(np.array(lt.fitting[0]) - origin, 0)
+        hi = np.minimum(np.array(lt.fitting[1]) - origin, merged.shape)
+        inside = merged.data[lo[0] : hi[0], lo[1] : hi[1], lo[2] : hi[2]]
+        if np.all(hi > lo) and np.isin(inside, glowing).any():
+            continue
+        lo_, hi_ = list(lt.fitting[0]), list(lt.fitting[1])
+        out.append(
+            Finding(
+                "light_fitting",
+                "warning",
+                f"light {name!r}'s fitting, voxels {tuple(lo_)} to {tuple(hi_)}, holds no glowing "
+                "voxel, so nothing glows with the light; pass the shape of its glowing glass or "
+                "embers as fitting=, or leave fitting out",
+                {"light": name, "min": lo_, "max": hi_},
+            )
+        )
+    return out
+
+
 def _floor_under(grid: VoxelGrid, position) -> int | None:
     """The top of the floor under ``position``, going straight down its column from the voxel it
     is in: past the light's own fixture (the run of filled voxels it is in, or that its voxel sits

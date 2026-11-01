@@ -123,7 +123,11 @@ An engine can drive joints directly, such as a door the player pushes, using the
   1 m, pooling out of doors and windows). On an asset with no storey lines (no part tagged `upper`
   or `roof`, such as a stall whose only hidden part is a `canopy` awning) the engine doesn't know the
   room, and the light lights wherever its range reaches: only storey lines bound it, never a
-  canopy's. Not in the `.glb`.
+  canopy's. Not in the `.glb`. And `fitting` (only when the script sets it), `{"min": [x, y, z],
+  "max": [x, y, z]}` in asset voxels, `max` just past the last: the box of the light's own glowing
+  voxels (a lantern's glass, a grate's embers), which the engine glows with the light instead of
+  with the whole asset, so they go dark when it is put out. It comes after `flicker`, before
+  `hold_m` and `indoor`. Not in the `.glb`.
 
 ## Emitters and particles
 

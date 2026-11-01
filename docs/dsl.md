@@ -278,7 +278,17 @@ bands dark-to-light in the direction the water should flow. Every voxel of that 
 in every part, so paint spray, foam and flashes from another ramp.
 
 ```python
-light(position, color, range=8, intensity=1.0, flicker=0.0, part=None, indoor=False, hold_m=None)
+light(
+    position,
+    color,
+    range=8,
+    intensity=1.0,
+    flicker=0.0,
+    part=None,
+    indoor=False,
+    hold_m=None,
+    fitting=None,
+)
 Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=96, flicker=0.35)})
 ```
 
@@ -322,9 +332,19 @@ hidden part is a `canopy` awning) Kiln doesn't know the room, and the light ligh
 range reaches. Only storey lines bound it; a canopy's never does. It isn't in the `.glb`.
 
 `hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
-distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls
-passing its light on, since Kiln has no bounce light. Walls still shadow it. It goes in the
-manifest's light only when set, and isn't in the `.glb` (glTF has no such falloff).
+distance: Kiln holds its level there out to where `range` fades it, as a room's walls would pass its
+light on (Kiln also passes a share of an indoor light round its storey, unshadowed). Walls still
+shadow it. It goes in the manifest's light only when set, and isn't in the `.glb` (glTF has no such
+falloff).
+
+`fitting` (a shape, or None) is the light's fixture: the shape of the glowing voxels it shines from,
+a lantern's glass or a grate's embers. The engine glows the glowing voxels in that shape's bounds
+with the light, so they go dark when the light is put out, while the rest of the asset's glow keeps
+its own switch: a house's lit windows go out at dawn with its door lamp, and the embers in its
+hearths, fitted to the room lights, glow on. Without one, a glowing voxel glows with the whole asset.
+Pass the shape the glass or embers were built from (`fitting=glass`); its voxels' bounds go in the
+manifest's light as `fitting`, and lint warns (`light_fitting`) when they hold no glowing voxel. A
+shape with no voxels, or anything else, is an error. Not in the `.glb`.
 
 ### Fracture and bursts
 

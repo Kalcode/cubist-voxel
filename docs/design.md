@@ -927,6 +927,19 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   the storey from the part, not from where the light stands. On an asset with no storey lines (no
   part tagged `upper` or `roof`; a `canopy` line never counts) the engine keeps an indoor light
   unboxed: it doesn't know the room.
+- **13o. A light's fitting (Nov 1).** `light(..., fitting=glass)` names the light's fixture, the
+  shape of the glowing voxels it shines from, and the manifest's light carries that shape's voxel
+  bounds as `"fitting": {"min", "max"}` (half-open), after `flicker` and before `hold_m` and
+  `indoor`; unset, there is no key and a manifest is byte-for-byte as before. Kiln needed it: its
+  glow was one switch an asset, so by day a townhouse's room lights shone while their own lanterns'
+  glass and hearths' embers were dark, the house's glow following its lamps (Kiln's
+  `docs/engine/review-backlog.md`, "A prop's glow is one switch"). Kiln now glows the glowing voxels
+  in a fitting with its light. A box, not the shape's voxels: the glass of a lantern and the embers
+  of a grate are solid boxes or nearly, and a box is six numbers in the manifest. Where two
+  fittings overlap, the light first in the manifest takes the voxels. The shape is sampled for
+  occupancy alone, so an uncoloured shape is fine; one with no voxels, or something that isn't a
+  shape, is an error naming `fitting`. Lint warns (`light_fitting`) when a fitting holds no glowing
+  voxel, which would do nothing. `build.json` carries it; the `.glb` has none.
 
 ### v1 acceptance targets
 
