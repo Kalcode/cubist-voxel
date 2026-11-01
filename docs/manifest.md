@@ -120,9 +120,10 @@ An engine can drive joints directly, such as a door the player pushes, using the
   and the engine keeps it to the storey its `part` is in (Kiln: from the storey line at or below
   that part's lowest voxel up to the next line, over that storey's own voxels' x–z bounds, or the
   prop's box for a cellar, which starts no line; grown by a voxel; past the walls it fades out over
-  1 m, pooling out of doors and windows). On an asset with no storey lines (no part tagged for
-  hiding) the engine doesn't know the room, and the light lights wherever its range reaches. Not in
-  the `.glb`.
+  1 m, pooling out of doors and windows). On an asset with no storey lines (no part tagged `upper`
+  or `roof`, such as a stall whose only hidden part is a `canopy` awning) the engine doesn't know the
+  room, and the light lights wherever its range reaches: only storey lines bound it, never a
+  canopy's. Not in the `.glb`.
 
 ## Emitters and particles
 

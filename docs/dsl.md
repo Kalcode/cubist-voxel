@@ -317,8 +317,9 @@ below that part's lowest voxel up to the next line (where the next storey or the
 that storey's own voxels' x–z bounds (a cellar, which starts no line, takes the prop's box), grown
 by a voxel; past the storey's walls the light fades out over 1 m in x and z, so it pools out of a
 door or a window instead of stopping in a line. So give a room light its storey's part. On an asset
-with no storey lines (no part tagged for hiding: a stove, a brazier) Kiln doesn't know the room, and
-the light lights wherever its range reaches. It isn't in the `.glb`.
+with no storey lines (no part tagged `upper` or `roof`: a stove, a brazier, or a stall whose only
+hidden part is a `canopy` awning) Kiln doesn't know the room, and the light lights wherever its
+range reaches. Only storey lines bound it; a canopy's never does. It isn't in the `.glb`.
 
 `hold_m` (metres, a number > 0, or None) asks the engine to stop the light falling off past that
 distance: Kiln holds its level there out to where `range` fades it, a stand-in for a room's walls
