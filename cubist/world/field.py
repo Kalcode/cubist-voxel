@@ -26,10 +26,32 @@ class WorldError(ValueError):
     """A world script or world operation can't proceed; the message says how to fix it."""
 
 
+def finite(what: str, *values) -> None:
+    """Refuse NaN and infinity in ``values`` (numbers, or points and lists of them) with a
+    WorldError naming ``what``, the argument as a script wrote it ("noise scale_m"). Every
+    world DSL function that takes a number checks it with this, before its own range checks:
+    NaN passes ``x <= 0`` (every comparison with it is false), and what it reaches either
+    leaves a hole in the ground or goes into world.json as NaN, which an engine's JSON reader
+    rejects far from the cause. Values that aren't numbers at all are left to the caller's own
+    checks, which say what they should be."""
+    for value in values:
+        try:
+            a = np.asarray(value, dtype=np.float64)
+        except (TypeError, ValueError):
+            continue
+        if not np.isfinite(a).all():
+            kind = "a finite number" if a.ndim == 0 else "finite numbers"
+            raise WorldError(
+                f"{what} must be {kind}, got {value!r} (NaN and infinity usually come from "
+                f"a division by zero or an overflow in the arithmetic that made it)"
+            )
+
+
 def _field(value) -> Field:
     if isinstance(value, Field):
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
+        finite("field arithmetic operand", value)
         return flat(float(value))
     raise WorldError(f"expected a field or a number, got {value!r}")
 
@@ -78,15 +100,21 @@ class Field:
 
     def flatten(self, mask: Field, at_m: float) -> Field:
         """Level the ground to ``at_m`` where ``mask`` is 1 (a town), easing out at its edge."""
+        finite("flatten at_m", at_m)
         return self.blend(flat(at_m), mask)
 
     def level(self, center, radius_m: float, edge_m: float = 20.0) -> Field:
         """Flatten a circle to this ground's own height at its center (a square, a pass), easing out
         over ``edge_m``: like ``flatten`` without knowing the height."""
+        finite("level center", center)
+        finite("level radius_m", radius_m)
+        finite("level edge_m", edge_m)
         return _Level(self, (float(center[0]), float(center[1])), float(radius_m), float(edge_m))
 
     def terrace(self, step_m: float, softness: float = 0.3) -> Field:
         """Steps every ``step_m`` metres; ``softness`` (0–1) rounds their edges."""
+        finite("terrace step_m", step_m)
+        finite("terrace softness", softness)
         if step_m <= 0:
             raise WorldError(f"terrace step_m must be positive, got {step_m}")
         return _Terrace(self, float(step_m), float(np.clip(softness, 0.0, 1.0)))
@@ -157,6 +185,7 @@ class _Flat(Field):
     name = "flat"
 
     def __init__(self, value: float):
+        finite("flat height_m", value)
         self.value = float(value)
 
     def sample(self, x, z, seed):
@@ -186,6 +215,12 @@ class _Noise(Field):
     name = "noise"
 
     def __init__(self, scale_m, amplitude_m, octaves, kind, seed, ridged, sharpness):
+        what = "ridges" if ridged else "noise"
+        finite(f"{what} scale_m", scale_m)
+        finite(f"{what} amplitude_m", amplitude_m)
+        finite(f"{what} octaves", octaves)
+        finite(f"{what} seed", seed)
+        finite(f"{what} sharpness", sharpness)
         if scale_m <= 0:
             raise WorldError(
                 f"noise scale_m must be positive (its features' size in metres), got {scale_m}"
@@ -228,7 +263,12 @@ def ridges(
 class _HeightMap(Field):
     name = "height_map"
 
-    def __init__(self, path, low_m, high_m, origin_m, size_m):
+    def __init__(self, path, low_m, high_m, origin_m, size_m, what="height_map"):
+        finite(f"{what} low_m", low_m)
+        finite(f"{what} high_m", high_m)
+        finite(f"{what} origin_m", origin_m)
+        if size_m is not None:
+            finite(f"{what} size_m", size_m)
         self.path, self.low, self.high = Path(path), float(low_m), float(high_m)
         self.origin = (float(origin_m[0]), float(origin_m[1]))
         self.size = size_m
@@ -271,6 +311,11 @@ class _HeightMap(Field):
         return self.low + (top * (1 - fv) + bottom * fv) * (self.high - self.low)
 
 
+def _pair(what: str, value) -> tuple[float, float]:
+    finite(what, value)
+    return (float(value[0]), float(value[1]))
+
+
 def height_map(path, low_m: float, high_m: float, origin_m=(0.0, 0.0), size_m=None) -> Field:
     """A painted greyscale PNG (8 or 16 bit): black is ``low_m``, white ``high_m``.
 
@@ -282,14 +327,19 @@ def height_map(path, low_m: float, high_m: float, origin_m=(0.0, 0.0), size_m=No
         low_m,
         high_m,
         origin_m,
-        None if size_m is None else (float(size_m[0]), float(size_m[1])),
+        None if size_m is None else _pair("height_map size_m", size_m),
     )
 
 
 def mask_map(path, origin_m=(0.0, 0.0), size_m=None) -> Field:
     """A painted greyscale PNG as a mask: black 0, white 1."""
     return _HeightMap(
-        path, 0.0, 1.0, origin_m, None if size_m is None else (float(size_m[0]), float(size_m[1]))
+        path,
+        0.0,
+        1.0,
+        origin_m,
+        None if size_m is None else _pair("mask_map size_m", size_m),
+        "mask_map",
     )
 
 
@@ -305,6 +355,9 @@ class _Circle(Field):
     name = "circle"
 
     def __init__(self, center, radius_m, edge_m):
+        finite("circle center", center)
+        finite("circle radius_m", radius_m)
+        finite("circle edge_m", edge_m)
         self.cx, self.cz, self.r, self.edge = (
             float(center[0]),
             float(center[1]),
@@ -327,6 +380,9 @@ class _Rect(Field):
     name = "rect"
 
     def __init__(self, lo, hi, edge_m):
+        finite("rect lo", lo)
+        finite("rect hi", hi)
+        finite("rect edge_m", edge_m)
         self.x0, self.z0 = min(lo[0], hi[0]), min(lo[1], hi[1])
         self.x1, self.z1 = max(lo[0], hi[0]), max(lo[1], hi[1])
         self.edge = float(edge_m)

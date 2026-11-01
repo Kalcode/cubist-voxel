@@ -12,7 +12,7 @@ import numpy as np
 from cubist.core.palette import Color, Palette
 from cubist.dsl.context import building
 from cubist.dsl.noise import mix_seed
-from cubist.world.field import Field, WorldError, script_dir, world_size
+from cubist.world.field import Field, WorldError, finite, script_dir, world_size
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -38,16 +38,19 @@ class Rule:
 
 def height_over(m: float, color: Color) -> Rule:
     """Surface ``color`` above ``m`` metres (snow on peaks)."""
+    finite("height_over m", m)
     return Rule(_color(color), "height_over", float(m))
 
 
 def height_under(m: float, color: Color) -> Rule:
     """Surface ``color`` below ``m`` metres (sand along a shore)."""
+    finite("height_under m", m)
     return Rule(_color(color), "height_under", float(m))
 
 
 def slope_over(degrees: float, color: Color) -> Rule:
     """Surface ``color`` where the ground is steeper than ``degrees`` (rock on cliffs)."""
+    finite("slope_over degrees", degrees)
     return Rule(_color(color), "slope_over", float(degrees))
 
 
@@ -55,6 +58,7 @@ def where(mask: Field, color: Color, over: float = 0.5) -> Rule:
     """Surface ``color`` where ``mask`` is above ``over`` (a painted biome, a road)."""
     if not isinstance(mask, Field):
         raise WorldError(f"where() needs a mask field (circle, rect, mask_map, ...), got {mask!r}")
+    finite("where over", over)
     return Rule(_color(color), "where", float(over), mask)
 
 
@@ -114,6 +118,8 @@ def world(name: str, size_m, seed: int = 0) -> Callable[[Callable], WorldDef]:
         size = (float(size_m[0]), float(size_m[1]))
     except (TypeError, IndexError, ValueError):
         raise WorldError(f"world {name}: size_m must be (x, z) metres, got {size_m!r}") from None
+    finite("world size_m", size)
+    finite("world seed", seed)
     if size[0] <= 0 or size[1] <= 0:
         raise WorldError(f"world {name}: size_m must be positive on both axes, got {size_m!r}")
 
@@ -252,6 +258,15 @@ def load_world(
     for cave in result.caves:
         if isinstance(cave, Worms):
             cave.keep_floors(result.caves)
+    finite("World surface_depth_m", result.surface_depth_m)
+    if result.step_m is not None:
+        finite("World step_m", result.step_m)
+    for entry in result.subsoil:
+        if not isinstance(entry, Color):
+            finite("World subsoil depth", entry[0])
+    for lname, at in result.landmarks.items():
+        if not isinstance(at, str):
+            finite(f"World landmark {lname}", at)
     if result.step_m is not None and result.step_m <= 0:
         raise WorldError(f"world {defn.name}: step_m must be positive, got {result.step_m}")
     named = {p.name for p in result.props if isinstance(p, Place) and p.name}

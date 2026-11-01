@@ -19,11 +19,25 @@ from cubist.motion.clips import CHANNELS, TrackSpec, _free
 SAMPLES_PER_CYCLE = 8
 
 
+def _finite(fn: str, **values) -> None:
+    """Refuse NaN and infinity in a generator's numbers (or a vector of them), naming the
+    argument: they would sample into keys the clip then writes into its manifest."""
+    for name, value in values.items():
+        try:
+            ok = bool(np.isfinite(np.asarray(value, dtype=np.float64)).all())
+        except (TypeError, ValueError):
+            continue  # not numbers at all: the caller's own checks say so
+        if not ok:
+            raise ModelError(f"{fn} {name} must be finite numbers, got {value!r}")
+
+
 def swing(
     part: str, axis: str, amount: float, phase: float = 0.0, cycles: int = 1, center: float = 0.0
 ) -> TrackSpec:
     """Rock ``part`` about its pivot: ``center + amount * sin(2π(cycles·u + phase))`` degrees.
     ``phase`` is in cycles, so 0.5 swings the opposite way (the other leg)."""
+
+    _finite("swing", amount=amount, phase=phase, cycles=cycles, center=center)
 
     def curve(u: float) -> float:
         return center + amount * math.sin(2 * math.pi * (cycles * u + phase))
@@ -37,6 +51,8 @@ def bob(
 ) -> TrackSpec:
     """Move ``part`` from rest to ``height`` voxels and back, ``cycles`` times (two steps per
     walk cycle by default). A negative height dips instead."""
+
+    _finite("bob", height=height, cycles=cycles, phase=phase)
 
     def curve(u: float) -> float:
         return height * (1 - math.cos(2 * math.pi * (cycles * u + phase))) / 2
@@ -53,6 +69,8 @@ def shake(
     if channel not in CHANNELS or not channel.startswith(("rotate_", "move_")):
         raise ModelError(f"shake channel must be rotate_x|y|z or move_x|y|z, got {channel!r}")
 
+    _finite("shake", amount=amount, rate=rate, seed=seed)
+
     def make(length: float):
         n = max(2, math.ceil(length * rate)) + 1
         times = np.linspace(0.0, length, n)
@@ -67,6 +85,7 @@ def shake(
 def spin_track(part: str, turns: float, axis: str | None = None) -> TrackSpec:
     """Turn at a constant speed: ``turns`` full turns over the clip, on the part's spin joint,
     or about ``axis`` ('y', '-z', ...) on any part."""
+    _finite("spin_track", turns=turns)
     if axis is None:
         return TrackSpec(part, "joint", [0.0, float(turns)], ease="linear")
     return _free("rotate", part, axis, [0.0, 360.0 * float(turns)], "linear")
@@ -161,6 +180,17 @@ def burst(
     corner reaches the floor. ``start`` delays the blast (seconds) for a wind-up; ``rate`` is
     keys per second. Seeded; follows the build seed. Use with ``clip(..., collisions=False)``:
     debris passes through debris."""
+    _finite(
+        "burst",
+        origin=origin if origin is not None else 0.0,
+        speed=speed,
+        up=up,
+        spin=spin,
+        gravity=gravity,
+        rate=rate,
+        seed=seed,
+        start=start,
+    )
     for part in parts:
         if part.pivot is None or part.frames:
             raise ModelError(

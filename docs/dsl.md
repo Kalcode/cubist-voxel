@@ -38,6 +38,10 @@ variants), and only that asset's iteration counts.
     needs `r` of about 0.85 or more for its voxels to join.
 - **Ranges are half-open.** `band(axis, at, height)`, `region(lo, hi)` and `gradient(lo, hi)`
   include the low bound and exclude the high one.
+- **Numbers are finite.** Every function that takes a number refuses NaN and infinity with an error
+  naming the argument (`ShapeError` for shapes, modifiers, paint and selections; `ModelError` for
+  joints, lights, sockets, emitters, parts, `asset(size=)` and the motion generators). They come
+  from a division by zero upstream, and would otherwise reach the manifest as `NaN`.
 - **Colors** are palette names, never indices: `p.wood.dark`, `p.wood.mid`, `p.wood.light`,
   `p.wood[1]`, `p.cloth.white` (a named table), `p.cork` (a single color). On a list ramp
   `dark` is the first shade, `light` the last, and `mid` index `n // 2` (the third of four).

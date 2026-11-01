@@ -98,6 +98,7 @@ class Hollow(_Morph):
 
     def __init__(self, shape: Shape, t: float):
         super().__init__(shape)
+        check_finite("hollow thickness", t)
         if t <= 0:
             raise ShapeError(f"hollow thickness must be > 0, got {t}")
         self.t = float(t)
@@ -111,6 +112,7 @@ class Hollow(_Morph):
 class Erode(_Morph):
     def __init__(self, shape: Shape, r: float):
         super().__init__(shape)
+        check_finite("erode radius", r)
         self.r = float(r)
 
     def _apply(self, data):
@@ -121,6 +123,7 @@ class Erode(_Morph):
 class Dilate(_Morph):
     def __init__(self, shape: Shape, r: float, color):
         super().__init__(shape)
+        check_finite("dilate radius", r)
         self.r = float(r)
         self.pad = math.ceil(self.r) + 1
         self.color = color
@@ -142,6 +145,7 @@ class Opening(_Morph):
 
     def __init__(self, shape: Shape, r: float):
         super().__init__(shape)
+        check_finite("round radius", r)
         if r <= 0:
             raise ShapeError(f"round radius must be > 0, got {r}")
         self.r = float(r)
@@ -158,6 +162,7 @@ class Opening(_Morph):
 class Chamfer(_Morph):
     def __init__(self, shape: Shape, c: int):
         super().__init__(shape)
+        check_finite("chamfer c", c)
         if int(c) != c or c < 1:
             raise ShapeError(f"chamfer takes a whole number of voxels >= 1, got {c}")
         self.c = int(c)

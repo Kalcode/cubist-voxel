@@ -17,7 +17,7 @@ from cubist.core.part import Part
 from cubist.core.topology import SIX
 from cubist.dsl.gridops import GridShape
 from cubist.dsl.noise import hash_unit, mix_seed
-from cubist.dsl.shape import Shape, ShapeError
+from cubist.dsl.shape import Shape, ShapeError, check_finite
 
 _FACES = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
 
@@ -56,6 +56,9 @@ def fracture(shape: Shape, pieces: int = 8, seed: int = 0, min_voxels: int | Non
     as voxel shapes that keep their colors. Seeded, and follows the build seed."""
     if isinstance(pieces, bool) or not isinstance(pieces, int) or pieces < 2:
         raise ModelError(f"fracture pieces must be a whole number >= 2, got {pieces!r}")
+    check_finite("fracture seed", seed)
+    if min_voxels is not None:
+        check_finite("fracture min_voxels", min_voxels)
     grid = shape.voxelize().cropped()
     coords, colors = grid.voxels()
     n = len(coords)

@@ -11,7 +11,7 @@ import numpy as np
 
 from cubist.core.grid import VoxelGrid
 from cubist.dsl.gridops import exposed, neighbor
-from cubist.dsl.shape import EPS, Shape, ShapeError
+from cubist.dsl.shape import EPS, Shape, ShapeError, check_finite
 
 DIRECTIONS = {
     "top": (0, 1, 0),
@@ -80,6 +80,8 @@ class _Band(Selection):
     def __init__(self, axis: str, at: float, height: float):
         if axis not in ("x", "y", "z"):
             raise ShapeError(f"band axis must be x, y or z, got {axis!r}")
+        check_finite("band at", at)
+        check_finite("band height", height)
         self.axis, self.at, self.height = "xyz".index(axis), at, height
 
     def mask(self, grid):
@@ -89,6 +91,8 @@ class _Band(Selection):
 
 class _Region(Selection):
     def __init__(self, lo, hi):
+        check_finite("region lo", lo)
+        check_finite("region hi", hi)
         self.lo, self.hi = np.asarray(lo), np.asarray(hi)
 
     def mask(self, grid):
@@ -139,6 +143,9 @@ class _Stripes(Selection):
     def __init__(self, axis: str, period: int, width: int, offset: int):
         if axis not in ("x", "y", "z"):
             raise ShapeError(f"stripes axis must be x, y or z, got {axis!r}")
+        check_finite("stripes period", period)
+        check_finite("stripes width", width)
+        check_finite("stripes offset", offset)
         if period < 1 or not 0 < width <= period:
             raise ShapeError("stripes need period >= 1 and 0 < width <= period")
         self.axis, self.period, self.width, self.offset = "xyz".index(axis), period, width, offset
@@ -150,6 +157,7 @@ class _Stripes(Selection):
 
 class _Checker(Selection):
     def __init__(self, size: int, axes: str):
+        check_finite("checker size", size)
         if size < 1 or not axes or any(a not in "xyz" for a in axes):
             raise ShapeError("checker needs size >= 1 and axes from 'xyz'")
         self.size, self.axes = size, ["xyz".index(a) for a in axes]

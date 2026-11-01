@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from cubist.dsl.noise import fbm, mix_seed
-from cubist.world.field import WorldError
+from cubist.world.field import WorldError, finite
 from cubist.world.paths import _catmull_rom
 
 FLOOR_M = 2.0  # rock worms leave under a tunnel's or cavern's floor
@@ -47,6 +47,8 @@ class Tunnel(Carver):
     label: str | None = None  # its line's name in world.json
 
     def __init__(self, points, radius_m: float, smooth: bool, below_ground: bool = False):
+        finite("tunnel points", points)
+        finite("tunnel radius_m", radius_m)
         pts = np.asarray(points, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 3 or len(pts) < 2:
             raise WorldError(f"a tunnel needs at least two (x, y, z) points, got {points!r}")
@@ -108,6 +110,10 @@ class Cavern(Carver):
     name = "cavern"
 
     def __init__(self, center, radius_m, roughness_m: float, seed: int, below_ground: bool = False):
+        finite("cavern center", center)
+        finite("cavern radius_m", radius_m)
+        finite("cavern roughness_m", roughness_m)
+        finite("cavern seed", seed)
         self.below_ground = below_ground
         self.c = np.asarray(center, dtype=np.float64)
         r = np.broadcast_to(np.asarray(radius_m, dtype=np.float64), (3,)).copy()
@@ -163,6 +169,11 @@ class Worms(Carver):
     def __init__(
         self, region, depth_m, scale_m: float, thickness: float, seed: int, floors: bool = True
     ):
+        finite("worms region", region)
+        finite("worms depth_m", depth_m)
+        finite("worms scale_m", scale_m)
+        finite("worms thickness", thickness)
+        finite("worms seed", seed)
         (x0, z0), (x1, z1) = region
         self.x0, self.z0, self.x1, self.z1 = min(x0, x1), min(z0, z1), max(x0, x1), max(z0, z1)
         self.dmin, self.dmax = (float(depth_m[0]), float(depth_m[1]))

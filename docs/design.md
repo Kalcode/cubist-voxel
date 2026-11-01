@@ -908,9 +908,7 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
       `radial`, and `Part.mirrored()`'s plane;
     - a `Part`'s pivot, and `asset(size=)`, which must also be above 0 now (`ground_y` was already
       a whole number of voxels).
-  - Not yet: the shape modifiers (`smooth_union`, `taper`, `round`, `hollow`, `erode`, `dilate`,
-    `displace` and the paint ops' numbers) and the world DSL (`docs/worlds.md`), whose functions
-    from `flat` to `scatter`, and `Field` arithmetic, take NaN with no check at all.
+  - The rest is covered too (13p, Nov 1): see below.
 - **13n. Indoor lights in the manifest (Oct 31).** The manifest's light has `"indoor": true` when
   `light(..., indoor=True)` set it (the schema takes a boolean), after the keys every light has and
   after `hold_m`; an outdoor light has no key, so its manifest is byte-for-byte as before. Kiln
@@ -948,6 +946,25 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
     off at planes like 4.25).
   - The lint also warns when every glowing voxel of a fitting is in an earlier light's, which takes
     them in Kiln, and its message says the box's end is left out.
+- **13p. The rest of the numbers (Nov 1).** Kiln's backlog: the shape modifiers and the world DSL
+  still took NaN, and `dilate` raised a bare `ValueError` on it. Now refused, each naming its argument
+  (tests: `tests/test_finite_inputs.py`, and `tests/test_world_finite_inputs.py` for the world DSL, which
+  lists every function and numeric argument in tables, so a new function adds a row):
+  - shape modifiers: `smooth_union` k, `taper` top, `displace` amp, scale, seed and octaves, `round`,
+    `chamfer`, `hollow`, `erode`, `dilate`; paint: `paint_faces` depth, `gradient` lo and hi, `dither`
+    amount, seed and mirror, `darken_crevices` and `highlight_edges` steps, `masonry` block and seed,
+    `decal` at; selections: `band`, `region`, `stripes`, `checker`; `fracture` and `chunks` seed and
+    min_voxels (`fracture` pieces was already a whole number). All `ShapeError`, through `check_finite`.
+  - the motion generators (`swing`, `bob`, `shake`, `spin_track`, `burst`), which a clip only checked once
+    they were sampled (`shake` and `burst` not at all): a `ModelError` at the call.
+  - the world DSL, with its own `WorldError` and a shared helper, `finite()` in `cubist/world/field.py`:
+    fields (`flat`, `noise`, `ridges`, `height_map`, `mask_map`, `circle`, `rect`, `flatten`, `level`,
+    `terrace`, and `Field` arithmetic with a number), `path`, `Path.distance`, `river`, `road`,
+    `tunnel`, `cavern`, `worms`, `place`, `scatter`, the surface rules, `world(size_m, seed)`, and
+    `World`'s `surface_depth_m`, `step_m`, subsoil depths and landmark points (checked at load).
+  - Left: a field that *samples* to NaN (a `Custom` field's function, a height map's pixels) is not
+    checked, nor is `building(seed=)`; bools are not refused as numbers by the new checks (the old
+    ones that refused them still do).
 
 ### v1 acceptance targets
 

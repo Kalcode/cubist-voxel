@@ -13,7 +13,7 @@ import math
 import numpy as np
 
 from cubist.core.palette import Color
-from cubist.world.field import Field, WorldError
+from cubist.world.field import Field, WorldError, finite
 
 _BLOCK = 64  # grids are searched in blocks this many columns on a side (each block culls segments)
 _BUCKET_M = 64.0  # scattered points are searched in buckets of this many metres on a side
@@ -30,6 +30,8 @@ class Path:
     """A line across the ground through ``points`` (x, z metres), smoothed into a curve."""
 
     def __init__(self, points, smooth: bool = True, spacing_m: float = 4.0):
+        finite("path points", points)
+        finite("path spacing_m", spacing_m)
         pts = np.asarray(points, dtype=np.float64)
         if pts.ndim != 2 or pts.shape[1] != 2 or len(pts) < 2:
             raise WorldError(f"a path needs at least two (x, z) points, got {points!r}")
@@ -56,6 +58,9 @@ class Path:
         reach (a valley's walls), but off by up to about a third of a step where the nearest part of
         the path switches and half a step next to it, so leave it unset for masks near a path.
         """
+        finite("distance max_m", max_m)
+        if step_m is not None:
+            finite("distance step_m", step_m)
         return _PathDistance(self, float(max_m), step_m)
 
     def nearest(self, x, z, reach: float) -> tuple[np.ndarray, np.ndarray]:
@@ -401,6 +406,10 @@ def river(
     ``water`` (solid voxels of that color). ``name`` names its line in the bake's ``world.json``
     (default ``river1``, ...).
     """
+    finite("river width_m", width_m)
+    finite("river depth_m", depth_m)
+    if bank_m is not None:
+        finite("river bank_m", bank_m)
     for c in (bed, water):
         if c is not None and not isinstance(c, Color):
             raise WorldError(f"river colors are palette colors such as p.water.mid, got {c!r}")
@@ -429,6 +438,10 @@ def road(
     straight between the road's heights at the two banks. The deck itself is a prop: ``place()`` a
     bridge asset over each crossing (lint warns of one with none).
     """
+    finite("road width_m", width_m)
+    finite("road smooth_m", smooth_m)
+    if bank_m is not None:
+        finite("road bank_m", bank_m)
     if not isinstance(color, Color):
         raise WorldError(f"road color must be a palette color such as p.stone.light, got {color!r}")
     r = Road(line, width_m, color, bank_m, smooth_m, bridges)

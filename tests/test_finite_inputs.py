@@ -11,12 +11,18 @@ from cubist import (
     Part,
     ShapeError,
     asset,
+    band,
+    bob,
     box,
+    burst,
     capsule,
+    checker,
+    chunks,
     cone,
     cylinder,
     ellipsoid,
     extrude,
+    fracture,
     heightmap,
     hinge,
     lathe,
@@ -24,9 +30,14 @@ from cubist import (
     panel,
     polyline,
     pyramid,
+    region,
+    shake,
     slide,
     sphere,
     spin,
+    spin_track,
+    stripes,
+    swing,
     torus,
     wedge,
 )
@@ -151,3 +162,110 @@ def test_finite_pivots_and_sizes_still_build():
     # ground_y was already a whole number of voxels: NaN and infinity never passed it.
     with pytest.raises(ModelError, match="ground_y"):
         asset(name="crate", size=(2, 2, 2), ground_y=float("nan"))(lambda p: _part(None))
+
+
+def _solid():
+    return box((6, 6, 6), color=C)
+
+
+def _build(shape):
+    return shape.voxelize()
+
+
+MODIFIERS = [
+    ("smooth_union k", "smooth_union k", lambda b: _solid().smooth_union(sphere(2, color=C), b)),
+    ("taper top", "taper top", lambda b: _solid().taper(b)),
+    ("displace amp", "displace amp", lambda b: _solid().displace(b)),
+    ("displace scale", "displace scale", lambda b: _solid().displace(1, scale=b)),
+    ("displace seed", "displace seed", lambda b: _solid().displace(1, seed=b)),
+    ("displace octaves", "displace octaves", lambda b: _solid().displace(1, octaves=b)),
+    ("round", "round radius", lambda b: _solid().round(b)),
+    ("chamfer", "chamfer", lambda b: _solid().chamfer(b)),
+    ("hollow", "hollow thickness", lambda b: _solid().hollow(b)),
+    ("erode", "erode radius", lambda b: _solid().erode(b)),
+    ("dilate", "dilate radius", lambda b: _solid().dilate(b)),
+    ("paint_faces depth", "paint_faces depth", lambda b: _solid().paint_faces("top", C, depth=b)),
+    ("gradient lo", "gradient lo", lambda b: _solid().gradient("y", P.wood, lo=b)),
+    ("gradient hi", "gradient hi", lambda b: _solid().gradient("y", P.wood, hi=b)),
+    ("dither amount", "dither amount", lambda b: _solid().dither(P.wood, amount=b)),
+    ("dither seed", "dither seed", lambda b: _solid().dither(P.wood, seed=b)),
+    ("dither mirror", "dither mirror", lambda b: _solid().dither(P.wood, mirror=("x", b))),
+    ("darken_crevices", "darken_crevices steps", lambda b: _solid().darken_crevices(b)),
+    ("highlight_edges", "highlight_edges steps", lambda b: _solid().highlight_edges(b)),
+    ("masonry block", "masonry block", lambda b: _solid().masonry(P.wood, block=(4, b, 4))),
+    ("masonry seed", "masonry seed", lambda b: _solid().masonry(P.wood, seed=b)),
+    ("decal at", "decal at", lambda b: _solid().decal(["x"], {"x": C}, at=(0, b))),
+    ("band at", "band at", lambda b: band("y", b)),
+    ("band height", "band height", lambda b: band("y", 0, b)),
+    ("region lo", "region lo", lambda b: region((0, b, 0), (1, 1, 1))),
+    ("region hi", "region hi", lambda b: region((0, 0, 0), (1, b, 1))),
+    ("stripes period", "stripes period", lambda b: stripes("y", b)),
+    ("stripes width", "stripes width", lambda b: stripes("y", 4, b)),
+    ("stripes offset", "stripes offset", lambda b: stripes("y", 4, 1, b)),
+    ("checker size", "checker size", lambda b: checker(b)),
+    ("fracture seed", "fracture seed", lambda b: fracture(_solid(), seed=b)),
+    ("fracture min_voxels", "fracture min_voxels", lambda b: fracture(_solid(), min_voxels=b)),
+    ("fracture pieces", "fracture pieces", lambda b: fracture(_solid(), pieces=b)),
+]
+
+
+@pytest.mark.parametrize("bad", BAD)
+@pytest.mark.parametrize(("case", "match", "make"), MODIFIERS, ids=[m[0] for m in MODIFIERS])
+def test_modifiers_and_paint_refuse_nan_and_infinity(case, match, make, bad):
+    # Selections are lazy about nothing: they check when made. Modifiers check when made too,
+    # so no voxelizing is needed to see the error.
+    with pytest.raises((ShapeError, ModelError), match=match):
+        make(bad)
+
+
+def test_finite_modifiers_still_build():
+    shape = (
+        _solid()
+        .smooth_union(sphere(2, color=C), 1)
+        .taper(0.5)
+        .displace(1, seed=3)
+        .round(1)
+        .hollow(1)
+        .erode(0.5)
+        .dilate(1)
+        .paint_faces("top", C, depth=2)
+        .gradient("y", P.wood, lo=0, hi=6)
+        .dither(P.wood, amount=0.5, mirror=("x", 3))
+        .masonry(P.wood, seed=2)
+        .paint(C, where=band("y", 0, 2) & region((0, 0, 0), (9, 9, 9)) & stripes("x", 4, 2))
+    )
+    assert shape.voxelize().count() > 0
+
+
+def _debris():
+    return chunks("rock", box((6, 6, 6), color=C), pieces=2)
+
+
+GENERATORS = [
+    ("swing amount", "swing amount", lambda b: swing("arm", "x", b)),
+    ("swing phase", "swing phase", lambda b: swing("arm", "x", 10, phase=b)),
+    ("swing cycles", "swing cycles", lambda b: swing("arm", "x", 10, cycles=b)),
+    ("swing center", "swing center", lambda b: swing("arm", "x", 10, center=b)),
+    ("bob height", "bob height", lambda b: bob("body", b)),
+    ("bob cycles", "bob cycles", lambda b: bob("body", 1, cycles=b)),
+    ("bob phase", "bob phase", lambda b: bob("body", 1, phase=b)),
+    ("shake amount", "shake amount", lambda b: shake("body", b)),
+    ("shake rate", "shake rate", lambda b: shake("body", 1, rate=b)),
+    ("shake seed", "shake seed", lambda b: shake("body", 1, seed=b)),
+    ("spin_track turns", "spin_track turns", lambda b: spin_track("fan", b)),
+    ("burst speed", "burst speed", lambda b: burst(_debris(), speed=b)),
+    ("burst up", "burst up", lambda b: burst(_debris(), up=b)),
+    ("burst spin", "burst spin", lambda b: burst(_debris(), spin=b)),
+    ("burst gravity", "burst gravity", lambda b: burst(_debris(), gravity=b)),
+    ("burst rate", "burst rate", lambda b: burst(_debris(), rate=b)),
+    ("burst seed", "burst seed", lambda b: burst(_debris(), seed=b)),
+    ("burst start", "burst start", lambda b: burst(_debris(), start=b)),
+    ("burst origin", "burst origin", lambda b: burst(_debris(), origin=(0, b, 0))),
+]
+
+
+@pytest.mark.parametrize("bad", BAD)
+@pytest.mark.parametrize(("case", "match", "make"), GENERATORS, ids=[g[0] for g in GENERATORS])
+def test_motion_generators_refuse_nan_and_infinity(case, match, make, bad):
+    with pytest.raises(ModelError, match=match):
+        make(bad)

@@ -58,6 +58,11 @@ masks right next to a path).
 
 A field is a value per ground column. Height fields are metres; masks are weights in [0, 1].
 
+Every number a world function takes must be finite: NaN or infinity (a division by zero, say) is a
+`WorldError` naming the argument, such as `noise scale_m must be a finite number`. That covers fields
+and their arithmetic (`field + nan` too), paths, rivers, roads, caves, props, surface rules, `world(...)`
+and the numbers of the `World` itself.
+
 | Field | Gives |
 | --- | --- |
 | `flat(m)` | The same value everywhere |

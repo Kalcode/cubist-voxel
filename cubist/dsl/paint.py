@@ -13,7 +13,7 @@ from cubist.dsl.context import BuildContext, current
 from cubist.dsl.gridops import GridShape, exposed, neighbor
 from cubist.dsl.primitives import color_index
 from cubist.dsl.select import as_selection, direction
-from cubist.dsl.shape import Shape, ShapeError
+from cubist.dsl.shape import Shape, ShapeError, check_finite
 
 
 class PaintOp(GridShape):
@@ -67,6 +67,7 @@ def paint_faces(shape: Shape, face: str, color, depth: int = 1, where=None) -> S
     index = color_index(color)
     if index == 0:
         raise ShapeError("paint_faces needs a palette color like p.grass.mid")
+    check_finite("paint_faces depth", depth)
     if depth < 1:
         raise ShapeError(f"paint_faces depth must be >= 1, got {depth}")
 
@@ -94,6 +95,8 @@ def gradient(
 ) -> Shape:
     if axis not in ("x", "y", "z"):
         raise ShapeError(f"gradient axis must be x, y or z, got {axis!r}")
+    check_finite("gradient lo", lo if lo is not None else 0.0)
+    check_finite("gradient hi", hi if hi is not None else 0.0)
     a = "xyz".index(axis)
     indices = _ramp_indices(ramp)
     if reverse:
@@ -117,6 +120,10 @@ def dither(
     shape: Shape, ramp, seed: int = 0, amount: float = 0.5, where=None, mirror=None
 ) -> Shape:
     indices = _ramp_indices(ramp)
+    check_finite("dither amount", amount)
+    check_finite("dither seed", seed)
+    if mirror is not None:
+        check_finite("dither mirror", mirror[1])
     if not 0 <= amount <= 1:
         raise ShapeError(f"dither amount must be between 0 and 1, got {amount}")
     position = {c: i for i, c in enumerate(indices)}
@@ -160,6 +167,8 @@ def _in_plane(d, k: int = 1) -> list[tuple[int, int, int]]:
 
 
 def darken_crevices(shape: Shape, steps: int = 1, where=None) -> Shape:
+    check_finite("darken_crevices steps", steps)
+
     # A crevice has solid material beside the open face one AND two layers out, like a
     # floor meeting a wall. Bevel steps and one-voxel curbs only reach one layer out.
     def fn(grid, selected, ctx):
@@ -187,6 +196,7 @@ def highlight_edges(shape: Shape, steps: int = 1, where=None, facing=None) -> Sh
     """Edges are voxels open on one side along two different axes; an axis open on both
     sides (a thin plate) doesn't count, so thin parts don't light up entirely. With
     ``facing`` (e.g. ("top", "left")), only edges open toward those directions lighten."""
+    check_finite("highlight_edges steps", steps)
     wanted = [direction(f) for f in facing] if facing else None
 
     def fn(grid, selected, ctx):
@@ -217,6 +227,8 @@ def masonry(
     """Blocks of ``block`` voxels, each a seeded shade from ``ramp``, in staggered courses,
     with ``mortar`` joints if given: stone walls, bricks, shingles, flagstones."""
     indices = _ramp_indices(ramp)
+    check_finite("masonry block", block)
+    check_finite("masonry seed", seed)
     bx, by, bz = (int(v) for v in block)
     if min(bx, by, bz) < 1:
         raise ShapeError(f"masonry block sizes must be >= 1, got {block}")
@@ -296,6 +308,7 @@ def decal(shape: Shape, rows, colors: dict, face: str = "front", at=(0, 0), wher
     character in that view's ruler coordinates. Eyes, emblems, signs, faces."""
     if face not in _DECAL_FACES:
         raise ShapeError(f"decal face must be one of {', '.join(_DECAL_FACES)}, got {face!r}")
+    check_finite("decal at", at)
     lookup = {ch: color_index(c) for ch, c in colors.items()}
     if 0 in lookup.values():
         raise ShapeError("decal colors must be palette colors like p.eye.dark")

@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from cubist.dsl.noise import hash_unit, mix_seed
-from cubist.world.field import Field, WorldError, rect
+from cubist.world.field import Field, WorldError, finite, rect
 
 VOXELS_PER_M = 16
 
@@ -74,6 +74,10 @@ def place(
     """
     if len(at) not in (2, 3):
         raise WorldError(f"place {asset}: at is (x, z) or (x, y, z) metres, got {at!r}")
+    finite("place at", at)
+    finite("place sink_m", sink_m)
+    if below_ground_m is not None:
+        finite("place below_ground_m", below_ground_m)
     below = None if below_ground_m is None else float(below_ground_m)
     at = tuple(float(v) for v in at)
     return Place(asset, at, _rotation(rotate_y), name, float(sink_m), below, bool(carve))
@@ -98,6 +102,17 @@ def scatter(
     high), or where ``avoid`` is over 0.5 are skipped. Each sinks ``sink_m`` into the ground, so
     trunks on slopes don't float.
     """
+    finite("scatter per_ha", per_ha)
+    finite("scatter seed", seed)
+    finite("scatter sink_m", sink_m)
+    if spacing_m is not None:
+        finite("scatter spacing_m", spacing_m)
+    if slope_max is not None:
+        finite("scatter slope_max", slope_max)
+    if height_m is not None:
+        finite("scatter height_m", height_m)
+    if not isinstance(region, Field):
+        finite("scatter region", region)
     if per_ha <= 0:
         raise WorldError(f"scatter {asset}: per_ha must be positive, got {per_ha}")
     if not isinstance(region, Field):

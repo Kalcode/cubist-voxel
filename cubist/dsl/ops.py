@@ -13,7 +13,7 @@ import numpy as np
 
 from cubist.core.grid import VoxelGrid
 from cubist.dsl import noise, sdf
-from cubist.dsl.shape import EPS, Shape, ShapeError, Vec3, require_sdf
+from cubist.dsl.shape import EPS, Shape, ShapeError, Vec3, check_finite, require_sdf
 
 _AXES = {"x": 0, "y": 1, "z": 2}
 
@@ -68,6 +68,7 @@ class SmoothUnion(Shape):
     def __init__(self, a: Shape, b: Shape, k: float):
         require_sdf(a, "smooth_union")
         require_sdf(b, "smooth_union")
+        check_finite("smooth_union k", k)
         if k <= 0:
             raise ShapeError(f"smooth_union k must be > 0, got {k}")
         self.a, self.b, self.k = a, b, float(k)
@@ -324,6 +325,7 @@ class Taper(Shape):
 
     def __init__(self, shape: Shape, top: float, axis: str):
         require_sdf(shape, "taper")
+        check_finite("taper top", top)
         if top <= 0:
             raise ShapeError(f"taper top must be > 0, got {top}")
         self.shape, self.top, self.axis = shape, float(top), axis_index(axis)
@@ -362,6 +364,10 @@ class Displace(Shape):
         require_sdf(shape, "displace")
         if kind not in noise.NOISES:
             raise ShapeError(f"noise must be one of {', '.join(noise.NOISES)}, got {kind!r}")
+        check_finite("displace amp", amp)
+        check_finite("displace scale", scale)
+        check_finite("displace seed", seed)
+        check_finite("displace octaves", octaves)
         if scale <= 0:
             raise ShapeError(f"displace scale must be > 0, got {scale}")
         self.shape, self.amp, self.scale = shape, float(amp), float(scale)
