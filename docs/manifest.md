@@ -127,7 +127,11 @@ An engine can drive joints directly, such as a door the player pushes, using the
   "max": [x, y, z]}` in asset voxels, `max` just past the last: the box of the light's own glowing
   voxels (a lantern's glass, a grate's embers), which the engine glows with the light instead of
   with the whole asset, so they go dark when it is put out. It comes after `flicker`, before
-  `hold_m` and `indoor`. Not in the `.glb`.
+  `hold_m` and `indoor`. Not in the `.glb`. And `room` (only when the script sets it, on an indoor
+  light), `{"min", "max"}` as `fitting`: the box of the air inside the room's walls, floor and
+  ceiling. The engine passes the share of an indoor light it sends round the storey only to the
+  surfaces bounding that air. It comes after `fitting`, before `hold_m` and `indoor`. Not in the
+  `.glb`.
 
 ## Emitters and particles
 

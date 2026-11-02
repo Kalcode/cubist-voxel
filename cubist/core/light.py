@@ -5,7 +5,8 @@ part. Flicker is for the engine (glTF can't animate it portably); previews draw 
 indoor light lights a room: the reach lint measures it from the floor under it, and the engine
 lights nothing outside its part's storey. A hold (``hold_m``) is for the engine too: past that many
 metres the light stops falling off. So is a fitting: the box of the glowing voxels (a lantern's
-glass, a grate's embers) that glow with the light rather than with the whole asset.
+glass, a grate's embers) that glow with the light rather than with the whole asset. And an indoor
+light's room: the box of the air inside its walls, whose surfaces alone the engine's bounce lights.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ class Light:
     indoor: bool = False  # lights a room: measured from the floor under it, kept to its storey
     hold_m: float | None = None  # metres past which the engine holds its level; None: no hold
     fitting: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: what glows with it
+    room: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: its bounce's air
 
     def to_summary(self) -> dict:
         summary = {
@@ -48,11 +50,14 @@ class Light:
             summary["hold_m"] = self.hold_m
         if self.fitting is not None:
             summary["fitting"] = [list(self.fitting[0]), list(self.fitting[1])]
+        if self.room is not None:
+            summary["room"] = [list(self.room[0]), list(self.room[1])]
         return summary
 
     def reflect(self, axis: str, about: float) -> Light:
         """The light reflected across the plane ``axis = about``, as ``Shape.reflect`` reflects a
-        shape: its position, and its fitting's box with it. For a mirrored building's lights, say.
+        shape: its position, and its fitting's and its room's boxes with it. For a mirrored
+        building's lights, say.
         The plane must lie on a whole or half voxel: there voxels land on voxels, so the box holds
         the reflected shape's; anywhere else a shape is resampled and a box can't follow it."""
         if axis not in ("x", "y", "z"):
@@ -68,15 +73,20 @@ class Light:
         i = "xyz".index(axis)
         position = list(self.position)
         position[i] = 2 * about - position[i]
-        fitting = self.fitting
-        if fitting is not None:
+
+        def mirrored(bounds):
             # Voxel v's centre v + 0.5 lands on 2a - v - 0.5, voxel 2a - v - 1: [lo, hi) becomes
             # [2a - hi, 2a - lo).
-            lo, hi = list(fitting[0]), list(fitting[1])
-            lo[i], hi[i] = round(2 * about) - fitting[1][i], round(2 * about) - fitting[0][i]
-            fitting = (tuple(lo), tuple(hi))  # type: ignore[assignment]
+            if bounds is None:
+                return None
+            lo, hi = list(bounds[0]), list(bounds[1])
+            lo[i], hi[i] = round(2 * about) - bounds[1][i], round(2 * about) - bounds[0][i]
+            return tuple(lo), tuple(hi)
+
         moved = tuple(float(v) for v in position)
-        return replace(self, position=moved, fitting=fitting)  # type: ignore[arg-type]
+        return replace(  # type: ignore[arg-type]
+            self, position=moved, fitting=mirrored(self.fitting), room=mirrored(self.room)
+        )
 
     @classmethod
     def from_summary(cls, d: dict) -> Light:
@@ -91,6 +101,7 @@ class Light:
             bool(d.get("indoor", False)),
             None if d.get("hold_m") is None else float(d["hold_m"]),
             None if d.get("fitting") is None else _box(d["fitting"]),
+            None if d.get("room") is None else _box(d["room"]),
         )
 
 
@@ -101,16 +112,27 @@ def _box(pair) -> tuple[Vec3i, Vec3i]:
 
 def _fitting(shape) -> tuple[Vec3i, Vec3i]:
     """The voxel bounds of ``shape``, half-open: what glows with the light."""
+    return _bounds(
+        shape,
+        "fitting",
+        "the shape of the light's glowing voxels (its lantern's glass, its grate's embers)",
+    )
+
+
+def _room(shape) -> tuple[Vec3i, Vec3i]:
+    """The voxel bounds of ``shape``, half-open: the air the light's bounce stays in."""
+    return _bounds(
+        shape, "room", "the shape of the room's air, inside its walls, floor and ceiling"
+    )
+
+
+def _bounds(shape, what: str, should_be: str) -> tuple[Vec3i, Vec3i]:
     if not isinstance(shape, Shape):
-        raise ModelError(
-            f"light fitting must be the shape of the light's glowing voxels (its lantern's glass, "
-            f"its grate's embers), or None, got {shape!r}"
-        )
+        raise ModelError(f"light {what} must be {should_be}, or None, got {shape!r}")
     bounds = shape.occupancy().bounds()
     if bounds is None:
         raise ModelError(
-            f"light fitting has no voxels: no voxel's centre is inside {shape!r}; pass the shape "
-            "of the light's glowing voxels"
+            f"light {what} has no voxels: no voxel's centre is inside {shape!r}; pass {should_be}"
         )
     return bounds
 
@@ -136,6 +158,7 @@ def light(
     indoor=False,
     hold_m=None,
     fitting=None,
+    room=None,
 ) -> Light:
     """A point light at ``position`` in palette ``color`` (e.g. ``p.fire.light``), reaching
     ``range`` voxels, moving with ``part`` (default: the part with the nearest voxel).
@@ -149,7 +172,11 @@ def light(
     shape, or None) is the light's fixture, the shape of its glowing voxels (its lantern's
     glass, its grate's embers): the engine glows the glowing voxels in its bounds with the light,
     so they go dark when it is put out, while the rest of the asset's glow keeps its own switch.
-    In the manifest, as those bounds, only when set."""
+    In the manifest, as those bounds, only when set. ``room`` (a shape, or None; an indoor light
+    only) is the room it lights: the shape of the air inside its walls, floor and ceiling. The
+    engine passes a share of an indoor light round its room's surfaces, unshadowed, and only
+    theirs, so the faces of the walls outside get none. In the manifest, as its bounds, only when
+    set."""
     try:
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
@@ -172,6 +199,10 @@ def light(
             f"light hold_m must be a number of metres > 0, or None for a light that falls off "
             f"all the way, got {hold_m!r}"
         )
+    if room is not None and not indoor:
+        raise ModelError(
+            "light room is the room an indoor light lights; pass indoor=True with it, or no room"
+        )
     return Light(
         pos,  # type: ignore[arg-type]
         int(color.index),
@@ -183,4 +214,5 @@ def light(
         indoor,
         None if hold_m is None else float(hold_m),
         None if fitting is None else _fitting(fitting),
+        None if room is None else _room(room),
     )

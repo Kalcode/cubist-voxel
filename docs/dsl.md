@@ -292,6 +292,7 @@ light(
     indoor=False,
     hold_m=None,
     fitting=None,
+    room=None,
 )
 Model(parts, ..., lights={"flame": light((3.5, 14, 3.5), p.fire.light, range=96, flicker=0.35)})
 ```
@@ -350,8 +351,16 @@ Pass the shape the glass or embers were built from (`fitting=glass`); its voxels
 manifest's light as `fitting`, and lint warns (`light_fitting`) when they hold no glowing voxel. A
 shape with no voxels, or anything else, is an error. Not in the `.glb`.
 
+`room` (a shape, or None; only with `indoor=True`) is the room an indoor light lights: the shape of
+the air inside its walls, floor and ceiling. The engine passes a share of an indoor light round its
+storey, unshadowed (Kiln's bounce), and with a room only round the surfaces bounding that air: the
+faces of its walls outside, behind a front's sills and balconies, get none. Pass a box of the room's
+air (`room=box((W - 2 * WALL, h, d)).at(WALL, floor, z)`); its bounds go in the manifest's light as
+`room`. A shape with no voxels, anything else, or a room on an outdoor light is an error. Not in the
+`.glb`.
+
 `light.reflect(axis, about)` is the light reflected across the plane `axis = about`, as
-`Shape.reflect` reflects a shape: its position and its fitting together. A script that mirrors its
+`Shape.reflect` reflects a shape: its position, its fitting and its room together. A script that mirrors its
 model (a building with its door on the other side) mirrors its lights with it, so each fitting still
 holds its glass. The plane must lie on a whole or half voxel (`W / 2` for a whole-voxel width):
 elsewhere a reflected shape is resampled, and a box can't follow it.

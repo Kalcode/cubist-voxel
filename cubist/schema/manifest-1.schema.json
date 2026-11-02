@@ -150,6 +150,12 @@
           "additionalProperties": false,
           "properties": {"min": {"$ref": "#/$defs/ivec3"}, "max": {"$ref": "#/$defs/ivec3"}}
         },
+        "room": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {"min": {"$ref": "#/$defs/ivec3"}, "max": {"$ref": "#/$defs/ivec3"}}
+        },
         "hold_m": {"type": "number", "exclusiveMinimum": 0},
         "indoor": {"type": "boolean"}
       }

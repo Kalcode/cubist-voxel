@@ -140,6 +140,11 @@ def build_manifest(
                     if lt.fitting is not None
                     else {}
                 ),
+                **(
+                    {"room": {"min": list(lt.room[0]), "max": list(lt.room[1])}}
+                    if lt.room is not None
+                    else {}
+                ),
                 **({"hold_m": lt.hold_m} if lt.hold_m is not None else {}),
                 **({"indoor": True} if lt.indoor else {}),
             }

@@ -491,3 +491,74 @@ def test_a_fitting_whose_glow_an_earlier_fitting_takes_warns():
     # Its message names the box with its end left out.
     [g] = fitting_findings(lantern("post"))
     assert "(0, 0, 0) up to (2, 6, 2), not including it" in g.message and "''" not in g.message
+
+
+# --- a light's room: the air inside its walls, which its bounce stays in --------------------
+
+
+def roomed(room=True):
+    """The torch's flame, indoor, in a room of air (x 0..1, y 5..8, z 0..1) or with none."""
+    shape = box((1, 3, 1)).at(0, 5, 0) if room else None
+    flame = light((0.5, 7, 0.5), P.fire.light, range=6, indoor=True, room=shape)
+    return built(lambda p: torch(p, {"flame": flame}))
+
+
+def test_a_room_goes_in_the_manifest_as_its_shape_s_voxel_bounds():
+    # Kiln passes an indoor light's bounce round the surfaces of its room alone (its formats.md,
+    # "Lights", Bounce): with the storey's box the faces of a front's walls were in, behind its
+    # sills and balconies, and the street fronts glowed by day.
+    m = build_manifest(roomed(), voxel_size_m=1)
+    schema = json.loads(SCHEMA_PATH.read_text())
+    jsonschema.validate(m, schema)
+    assert m["lights"]["flame"]["room"] == {"min": [0, 5, 0], "max": [1, 8, 1]}  # max: past it
+    # After a fitting, before a hold and indoor.
+    both = {
+        "flame": light(
+            (0.5, 7, 0.5),
+            P.fire.light,
+            fitting=box((1, 1, 1)).at(0, 6, 0),
+            indoor=True,
+            room=box((1, 3, 1)).at(0, 5, 0),
+            hold_m=1,
+        )
+    }
+    keys = list(build_manifest(built(lambda p: torch(p, both)), voxel_size_m=1)["lights"]["flame"])
+    assert keys[keys.index("flicker") + 1 :] == ["fitting", "room", "hold_m", "indoor"]
+    # Unset, the light is as before: no key, so every existing manifest is byte-for-byte the same.
+    assert "room" not in build_manifest(roomed(False), voxel_size_m=1)["lights"]["flame"]
+    for bad in ({"min": [0, 5, 0]}, {"min": [0, 5, 0], "max": [1, 8]}, [[0, 5, 0], [1, 8, 1]]):
+        wrong = json.loads(json.dumps(m))
+        wrong["lights"]["flame"]["room"] = bad
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(wrong, schema)
+
+
+def test_a_room_round_trips_through_the_summary():
+    a = roomed()
+    assert a.lights["flame"].room == ((0, 5, 0), (1, 8, 1))
+    again = BuiltAsset.from_vox(decode_vox(encode_vox(a.to_vox_scene())), a.summary(), P)
+    assert again.lights == a.lights
+    # A build.json from before rooms, or a light without one, reads as none.
+    plain = built().lights["flame"]
+    assert plain.room is None and "room" not in plain.to_summary()
+    assert type(plain).from_summary(plain.to_summary()).room is None
+
+
+def test_a_room_is_a_shape_with_voxels_and_only_for_an_indoor_light():
+    for bad in ("hall", ((0, 5, 0), (1, 8, 1)), 3):
+        with pytest.raises(ModelError, match="room"):
+            light((0, 0, 0), P.fire.light, indoor=True, room=bad)
+    with pytest.raises(ModelError, match="room.*no voxels"):
+        light((0, 0, 0), P.fire.light, indoor=True, room=box((0.2, 0.2, 0.2)).at(0.1, 0.1, 0.1))
+    # A room is where an indoor light's bounce stays; an outdoor light has none.
+    with pytest.raises(ModelError, match="room.*indoor=True"):
+        light((0, 0, 0), P.fire.light, room=box((1, 1, 1)))
+
+
+def test_a_light_reflects_with_its_room():
+    lamp = light((0.5, 7, 0.5), P.fire.light, indoor=True, room=box((1, 3, 1)).at(0, 5, 0))
+    there = lamp.reflect("x", 4)
+    assert there.room == ((7, 5, 0), (8, 8, 1))
+    assert there.reflect("x", 4) == lamp
+    assert lamp.reflect("y", 10).room == ((0, 12, 0), (1, 15, 1))
+    assert lamp.reflect("x", 4.5).room == ((8, 5, 0), (9, 8, 1))
