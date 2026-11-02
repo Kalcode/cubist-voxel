@@ -965,8 +965,9 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   - Left: a field that *samples* to NaN (a `Custom` field's function, a height map's pixels) is not
     checked, nor is `building(seed=)`; bools are not refused as numbers by the new checks (the old
     ones that refused them still do).
-- **13q. A light's room (Nov 2).** `light(..., indoor=True, room=air)` names the room an indoor light
-  lights, the shape of the air inside its walls, floor and ceiling, and the manifest's light carries
+- **13q. A light's room (Nov 2).** `light(..., indoor=True, room=box)` names the room an indoor light
+  lights, the shape of its air and of its walls, floor and ceiling short of their faces outside and
+  of its panes' outer faces, and the manifest's light carries
   its voxel bounds as `"room": {"min", "max"}` (half-open), after `fitting` and before `hold_m` and
   `indoor`; unset, there is no key and a manifest is byte-for-byte as before. Kiln needed it: it
   passes a share of an indoor light round the light's storey, unshadowed, and took the storey's box,
@@ -976,7 +977,11 @@ A street of townhouses with cellars (Kiln's `docs/city.md`). Cubist's part, in s
   (Kiln's `docs/city.md` §6.9, "Coarse colours keep the mean", Not yet). With a room, Kiln passes the
   share only round the surfaces bounding its air. A room on an outdoor light, a shape with no voxels,
   or anything that isn't a shape is an error naming `room`. `Light.reflect` mirrors it with the
-  light. `build.json` carries it; the `.glb` has none.
+  light. `build.json` carries it; the `.glb` has none. The kit's first rooms were the air alone, and
+  the panes set into a townhouse's 5-voxel walls lost the bounce, and their reveals went black; its
+  second reached a voxel short of the walls' faces outside, and the panes' outer faces, three voxels
+  in, glowed from the street. A room reaches into its walls, short of their faces outside and of its
+  panes' outer faces: the kit stops at the panes' inner faces.
 
 ### v1 acceptance targets
 

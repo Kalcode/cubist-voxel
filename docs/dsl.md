@@ -352,11 +352,13 @@ manifest's light as `fitting`, and lint warns (`light_fitting`) when they hold n
 shape with no voxels, or anything else, is an error. Not in the `.glb`.
 
 `room` (a shape, or None; only with `indoor=True`) is the room an indoor light lights: the shape of
-the air inside its walls, floor and ceiling. The engine passes a share of an indoor light round its
-storey, unshadowed (Kiln's bounce), and with a room only round the surfaces bounding that air: the
-faces of its walls outside, behind a front's sills and balconies, get none. Pass a box of the room's
-air (`room=box((W - 2 * WALL, h, d)).at(WALL, floor, z)`); its bounds go in the manifest's light as
-`room`. A shape with no voxels, anything else, or a room on an outdoor light is an error. Not in the
+its air, and of its walls, floor and ceiling short of their faces outside. Where panes are set into a
+wall, stop at their inner faces: a pane's outer face is outside. The engine passes a share of an
+indoor light round its storey, unshadowed (Kiln's bounce), and with a room only round the surfaces in
+it: the faces of its walls outside, behind a front's sills and balconies, and the panes' outer faces
+get none, while the panes' inner faces and the reveals inside them do. Kiln's townhouses pass a box a
+voxel inside the party walls', floors' and ceilings' faces outside, and to the panes' inner faces in
+the front and back walls; its bounds go in the manifest's light as `room`. A shape with no voxels, anything else, or a room on an outdoor light is an error. Not in the
 `.glb`.
 
 `light.reflect(axis, about)` is the light reflected across the plane `axis = about`, as

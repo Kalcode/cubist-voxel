@@ -6,7 +6,8 @@ indoor light lights a room: the reach lint measures it from the floor under it, 
 lights nothing outside its part's storey. A hold (``hold_m``) is for the engine too: past that many
 metres the light stops falling off. So is a fitting: the box of the glowing voxels (a lantern's
 glass, a grate's embers) that glow with the light rather than with the whole asset. And an indoor
-light's room: the box of the air inside its walls, whose surfaces alone the engine's bounce lights.
+light's room: the box its bounce stays in, the room's air and its walls short of their faces
+outside.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ class Light:
     indoor: bool = False  # lights a room: measured from the floor under it, kept to its storey
     hold_m: float | None = None  # metres past which the engine holds its level; None: no hold
     fitting: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: what glows with it
-    room: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: its bounce's air
+    room: tuple[Vec3i, Vec3i] | None = None  # (lo, hi) voxels, half-open: where its bounce stays
 
     def to_summary(self) -> dict:
         summary = {
@@ -122,7 +123,10 @@ def _fitting(shape) -> tuple[Vec3i, Vec3i]:
 def _room(shape) -> tuple[Vec3i, Vec3i]:
     """The voxel bounds of ``shape``, half-open: the air the light's bounce stays in."""
     return _bounds(
-        shape, "room", "the shape of the room's air, inside its walls, floor and ceiling"
+        shape,
+        "room",
+        "the shape of the room: its air, and its walls, floor and ceiling short of their faces "
+        "outside",
     )
 
 
@@ -173,10 +177,11 @@ def light(
     glass, its grate's embers): the engine glows the glowing voxels in its bounds with the light,
     so they go dark when it is put out, while the rest of the asset's glow keeps its own switch.
     In the manifest, as those bounds, only when set. ``room`` (a shape, or None; an indoor light
-    only) is the room it lights: the shape of the air inside its walls, floor and ceiling. The
-    engine passes a share of an indoor light round its room's surfaces, unshadowed, and only
-    theirs, so the faces of the walls outside get none. In the manifest, as its bounds, only when
-    set."""
+    only) is the room it lights: the shape of its air, and of its walls, floor and ceiling short of
+    their faces outside, and short of a pane's outer face where panes are set into a wall, so the
+    panes' inner faces and the reveals inside them are in. The engine passes a share of an indoor
+    light round the surfaces in its room, unshadowed, and only those, so the faces of the walls
+    outside get none. In the manifest, as its bounds, only when set."""
     try:
         pos = tuple(float(v) for v in position)
     except (TypeError, ValueError):
