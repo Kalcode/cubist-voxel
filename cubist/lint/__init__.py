@@ -1,6 +1,6 @@
-"""Lint: palette, bounds, pivots, part overlap, motion, connectivity, symmetry, grounding, scale,
-a building's walk and storey bands, budgets, thin features, and hidden interior. Errors block
-export; warnings and infos are advice."""
+"""Lint: palette, bounds, pivots (and parts left with no voxels), part overlap, motion,
+connectivity, symmetry, grounding, scale, a building's walk and storey bands, budgets, thin
+features, and hidden interior. Errors block export; warnings and infos are advice."""
 
 from __future__ import annotations
 

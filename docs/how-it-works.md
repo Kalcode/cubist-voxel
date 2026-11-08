@@ -158,7 +158,7 @@ solid blocks turning, never a re-voxelized staircase.
 flowchart TD
     asset[Built asset] --> palette{Palette}
     asset --> bounds{Bounds}
-    asset --> pivots{Pivots & sockets}
+    asset --> pivots{Pivots, sockets & empty parts}
     asset --> floating{Floating pieces}
     asset --> symmetry{Symmetry}
     asset --> grounding{Grounding}

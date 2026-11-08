@@ -51,6 +51,23 @@ def test_pivot_outside_its_part_is_an_error():
     assert "pivots" in checks(report, "error")
 
 
+def test_a_part_left_with_no_voxels_is_an_error():
+    # Rounding a box two voxels wide takes every voxel; the export can't write an empty part.
+    def fn(p):
+        return Model(
+            parts=[
+                Part("body", box((4, 4, 4), color=p.wood.mid)),
+                Part("ear", box((2, 6, 2), color=p.wood.mid).at(1, 4, 1).round(1), parent="body"),
+            ]
+        )
+
+    report = lint(build(fn, size=(4, 10, 4)), style())
+    assert "empty_part" in checks(report, "error")
+    assert not report.ok
+    finding = next(f for f in report.findings if f.check == "empty_part")
+    assert "'ear'" in finding.message and "no voxels" in finding.message
+
+
 def test_pivot_on_the_part_boundary_is_fine():
     def fn(p):
         return Model(parts=[Part("lid", box((2, 2, 2), color=p.wood.mid), pivot=(2, 2, 0))])
@@ -191,9 +208,10 @@ def test_report_summary_and_dict():
 
 
 def test_empty_asset_does_not_crash():
+    # Linting runs to the end; the part it has can't be exported, so that's its one error.
     a = build(lambda p: box((2, 2, 2), color=p.wood.mid) - box((3, 3, 3)).at(-0.5, -0.5, -0.5))
     assert a.voxel_count() == 0
-    assert lint(a, style()).ok
+    assert checks(lint(a, style()), "error") == {"empty_part"}
 
 
 def test_closed_shell_walls_are_not_thin():

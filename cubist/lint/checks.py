@@ -125,6 +125,17 @@ def check_pivots(asset: BuiltAsset) -> list[Finding]:
     for part in asset.parts:
         b = part.grid.bounds()
         if b is None:
+            out.append(
+                Finding(
+                    "empty_part",
+                    "error",
+                    f"part {part.name!r} has no voxels, and no export can write an empty part: "
+                    "a modifier or a cut took them all (round(1) empties a box two voxels thin, "
+                    "erode(r) one 2r thin). Drop the modifier or thicken the shape, or remove "
+                    "the part",
+                    {"part": part.name},
+                )
+            )
             continue
         lo, hi = np.array(b[0]), np.array(b[1])
         pivot = np.array(part.pivot, dtype=float)
