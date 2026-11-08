@@ -256,6 +256,7 @@ only with `cubist build --check-determinism`. `cubist lint` exits 2 when there a
 | Palette | Colors not in the project palette | Error |
 | Bounds | Voxels outside the declared asset size, or a part over 256³ | Error |
 | Pivots and sockets | Pivots or sockets outside the part's bounds | Error |
+| Empty parts | A part a modifier or a cut left with no voxels (`empty_part`): no export can write it | Error |
 | Overlap | Voxels claimed by two parts (they double up in exports and poke through when a part moves) | Warning |
 | Determinism | Two builds with the same seed hash differently (CI only) | Error |
 | Floating voxels | Components not attached to the main body (6-connectivity); allow with a flag | Warning |
